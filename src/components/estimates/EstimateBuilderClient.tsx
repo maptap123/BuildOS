@@ -11,8 +11,10 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  Trash2,
   ClipboardList,
+  Printer,
+  ExternalLink,
+  Send,
 } from 'lucide-react'
 import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow } from './EstimateLineRow'
@@ -241,6 +243,31 @@ export function EstimateBuilderClient({
     }
   }
 
+  async function markProposalSent() {
+    if (!activeEstimate) return
+    setSaving(true)
+    setError(null)
+    setSuccessMsg(null)
+    try {
+      const res = await fetch(`/api/estimates/${activeEstimate.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status: 'sent' }),
+      })
+      const updated = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(updated.error ?? 'Failed to mark proposal sent')
+
+      setActiveEstimate(updated)
+      setEstimates(prev => prev.map(est => est.id === updated.id ? updated : est))
+      setSuccessMsg('Proposal marked sent')
+      setTimeout(() => setSuccessMsg(null), 3000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to mark proposal sent')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ── Toggle phase collapse ──────────────────────────────────────
   function togglePhase(phase: string) {
     setCollapsedPhases(prev => {
@@ -304,6 +331,36 @@ export function EstimateBuilderClient({
                 <Save size={14} />
                 Save
               </button>
+            )}
+            {activeEstimate && (
+              <>
+                <button
+                  onClick={() => window.open(`/leads/${lead.id}/proposals/${activeEstimate.id}/print`, '_blank')}
+                  className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+                >
+                  <Printer size={14} />
+                  Proposal
+                </button>
+                {activeEstimate.status === 'draft' && lines.length > 0 && permissions.can_edit && (
+                  <button
+                    onClick={markProposalSent}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    Send
+                  </button>
+                )}
+                {activeEstimate.public_token && activeEstimate.status === 'sent' && (
+                  <button
+                    onClick={() => window.open(`/proposals/${activeEstimate.public_token}`, '_blank')}
+                    className="flex items-center gap-1.5 border border-green-200 text-green-700 hover:bg-green-50 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+                  >
+                    <ExternalLink size={14} />
+                    Client Link
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

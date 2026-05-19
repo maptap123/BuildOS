@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { convertAcceptedProposalToJob } from '@/lib/proposals/conversion'
 import { NextResponse } from 'next/server'
 
 type Params = { params: Promise<{ id: string }> }
@@ -15,7 +16,7 @@ type Params = { params: Promise<{ id: string }> }
  *
  * Requires: jobs.can_create permission.
  */
-export async function POST(_request: Request, { params }: Params) {
+export async function POST(request: Request, { params }: Params) {
   const { id } = await params
   const supabase = await createClient()
 
@@ -23,6 +24,8 @@ export async function POST(_request: Request, { params }: Params) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
+  const body = await request.json().catch(() => ({}))
+  const estimateId = typeof body.estimate_id === 'string' ? body.estimate_id : null
 
   // Permission check — need jobs.can_create to create a job
   const { data: perm } = await admin
@@ -34,6 +37,24 @@ export async function POST(_request: Request, { params }: Params) {
 
   if (!perm?.can_create) {
     return NextResponse.json({ error: 'You do not have permission to create jobs.' }, { status: 403 })
+  }
+
+  if (estimateId) {
+    try {
+      const result = await convertAcceptedProposalToJob({
+        admin,
+        leadId: id,
+        estimateId,
+        actorUserId: user.id,
+      })
+
+      return NextResponse.json(result, { status: result.reused_existing_job ? 200 : 201 })
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Failed to convert proposal.' },
+        { status: 500 },
+      )
+    }
   }
 
   // Fetch the lead

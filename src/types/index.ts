@@ -500,6 +500,12 @@ export interface Estimate {
   title: string | null
   version: number
   notes: string | null
+  public_token: string | null
+  client_approved_at: string | null
+  client_rejected_at: string | null
+  client_name: string | null
+  client_signature: string | null
+  client_response_note: string | null
   created_by: string | null
   created_at: string
   updated_at: string
