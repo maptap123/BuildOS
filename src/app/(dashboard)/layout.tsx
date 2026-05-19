@@ -1,0 +1,181 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut, ChevronDown, ShieldCheck, Clock } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useJob } from '@/hooks/useJob'
+import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
+
+const TABS = [
+  { key: 'jobs',       label: 'Jobs',       icon: Briefcase   },
+  { key: 'budget',     label: 'Budget',     icon: DollarSign  },
+  { key: 'schedule',   label: 'Schedule',   icon: Calendar    },
+  { key: 'tasks',      label: 'Tasks',      icon: CheckSquare },
+  { key: 'logs',       label: 'Logs',       icon: FileText    },
+  { key: 'time-clock', label: 'Time Clock', icon: Clock       },
+  { key: 'admin',      label: 'Admin',      icon: ShieldCheck },
+]
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const segments = pathname.split('/').filter(Boolean)
+  const jobId = segments[0] === 'jobs' && segments[1] ? segments[1] : null
+
+  const { job } = useJob(jobId)
+
+  async function signOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  function tabHref(key: string): string | null {
+    if (key === 'jobs')       return '/jobs'
+    if (key === 'admin')      return '/admin'
+    if (key === 'time-clock') return '/time-clock'
+    if (!jobId) return null
+    return `/jobs/${jobId}/${key}`
+  }
+
+  function isActive(key: string): boolean {
+    if (key === 'jobs')       return pathname === '/jobs' || (!!jobId && segments.length === 2)
+    if (key === 'admin')      return pathname.startsWith('/admin')
+    if (key === 'time-clock') return pathname.startsWith('/time-clock')
+    if (!jobId) return false
+    return pathname.startsWith(`/jobs/${jobId}/${key}`)
+  }
+
+  function isEnabled(key: string): boolean {
+    return key === 'jobs' || key === 'admin' || key === 'time-clock' || jobId !== null
+  }
+
+  return (
+    <div className="flex h-full min-h-screen">
+
+      {/* ── Desktop: permanent left job panel ── */}
+      <DesktopJobPanel currentJobId={jobId} />
+
+      {/* ── Right side: top bar + content ── */}
+      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+
+        {/* Desktop top tab bar */}
+        <nav className="hidden md:flex items-center gap-1 bg-white border-b border-border px-4 shrink-0">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const href = tabHref(key)
+            const active = isActive(key)
+            const enabled = isEnabled(key)
+
+            if (!enabled) {
+              return (
+                <span
+                  key={key}
+                  title="Select a job first"
+                  className="flex items-center gap-1.5 px-3 py-3 text-sm font-medium text-gray-300 cursor-not-allowed select-none"
+                >
+                  <Icon size={15} />
+                  {label}
+                </span>
+              )
+            }
+
+            return (
+              <Link
+                key={key}
+                href={href!}
+                className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  active
+                    ? 'border-gold-500 text-navy-900'
+                    : 'border-transparent text-gray-500 hover:text-navy-900 hover:border-gray-300'
+                }`}
+              >
+                <Icon size={15} />
+                {label}
+              </Link>
+            )
+          })}
+
+          {/* Current job context pill */}
+          {jobId && (
+            <div className="ml-auto flex items-center gap-2 py-2">
+              <span className="text-xs text-gray-400 truncate max-w-[180px]">
+                {job?.name ?? '…'}
+              </span>
+              <span className="text-[10px] text-gray-400 capitalize bg-gray-100 rounded-full px-2 py-0.5">
+                {job?.status ?? ''}
+              </span>
+            </div>
+          )}
+        </nav>
+
+        {/* Mobile top bar */}
+        <header className="md:hidden bg-navy-900 px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="flex items-center gap-1.5 min-w-0 flex-1"
+          >
+            <div className="min-w-0">
+              <p className="text-gold-400 text-[10px] font-medium tracking-widest uppercase leading-none mb-0.5">
+                {jobId ? (job?.status ?? '…') : 'JDC Platform'}
+              </p>
+              <div className="flex items-center gap-1">
+                <span className="font-display text-base font-bold text-white truncate">
+                  {jobId ? (job?.name ?? '…') : 'All Jobs'}
+                </span>
+                <ChevronDown size={14} className="text-gold-400 shrink-0" />
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={signOut}
+            className="text-navy-300 hover:text-white transition-colors shrink-0 ml-3"
+          >
+            <LogOut size={20} />
+          </button>
+        </header>
+
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-6 pb-24 md:pb-8">
+          {children}
+        </main>
+
+        {/* Mobile bottom nav */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-navy-900 border-t border-navy-800 flex z-30">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const href = tabHref(key)
+            const active = isActive(key)
+            const enabled = isEnabled(key)
+
+            return (
+              <Link
+                key={key}
+                href={enabled && href ? href : '#'}
+                className={`flex-1 flex flex-col items-center py-2.5 text-xs font-medium transition-colors ${
+                  !enabled
+                    ? 'text-navy-700 pointer-events-none'
+                    : active
+                    ? 'text-gold-400'
+                    : 'text-navy-400 hover:text-white'
+                }`}
+              >
+                <Icon size={20} className="mb-0.5" />
+                {label}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* Mobile job picker sheet */}
+      {pickerOpen && (
+        <JobPickerSheet
+          onClose={() => setPickerOpen(false)}
+          currentJobId={jobId}
+        />
+      )}
+    </div>
+  )
+}
