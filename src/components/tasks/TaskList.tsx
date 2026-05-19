@@ -39,6 +39,7 @@ interface Permissions {
 interface Props {
   tasks: Task[]
   permissions: Permissions
+  isPunchView?: boolean
   onAdd: () => void
   onEdit: (task: Task) => void
   onMarkDone: (id: string) => void
@@ -66,12 +67,14 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   )
 }
 
-export function TaskList({ tasks, permissions, onAdd, onEdit, onMarkDone, onDelete }: Props) {
+export function TaskList({ tasks, permissions, isPunchView, onAdd, onEdit, onMarkDone, onDelete }: Props) {
   if (tasks.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-border">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-display font-semibold text-navy-900 text-base">Tasks</h2>
+          <h2 className="font-display font-semibold text-navy-900 text-base">
+            {isPunchView ? 'Punch List' : 'Tasks'}
+          </h2>
           {permissions.can_create && (
             <button
               onClick={onAdd}
@@ -83,13 +86,15 @@ export function TaskList({ tasks, permissions, onAdd, onEdit, onMarkDone, onDele
         </div>
         <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm gap-2">
           <ClipboardList size={32} className="text-gray-200" />
-          No tasks yet
+          {isPunchView
+            ? "No punch list items. Add a task and tag it 'punch'."
+            : 'No tasks yet'}
           {permissions.can_create && (
             <button
               onClick={onAdd}
               className="mt-2 text-gold-600 hover:text-gold-700 font-medium text-sm transition-colors"
             >
-              Add the first task →
+              {isPunchView ? 'Add punch list item →' : 'Add the first task →'}
             </button>
           )}
         </div>
@@ -103,7 +108,7 @@ export function TaskList({ tasks, permissions, onAdd, onEdit, onMarkDone, onDele
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <h2 className="font-display font-semibold text-navy-900 text-base">
-          Tasks
+          {isPunchView ? 'Punch List' : 'Tasks'}
           <span className="ml-2 text-xs font-sans font-normal text-gray-400">{tasks.length} item{tasks.length !== 1 ? 's' : ''}</span>
         </h2>
         {permissions.can_create && (
@@ -152,9 +157,16 @@ export function TaskList({ tasks, permissions, onAdd, onEdit, onMarkDone, onDele
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    <p className={`font-medium text-navy-800 leading-snug ${isDone ? 'line-through text-gray-400' : ''}`}>
-                      {task.title}
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={`font-medium text-navy-800 leading-snug ${isDone ? 'line-through text-gray-400' : ''}`}>
+                        {task.title}
+                      </p>
+                      {task.tags?.includes('punch') && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 shrink-0">
+                          Punch
+                        </span>
+                      )}
+                    </div>
                     {task.description && (
                       <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{task.description}</p>
                     )}
@@ -234,9 +246,16 @@ export function TaskList({ tasks, permissions, onAdd, onEdit, onMarkDone, onDele
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <p className={`text-sm font-medium leading-snug ${isDone ? 'line-through text-gray-400' : 'text-navy-800'}`}>
-                      {task.title}
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      <p className={`text-sm font-medium leading-snug ${isDone ? 'line-through text-gray-400' : 'text-navy-800'}`}>
+                        {task.title}
+                      </p>
+                      {task.tags?.includes('punch') && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 shrink-0">
+                          Punch
+                        </span>
+                      )}
+                    </div>
                     <StatusBadge status={task.status} />
                   </div>
 

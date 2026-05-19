@@ -4,6 +4,7 @@ import { MapPin, Phone, Calendar, Users, Plus, FileText, CheckSquare, CalendarDa
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Job, DailyLog, Task, ScheduleItem } from '@/types'
+import { CloseoutPanel } from '@/components/jobs/CloseoutPanel'
 
 type JobDetail = Job & {
   pm: { full_name: string | null } | null
@@ -57,7 +58,7 @@ export default async function JobDetailPage({
 
   const { data: jobPerm } = await admin
     .from('user_permissions')
-    .select('can_view')
+    .select('can_view, can_edit')
     .eq('user_id', user.id)
     .eq('module', 'jobs')
     .single()
@@ -386,7 +387,23 @@ export default async function JobDetailPage({
         )}
       </div>
 
-      {/* Card 5 — Budget Snapshot (permission-gated) */}
+      {/* Card 5 — Closeout Panel (active / warranty / closed jobs) */}
+      {['active', 'warranty', 'closed'].includes(job.status) && (
+        <div className="md:col-span-2">
+          <CloseoutPanel
+            job={{
+              id: job.id,
+              status: job.status,
+              warranty_start_date: job.warranty_start_date ?? null,
+              warranty_end_date: job.warranty_end_date ?? null,
+              closeout_checklist: job.closeout_checklist ?? {},
+            }}
+            canEdit={jobPerm?.can_edit ?? false}
+          />
+        </div>
+      )}
+
+      {/* Card 6 — Budget Snapshot (permission-gated) */}
       {canSeeBudget && (
         <div className="bg-white rounded-xl border border-border p-5 md:col-span-2">
           <div className="flex items-center justify-between mb-4">

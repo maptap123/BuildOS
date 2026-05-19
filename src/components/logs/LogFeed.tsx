@@ -16,8 +16,10 @@ import {
   Sparkles,
   Images,
   X,
+  Camera,
 } from 'lucide-react'
 import type { DailyLog, LogPhoto } from '@/types'
+import { LogPhotoUploader } from './LogPhotoUploader'
 
 interface Permissions {
   can_create: boolean
@@ -32,6 +34,7 @@ interface Props {
   onAdd: () => void
   onEdit: (log: DailyLog) => void
   onDelete: (id: string) => void
+  onRefreshPhotos?: () => void
 }
 
 function formatLogDate(dateStr: string): string {
@@ -83,15 +86,18 @@ function LogCard({
   permissions,
   onEdit,
   onDelete,
+  onRefreshPhotos,
 }: {
   log: DailyLog
   logPhotos: LogPhoto[]
   permissions: Permissions
   onEdit: (log: DailyLog) => void
   onDelete: (id: string) => void
+  onRefreshPhotos?: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  const [showUploader, setShowUploader] = useState(false)
   const hasExtras = log.delays || log.safety_notes || log.inspection_notes
 
   return (
@@ -129,6 +135,15 @@ function LogCard({
             </div>
           )}
 
+          {permissions.can_create && (
+            <button
+              onClick={() => setShowUploader(v => !v)}
+              className="text-gray-300 hover:text-gold-500 transition-colors p-1"
+              title="Add photos to this log"
+            >
+              <Camera size={14} />
+            </button>
+          )}
           {permissions.can_edit && (
             <button
               onClick={() => onEdit(log)}
@@ -226,6 +241,21 @@ function LogCard({
           <PhotoLightbox photos={logPhotos} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
         )}
 
+        {/* Inline photo uploader for this log */}
+        {showUploader && (
+          <div className="border border-dashed border-gold-300 rounded-xl px-4 py-3 bg-gold-50/40">
+            <p className="text-[10px] font-semibold text-gold-600 uppercase tracking-wide mb-2">Add Photos</p>
+            <LogPhotoUploader
+              logId={log.id}
+              jobId={log.job_id}
+              onUploaded={() => {
+                setShowUploader(false)
+                onRefreshPhotos?.()
+              }}
+            />
+          </div>
+        )}
+
         {/* Expandable extras */}
         {hasExtras && (
           <>
@@ -275,7 +305,7 @@ function LogCard({
   )
 }
 
-export function LogFeed({ logs, photos = [], permissions, onAdd, onEdit, onDelete }: Props) {
+export function LogFeed({ logs, photos = [], permissions, onAdd, onEdit, onDelete, onRefreshPhotos }: Props) {
   const [galleryIdx, setGalleryIdx] = useState<number | null>(null)
 
   // Map direct uploads and Buildertrend-imported photos to the matching log.
@@ -385,6 +415,7 @@ export function LogFeed({ logs, photos = [], permissions, onAdd, onEdit, onDelet
           permissions={permissions}
           onEdit={onEdit}
           onDelete={onDelete}
+          onRefreshPhotos={onRefreshPhotos}
         />
       ))}
     </div>

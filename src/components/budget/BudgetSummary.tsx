@@ -9,6 +9,7 @@ interface Props {
   job: Pick<Job, 'contract_amount' | 'estimated_cost'>
   lines: BudgetLine[]
   approvedCOTotal?: number
+  actualsTotal?: number  // sum of approved + paid actuals
 }
 
 interface Metric {
@@ -18,7 +19,7 @@ interface Metric {
   highlight?: 'good' | 'bad' | 'neutral'
 }
 
-export function BudgetSummary({ job, lines, approvedCOTotal = 0 }: Props) {
+export function BudgetSummary({ job, lines, approvedCOTotal = 0, actualsTotal }: Props) {
   const totalRevised   = lines.reduce((s, l) => s + l.revised_budget, 0)
   const totalCommitted = lines.reduce((s, l) => s + l.committed_cost, 0)
   const totalForecast  = lines.reduce((s, l) => s + (l.forecast_cost ?? l.revised_budget), 0)
@@ -49,6 +50,14 @@ export function BudgetSummary({ job, lines, approvedCOTotal = 0 }: Props) {
         : undefined,
     },
     {
+      label: 'Actual',
+      value: fmt(actualsTotal ?? 0),
+      sub: (actualsTotal != null) && totalRevised > 0
+        ? `${((actualsTotal / totalRevised) * 100).toFixed(1)}% of budget`
+        : undefined,
+      highlight: (actualsTotal != null) && actualsTotal > totalRevised ? 'bad' : 'neutral',
+    },
+    {
       label: 'Forecast',
       value: fmt(totalForecast),
       sub: totalRevised > 0
@@ -61,10 +70,18 @@ export function BudgetSummary({ job, lines, approvedCOTotal = 0 }: Props) {
       sub: variance >= 0 ? 'under budget' : 'over budget',
       highlight: variance >= 0 ? 'good' : 'bad',
     },
+    {
+      label: 'Margin',
+      value: (() => { const m = revisedContract - totalForecast; return m >= 0 ? `+${fmt(m)}` : fmt(m) })(),
+      sub: revisedContract > 0
+        ? `${(((revisedContract - totalForecast) / revisedContract) * 100).toFixed(1)}% margin`
+        : undefined,
+      highlight: revisedContract - totalForecast >= 0 ? 'good' : 'bad',
+    },
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
       {metrics.map(m => (
         <div
           key={m.label}
@@ -74,7 +91,7 @@ export function BudgetSummary({ job, lines, approvedCOTotal = 0 }: Props) {
               : m.highlight === 'bad'
               ? 'border-red-200 bg-red-50'
               : 'border-border'
-          } ${m.label === 'Variance' ? 'col-span-2 md:col-span-1' : ''}`}
+          } ${m.label === 'Variance' || m.label === 'Margin' ? 'col-span-2 md:col-span-1' : ''}`}
         >
           <p className="text-xs text-gray-500 font-medium mb-1">{m.label}</p>
           <p className={`font-display font-semibold text-lg leading-tight ${

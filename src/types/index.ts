@@ -14,6 +14,7 @@ export type JobStatus =
   | "lead"
   | "presale"
   | "active"
+  | "warranty"
   | "closed"
   | "archived";
 
@@ -149,6 +150,10 @@ export interface Job {
   project_manager_id: string | null;
   superintendent_id: string | null;
   tags: string[];
+  // Closeout & warranty
+  warranty_start_date: string | null;
+  warranty_end_date: string | null;
+  closeout_checklist: Record<string, boolean>;
   // QuickBooks integration
   qb_customer_id: string | null;
   qb_project_id: string | null;
@@ -218,6 +223,10 @@ export interface ChangeOrder {
   approved_by: string | null;
   budget_line_id: string | null;
   qb_estimate_id: string | null;
+  client_token: string | null;
+  client_approved_at: string | null;
+  client_rejected_at: string | null;
+  client_name: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -330,6 +339,24 @@ export interface Document {
   updated_at: string;
 }
 
+export interface Contact {
+  id: string
+  job_id: string | null
+  full_name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+  is_primary: boolean
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  jobs?: { name: string } | null
+}
+
 export interface IntegrationSetting {
   id: string;
   service: IntegrationService;
@@ -383,4 +410,53 @@ export interface AgendaPayload {
   this_week: AgendaScheduleItem[];
   team_activity: AgendaLogEntry[];
   missing_perms: Array<'tasks' | 'schedule' | 'logs'>;
+}
+
+export type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'cancelled'
+
+export interface PurchaseOrder {
+  id: string
+  job_id: string
+  budget_line_id: string | null
+  vendor_name: string
+  po_number: string | null
+  description: string
+  amount: number
+  status: POStatus
+  issued_date: string | null
+  expected_date: string | null
+  notes: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  budget_lines?: { cost_code: string; description: string } | null
+}
+
+export type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
+export type LeadSource = 'referral' | 'website' | 'cold_call' | 'repeat' | 'other'
+
+export interface Lead {
+  id: string
+  title: string
+  client_name: string | null
+  client_email: string | null
+  client_phone: string | null
+  source: LeadSource | null
+  status: LeadStatus
+  estimated_value: number | null
+  notes: string | null
+  address: string | null
+  assigned_to: string | null
+  converted_job_id: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LeadActivity {
+  id: string
+  lead_id: string
+  note: string
+  created_by: string
+  created_at: string
 }

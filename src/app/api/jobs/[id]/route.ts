@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const VALID_STATUSES = ['lead', 'presale', 'active', 'closed', 'archived'] as const
+const VALID_STATUSES = ['lead', 'presale', 'active', 'warranty', 'closed', 'archived'] as const
 
 async function getUser() {
   const supabase = await createClient()
@@ -69,6 +69,7 @@ export async function PATCH(
     'start_date', 'target_completion_date', 'actual_completion_date',
     'client_name', 'client_email', 'client_phone',
     'project_manager_id', 'superintendent_id',
+    'warranty_start_date', 'warranty_end_date', 'closeout_checklist',
   ] as const
 
   const update: Record<string, unknown> = {}

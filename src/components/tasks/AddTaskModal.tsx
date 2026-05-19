@@ -30,6 +30,12 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
   const [error, setError]   = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details')
 
+  // Derive initial tags without 'punch', and whether 'punch' is present
+  const initialTagsWithoutPunch = task?.tags?.filter(t => t !== 'punch') ?? []
+  const [isPunchListItem, setIsPunchListItem] = useState<boolean>(
+    task?.tags?.includes('punch') ?? false
+  )
+
   const [form, setForm] = useState<FormState>({
     title:           task?.title ?? '',
     description:     task?.description ?? '',
@@ -38,7 +44,7 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
     due_date:        task?.due_date ?? '',
     estimated_hours: task?.estimated_hours != null ? String(task.estimated_hours) : '',
     actual_hours:    task?.actual_hours    != null ? String(task.actual_hours)    : '',
-    tags:            task?.tags?.join(', ') ?? '',
+    tags:            initialTagsWithoutPunch.join(', '),
   })
 
   function set<K extends keyof FormState>(field: K, value: FormState[K]) {
@@ -50,10 +56,15 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
     setSaving(true)
     setError(null)
     try {
-      const tags = form.tags
+      const baseTags = form.tags
         .split(',')
         .map(t => t.trim())
         .filter(Boolean)
+        .filter(t => t !== 'punch') // never let the text field add 'punch' independently
+
+      const tags = isPunchListItem
+        ? ['punch', ...baseTags]
+        : baseTags
 
       const payload = {
         ...(isEdit ? { id: task!.id } : { job_id: jobId }),
@@ -124,6 +135,21 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
           </div>
         ) : (
           <form onSubmit={submit} className="px-6 py-5 space-y-4">
+
+            {/* Punch List toggle */}
+            <label className={`flex items-center gap-2.5 text-sm font-medium cursor-pointer select-none rounded-lg px-3 py-2.5 border transition-colors ${
+              isPunchListItem
+                ? 'bg-amber-50 border-amber-200 text-amber-800'
+                : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+            }`}>
+              <input
+                type="checkbox"
+                checked={isPunchListItem}
+                onChange={e => setIsPunchListItem(e.target.checked)}
+                className="rounded border-gray-300 text-amber-500 focus:ring-amber-400 w-4 h-4"
+              />
+              Punch List Item
+            </label>
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">Title *</label>
@@ -232,12 +258,17 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
                 type="text"
                 value={form.tags}
                 onChange={e => set('tags', e.target.value)}
-                placeholder="e.g. inspection, permit, RFI"
+                placeholder="e.g. inspection, permit, RFI (punch tag is set above)"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
               />
-              {form.tags.trim() && (
+              {(isPunchListItem || form.tags.trim()) && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {form.tags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                  {isPunchListItem && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold uppercase tracking-wide rounded-full">
+                      punch
+                    </span>
+                  )}
+                  {form.tags.split(',').map(t => t.trim()).filter(t => Boolean(t) && t !== 'punch').map(tag => (
                     <span key={tag} className="inline-flex items-center px-2 py-0.5 bg-navy-50 text-navy-700 text-[11px] font-medium rounded-full">
                       {tag}
                     </span>

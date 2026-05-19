@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Link as LinkIcon, Check } from 'lucide-react'
 import type { ChangeOrder, ChangeOrderStatus, ChangeOrderType, BudgetLine } from '@/types'
 
 interface Props {
@@ -41,6 +41,20 @@ export function AddChangeOrderModal({ jobId, order, lines, canDelete, onClose, o
   const [saving, setSaving]             = useState(false)
   const [deleting, setDeleting]         = useState(false)
   const [error, setError]               = useState('')
+  const [savedToken, setSavedToken]     = useState<string | null>(
+    // Pre-fill if editing a submitted/approved CO that already has a token
+    (order && (order.status === 'submitted' || order.status === 'approved') && order.client_token)
+      ? order.client_token
+      : null
+  )
+  const [copied, setCopied]             = useState(false)
+
+  function copyClientLink(token: string) {
+    const url = `${window.location.origin}/co/${token}`
+    navigator.clipboard.writeText(url).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return }
@@ -64,7 +78,7 @@ export function AddChangeOrderModal({ jobId, order, lines, canDelete, onClose, o
         budget_line_id: budgetLineId || null,
       }
 
-      const url   = isEdit ? `/api/change-orders/${order!.id}` : '/api/change-orders'
+      const url    = isEdit ? `/api/change-orders/${order!.id}` : '/api/change-orders'
       const method = isEdit ? 'PATCH' : 'POST'
 
       const res = await fetch(url, {
@@ -75,6 +89,13 @@ export function AddChangeOrderModal({ jobId, order, lines, canDelete, onClose, o
       if (!res.ok) {
         const d = await res.json()
         throw new Error(d.error ?? 'Failed to save')
+      }
+      const saved = await res.json() as ChangeOrder
+      // Surface client_token so we can show the copy link button
+      if ((saved.status === 'submitted' || saved.status === 'approved') && saved.client_token) {
+        setSavedToken(saved.client_token)
+      } else {
+        setSavedToken(null)
       }
       onSaved()
     } catch (e) {
@@ -235,6 +256,29 @@ export function AddChangeOrderModal({ jobId, order, lines, canDelete, onClose, o
                   <option key={l.id} value={l.id}>{l.cost_code} · {l.description}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Client approval link — shown for submitted/approved COs with a token */}
+          {savedToken && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              <p className="text-xs font-semibold text-blue-700 mb-2">Client Approval Link</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs text-blue-800 bg-white border border-blue-200 rounded px-2 py-1.5 truncate">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/co/${savedToken}` : `/co/${savedToken}`}
+                </code>
+                <button
+                  onClick={() => copyClientLink(savedToken)}
+                  className={`flex items-center gap-1.5 shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                    copied
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {copied ? <Check size={12} /> : <LinkIcon size={12} />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
             </div>
           )}
 

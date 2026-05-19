@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, FileEdit, CheckCircle, XCircle, Clock, AlertCircle, Ban } from 'lucide-react'
+import { Plus, FileEdit, CheckCircle, XCircle, Clock, AlertCircle, Ban, Printer, Link as LinkIcon } from 'lucide-react'
 import type { ChangeOrder, ChangeOrderStatus, ChangeOrderType } from '@/types'
 
 const fmt = (n: number) =>
@@ -37,6 +37,10 @@ function StatusBadge({ status }: { status: ChangeOrderStatus }) {
   )
 }
 
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).catch(() => {})
+}
+
 interface Permissions {
   can_create: boolean
   can_edit: boolean
@@ -46,12 +50,28 @@ interface Permissions {
 interface Props {
   changeOrders: ChangeOrder[]
   permissions: Permissions
+  jobId: string
   onAdd: () => void
   onEdit: (co: ChangeOrder) => void
 }
 
-export function ChangeOrderTable({ changeOrders, permissions, onAdd, onEdit }: Props) {
+export function ChangeOrderTable({ changeOrders, permissions, jobId, onAdd, onEdit }: Props) {
   const [filter, setFilter] = useState<ChangeOrderStatus | 'all'>('all')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  function handleCopyLink(co: ChangeOrder, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!co.client_token) return
+    const url = `${window.location.origin}/co/${co.client_token}`
+    copyToClipboard(url)
+    setCopiedId(co.co_number)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  function handlePrint(co: ChangeOrder, e: React.MouseEvent) {
+    e.stopPropagation()
+    window.open(`/jobs/${jobId}/change-orders/${co.id}/print`, '_blank')
+  }
 
   const totals = {
     approved: changeOrders
@@ -159,7 +179,8 @@ export function ChangeOrderTable({ changeOrders, permissions, onAdd, onEdit }: P
               <th className="text-left px-3 py-3 w-28">Status</th>
               <th className="text-right px-3 py-3 w-32">Amount</th>
               <th className="text-left px-3 py-3 w-28">Submitted</th>
-              <th className="text-left px-5 py-3 w-28">Approved</th>
+              <th className="text-left px-3 py-3 w-28">Approved</th>
+              <th className="text-left px-5 py-3 w-24">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -185,10 +206,30 @@ export function ChangeOrderTable({ changeOrders, permissions, onAdd, onEdit }: P
                     ? new Date(co.submitted_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
                     : '—'}
                 </td>
-                <td className="px-5 py-3 text-xs text-gray-500">
+                <td className="px-3 py-3 text-xs text-gray-500">
                   {co.approved_date
                     ? new Date(co.approved_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
                     : '—'}
+                </td>
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                    <button
+                      title="Print / PDF"
+                      onClick={e => handlePrint(co, e)}
+                      className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-navy-700 transition-colors"
+                    >
+                      <Printer size={13} />
+                    </button>
+                    {(co.status === 'submitted' || co.status === 'approved') && co.client_token && (
+                      <button
+                        title={copiedId === co.co_number ? 'Copied!' : 'Copy client approval link'}
+                        onClick={e => handleCopyLink(co, e)}
+                        className={`p-1.5 rounded transition-colors ${copiedId === co.co_number ? 'text-green-600 bg-green-50' : 'text-gray-400 hover:text-navy-700 hover:bg-gray-100'}`}
+                      >
+                        <LinkIcon size={13} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -199,25 +240,44 @@ export function ChangeOrderTable({ changeOrders, permissions, onAdd, onEdit }: P
       {/* Mobile cards */}
       <div className="md:hidden divide-y divide-gray-100">
         {filtered.map(co => (
-          <button
-            key={co.id}
-            onClick={() => permissions.can_edit && onEdit(co)}
-            className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-3 mb-1">
-              <div className="min-w-0">
-                <p className="text-[11px] font-mono text-gray-400 mb-0.5">{co.co_number}</p>
-                <p className="text-sm font-medium text-navy-800 leading-snug">{co.title}</p>
+          <div key={co.id} className="px-4 py-4">
+            <button
+              onClick={() => permissions.can_edit && onEdit(co)}
+              className="w-full text-left hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-mono text-gray-400 mb-0.5">{co.co_number}</p>
+                  <p className="text-sm font-medium text-navy-800 leading-snug">{co.title}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={co.status} />
+                  <span className={`text-sm font-semibold tabular-nums ${TYPE_AMOUNT_COLOR[co.type]}`}>
+                    {co.type === 'deductive' ? '−' : '+'}{fmt(co.amount)}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <StatusBadge status={co.status} />
-                <span className={`text-sm font-semibold tabular-nums ${TYPE_AMOUNT_COLOR[co.type]}`}>
-                  {co.type === 'deductive' ? '−' : '+'}{fmt(co.amount)}
-                </span>
-              </div>
+              {co.reason && <p className="text-xs text-gray-400 truncate">{co.reason}</p>}
+            </button>
+            {/* Mobile action buttons */}
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={e => handlePrint(co, e)}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy-700 transition-colors"
+              >
+                <Printer size={11} /> Print
+              </button>
+              {(co.status === 'submitted' || co.status === 'approved') && co.client_token && (
+                <button
+                  onClick={e => handleCopyLink(co, e)}
+                  className={`flex items-center gap-1 text-xs transition-colors ${copiedId === co.co_number ? 'text-green-600' : 'text-gray-400 hover:text-navy-700'}`}
+                >
+                  <LinkIcon size={11} />
+                  {copiedId === co.co_number ? 'Copied!' : 'Copy Link'}
+                </button>
+              )}
             </div>
-            {co.reason && <p className="text-xs text-gray-400 truncate">{co.reason}</p>}
-          </button>
+          </div>
         ))}
       </div>
     </div>

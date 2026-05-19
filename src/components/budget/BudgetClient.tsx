@@ -10,7 +10,11 @@ import { AddBudgetLineModal } from './AddBudgetLineModal'
 import { AddActualModal } from './AddActualModal'
 import { ChangeOrderTable } from './ChangeOrderTable'
 import { AddChangeOrderModal } from './AddChangeOrderModal'
-import type { Job, BudgetLine, Actual, ChangeOrder, QBSyncStatus } from '@/types'
+import { BillsTable } from './BillsTable'
+import { PurchaseOrderTable } from './PurchaseOrderTable'
+import { AddPOModal } from './AddPOModal'
+import { usePurchaseOrders } from '@/hooks/usePurchaseOrders'
+import type { Job, BudgetLine, Actual, ChangeOrder, PurchaseOrder, QBSyncStatus } from '@/types'
 
 interface Permissions {
   can_create: boolean
@@ -25,9 +29,10 @@ interface Props {
   initialActuals: Actual[]
   initialChangeOrders: ChangeOrder[]
   permissions: Permissions
+  currentUserId: string
 }
 
-type Tab = 'budget' | 'change_orders'
+type Tab = 'budget' | 'change_orders' | 'bills' | 'purchase_orders'
 
 const QB_STATUS: Record<QBSyncStatus, { icon: React.ReactNode; text: string; color: string }> = {
   not_synced: { icon: <Clock size={12} />,       text: 'Not synced to QuickBooks', color: 'text-gray-400'    },
@@ -52,23 +57,31 @@ function QBSyncBadge({ status, lastSynced }: { status: QBSyncStatus; lastSynced:
 }
 
 export function BudgetClient({
-  jobId, job, initialLines, initialActuals, initialChangeOrders, permissions
+  jobId, job, initialLines, initialActuals, initialChangeOrders, permissions, currentUserId
 }: Props) {
   const { lines, actuals, loading: budgetLoading, error: budgetError, refresh: refreshBudget } = useBudget(jobId, initialLines, initialActuals)
   const { orders, loading: coLoading, error: coError, refresh: refreshCOs } = useChangeOrders(jobId, initialChangeOrders)
+  const { pos, loading: poLoading, error: poError, refresh: refreshPOs } = usePurchaseOrders(jobId)
 
   const [tab, setTab] = useState<Tab>('budget')
   const [showAddLine, setShowAddLine]           = useState(false)
   const [addActualForLine, setAddActualForLine] = useState<string | null>(null)
+  const [showAddBill, setShowAddBill]           = useState(false)
   const [showAddCO, setShowAddCO]               = useState(false)
   const [editCO, setEditCO]                     = useState<ChangeOrder | null>(null)
+  const [showAddPO, setShowAddPO]               = useState(false)
+  const [editPO, setEditPO]                     = useState<PurchaseOrder | null>(null)
 
-  const loading = tab === 'budget' ? budgetLoading : coLoading
-  const error   = tab === 'budget' ? budgetError   : coError
+  const loading = tab === 'budget' ? budgetLoading : tab === 'change_orders' ? coLoading : tab === 'purchase_orders' ? poLoading : false
+  const error   = tab === 'budget' ? budgetError   : tab === 'change_orders' ? coError   : tab === 'purchase_orders' ? poError   : null
 
   const approvedCOTotal = orders
     .filter(co => co.status === 'approved')
     .reduce((s, co) => s + (co.type === 'deductive' ? -co.amount : co.amount), 0)
+
+  const actualsTotal = actuals
+    .filter(a => a.status === 'approved' || a.status === 'paid')
+    .reduce((s, a) => s + a.amount, 0)
 
   return (
     <div className="space-y-5">
@@ -83,7 +96,7 @@ export function BudgetClient({
         )}
       </div>
 
-      <BudgetSummary job={job} lines={lines} approvedCOTotal={approvedCOTotal} />
+      <BudgetSummary job={job} lines={lines} approvedCOTotal={approvedCOTotal} actualsTotal={actualsTotal} />
 
       {/* Tab switcher */}
       <div className="flex gap-1">
@@ -105,6 +118,24 @@ export function BudgetClient({
           Change Orders
           <span className={`ml-2 text-[11px] ${tab === 'change_orders' ? 'text-white/70' : 'text-gray-400'}`}>{orders.length}</span>
         </button>
+        <button
+          onClick={() => setTab('bills')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'bills' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+          }`}
+        >
+          Bills
+          <span className={`ml-2 text-[11px] ${tab === 'bills' ? 'text-white/70' : 'text-gray-400'}`}>{actuals.length}</span>
+        </button>
+        <button
+          onClick={() => setTab('purchase_orders')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'purchase_orders' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+          }`}
+        >
+          Purchase Orders
+          <span className={`ml-2 text-[11px] ${tab === 'purchase_orders' ? 'text-white/70' : 'text-gray-400'}`}>{pos.length}</span>
+        </button>
       </div>
 
       {error && (
@@ -116,7 +147,7 @@ export function BudgetClient({
 
       {loading ? (
         <div className="bg-white rounded-xl border border-border p-8 text-center text-gray-400 text-sm">
-          Loading {tab === 'budget' ? 'budget' : 'change orders'}…
+          Loading {tab === 'budget' ? 'budget' : tab === 'change_orders' ? 'change orders' : tab === 'purchase_orders' ? 'purchase orders' : 'bills'}…
         </div>
       ) : tab === 'budget' ? (
         <BudgetLineTable
@@ -126,12 +157,36 @@ export function BudgetClient({
           onAddLine={() => setShowAddLine(true)}
           onAddActual={lineId => setAddActualForLine(lineId)}
         />
-      ) : (
+      ) : tab === 'change_orders' ? (
         <ChangeOrderTable
           changeOrders={orders}
           permissions={permissions}
+          jobId={jobId}
           onAdd={() => setShowAddCO(true)}
           onEdit={co => setEditCO(co)}
+        />
+      ) : tab === 'purchase_orders' ? (
+        <PurchaseOrderTable
+          pos={pos}
+          permissions={permissions}
+          onAdd={() => setShowAddPO(true)}
+          onEdit={po => setEditPO(po)}
+          onDelete={po => {
+            if (confirm('Delete this purchase order? This cannot be undone.')) {
+              fetch(`/api/purchase-orders?id=${po.id}`, { method: 'DELETE' })
+                .then(() => refreshPOs())
+                .catch(() => {})
+            }
+          }}
+        />
+      ) : (
+        <BillsTable
+          actuals={actuals}
+          lines={lines}
+          permissions={permissions}
+          currentUserId={currentUserId}
+          onAdd={() => setShowAddBill(true)}
+          onRefresh={refreshBudget}
         />
       )}
 
@@ -153,6 +208,16 @@ export function BudgetClient({
         />
       )}
 
+      {showAddBill && (
+        <AddActualModal
+          jobId={jobId}
+          budgetLineId=""
+          lines={lines}
+          onClose={() => setShowAddBill(false)}
+          onCreated={() => { setShowAddBill(false); refreshBudget() }}
+        />
+      )}
+
       {showAddCO && (
         <AddChangeOrderModal
           jobId={jobId}
@@ -170,6 +235,26 @@ export function BudgetClient({
           canDelete={permissions.can_delete}
           onClose={() => setEditCO(null)}
           onSaved={() => { setEditCO(null); refreshCOs() }}
+        />
+      )}
+
+      {showAddPO && (
+        <AddPOModal
+          jobId={jobId}
+          lines={lines}
+          onClose={() => setShowAddPO(false)}
+          onSaved={() => { setShowAddPO(false); refreshPOs() }}
+        />
+      )}
+
+      {editPO && (
+        <AddPOModal
+          jobId={jobId}
+          po={editPO}
+          lines={lines}
+          canDelete={permissions.can_delete}
+          onClose={() => setEditPO(null)}
+          onSaved={() => { setEditPO(null); refreshPOs() }}
         />
       )}
     </div>

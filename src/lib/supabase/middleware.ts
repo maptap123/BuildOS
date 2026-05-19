@@ -28,11 +28,13 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isAuthRoute = path.startsWith('/login')
-  const isApiRoute  = path.startsWith('/api/')
+  const isAuthRoute   = path.startsWith('/login')
+  const isApiRoute    = path.startsWith('/api/')
+  const isPublicRoute = path.startsWith('/co/')
 
   // API routes handle their own 401 — don't redirect them to /login
-  if (!user && !isAuthRoute && !isApiRoute) {
+  // /co/* routes are public (token-authenticated client approval pages)
+  if (!user && !isAuthRoute && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

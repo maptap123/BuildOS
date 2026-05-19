@@ -47,17 +47,17 @@ Goal: turn the current app from promising prototype into something stable enough
 
 Goal: make the app useful to the field every day.
 
-- [ ] Add visible Documents module to navigation
-- [ ] Build job document/file center
-- [ ] Add file upload to Supabase storage
-- [ ] Add file preview/download links
+- [x] Add visible Documents module to navigation
+- [x] Build job document/file center
+- [x] Add file upload to Supabase storage
+- [x] Add file preview/download links
 - [ ] Connect documents to jobs, logs, tasks, budget lines, and change orders
-- [ ] Build contacts/client directory UI
+- [x] Build contacts/client directory UI
 - [ ] Show contacts on job detail
-- [ ] Add contact create/edit/delete flows
-- [ ] Add log photo upload
-- [ ] Show log photos in daily log feed
-- [ ] Add photo captions
+- [x] Add contact create/edit/delete flows
+- [x] Add log photo upload
+- [x] Show log photos in daily log feed
+- [x] Add photo captions
 - [ ] Add mobile-friendly daily log creation flow
 - [ ] Add weather capture helper
 - [ ] Add safety notes / incidents structure
@@ -70,22 +70,22 @@ Goal: make the app useful to the field every day.
 
 Goal: make budgets, change orders, costs, and commitments reliable enough for real job control.
 
-- [ ] Improve budget summary: contract, revised contract, budget, committed, actual, forecast, variance
+- [x] Improve budget summary: contract, revised contract, budget, committed, actual, forecast, variance
 - [ ] Add budget phase grouping
 - [ ] Add cost code catalog
-- [ ] Add purchase orders table
-- [ ] Add purchase orders UI
+- [x] Add purchase orders table
+- [x] Add purchase orders UI
 - [ ] Add work orders table
 - [ ] Add work orders UI
 - [ ] Add vendor directory
-- [ ] Add bills/invoices table
-- [ ] Add bill approval status workflow
-- [ ] Link actual costs to purchase orders and bills
-- [ ] Add change order approval workflow
-- [ ] Add change order PDF generation
-- [ ] Add change order client signature status
-- [ ] Add client-facing change order approval link
-- [ ] Add job profitability report
+- [x] Add bills/invoices table
+- [x] Add bill approval status workflow
+- [x] Link actual costs to purchase orders and bills
+- [x] Add change order approval workflow
+- [x] Add change order PDF generation
+- [x] Add change order client signature status
+- [x] Add client-facing change order approval link
+- [x] Add job profitability report
 - [ ] Add cash flow / billing schedule view
 
 ## Phase 4: Real Integrations
@@ -109,13 +109,13 @@ Goal: stop being a placeholder and sync with the tools contractors already use.
 
 Goal: cover the pre-construction workflow that Buildertrend and JobTread users expect.
 
-- [ ] Add leads/CRM pipeline
+- [x] Add leads/CRM pipeline (kanban: New → Contacted → Proposal → Won → Lost)
 - [ ] Add website contact form lead intake
 - [ ] Add lead source for website contact form submissions
 - [ ] Add lead notification when a new website inquiry comes in
-- [ ] Add lead source tracking
-- [ ] Add lead detail page with contact info, project notes, status, and follow-up history
-- [ ] Add convert lead to job/project flow
+- [x] Add lead source tracking
+- [x] Add lead detail page with contact info, project notes, status, and follow-up history
+- [ ] Add convert lead to job/project flow (placeholder only — wires in after estimate builder)
 - [ ] Add estimate table
 - [ ] Add estimate builder UI
 - [ ] Add cost catalog / assemblies
@@ -214,6 +214,14 @@ Goal: once the job and budget modules are more fully built out, allow admins to 
 ## Immediate Next Work Queue
 
 Start here unless we intentionally reprioritize.
+
+- [ ] Show contacts on job detail panel (quick win — contacts table exists, job_id is linked)
+- [ ] Add convert lead to job/project flow (Lead status = Won → auto-create job + budget)
+- [ ] Add estimate builder UI (pulls from 4,600-row cost book already in DB)
+- [ ] Add proposal PDF generation + client accept flow
+- [ ] Add mobile-friendly daily log creation flow
+- [ ] Add job activity feed
+- [ ] Phase 7: AI daily brief + budget overrun risk detection (Batch 4)
 
 
 ## Product Principle

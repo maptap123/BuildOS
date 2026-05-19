@@ -5,10 +5,11 @@ import { ChevronDown } from 'lucide-react'
 import type { JobStatus } from '@/types'
 
 const OPTIONS: { value: JobStatus; label: string; className: string }[] = [
-  { value: 'lead',    label: 'Lead',    className: 'bg-gray-100 text-gray-600' },
-  { value: 'presale', label: 'Presale', className: 'bg-blue-100 text-blue-700' },
-  { value: 'active',  label: 'Active',  className: 'bg-emerald-100 text-emerald-700' },
-  { value: 'closed',  label: 'Closed',  className: 'bg-gray-200 text-gray-500' },
+  { value: 'lead',     label: 'Lead',     className: 'bg-gray-100 text-gray-600' },
+  { value: 'presale',  label: 'Presale',  className: 'bg-blue-100 text-blue-700' },
+  { value: 'active',   label: 'Active',   className: 'bg-emerald-100 text-emerald-700' },
+  { value: 'warranty', label: 'Warranty', className: 'bg-amber-100 text-amber-700' },
+  { value: 'closed',   label: 'Closed',   className: 'bg-gray-200 text-gray-500' },
 ]
 
 export function JobStatusSelect({

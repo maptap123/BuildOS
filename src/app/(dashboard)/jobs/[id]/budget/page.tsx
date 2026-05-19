@@ -69,6 +69,7 @@ export default async function JobBudgetPage({
         can_edit: perm.can_edit,
         can_delete: perm.can_delete,
       }}
+      currentUserId={user.id}
     />
   )
 }

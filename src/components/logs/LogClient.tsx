@@ -71,6 +71,7 @@ export function LogClient({ jobId, initialLogs, permissions }: Props) {
           onAdd={() => setShowAdd(true)}
           onEdit={log => setEditLog(log)}
           onDelete={handleDelete}
+          onRefreshPhotos={refreshPhotos}
         />
       )}
 
