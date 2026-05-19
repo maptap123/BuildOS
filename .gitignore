@@ -45,6 +45,8 @@ next-env.d.ts
 bt-export/
 
 # local automation / temporary artifacts
+.bootstrap-*
+.git-broken/
 .git-meta/
 .playwright-mcp/
 .tmp_pdf_lib/
