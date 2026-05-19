@@ -1,0 +1,13 @@
+.tmp_pdf_lib/
+bt-export/
+.bt-profile/
+.bootstrap-*
+.git-meta/
+.git-broken/
+.playwright-mcp/
+tmp_althoff_logs_pages/
+referance-images/
+Referance Images/
+scripts/
+node_modules/
+.next/
