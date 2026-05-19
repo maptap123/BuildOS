@@ -6,6 +6,7 @@ import type { Contact, Job } from '@/types'
 
 interface Props {
   contact?: Contact | null
+  defaultJobId?: string
   onClose: () => void
   onSaved: (contact: Contact) => void
 }
@@ -23,7 +24,7 @@ type FormState = {
   notes: string
 }
 
-function emptyForm(contact?: Contact | null): FormState {
+function emptyForm(contact?: Contact | null, defaultJobId?: string): FormState {
   return {
     full_name:   contact?.full_name ?? '',
     email:       contact?.email ?? '',
@@ -32,19 +33,19 @@ function emptyForm(contact?: Contact | null): FormState {
     city:        contact?.city ?? '',
     state:       contact?.state ?? '',
     postal_code: contact?.postal_code ?? '',
-    job_id:      contact?.job_id ?? '',
+    job_id:      contact?.job_id ?? defaultJobId ?? '',
     is_primary:  contact?.is_primary ?? false,
     notes:       contact?.notes ?? '',
   }
 }
 
-export function AddContactModal({ contact, onClose, onSaved }: Props) {
+export function AddContactModal({ contact, defaultJobId, onClose, onSaved }: Props) {
   const isEdit = Boolean(contact)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [addressOpen, setAddressOpen] = useState(Boolean(contact?.address || contact?.city || contact?.state || contact?.postal_code))
   const [jobs, setJobs] = useState<Pick<Job, 'id' | 'name'>[]>([])
-  const [form, setForm] = useState<FormState>(() => emptyForm(contact))
+  const [form, setForm] = useState<FormState>(() => emptyForm(contact, defaultJobId))
 
   useEffect(() => {
     fetch('/api/jobs')

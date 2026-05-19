@@ -3,8 +3,9 @@ import Link from 'next/link'
 import { MapPin, Phone, Calendar, Users, Plus, FileText, CheckSquare, CalendarDays, DollarSign, AlertCircle, TrendingUp, Tag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { Job, DailyLog, Task, ScheduleItem } from '@/types'
+import type { Job, DailyLog, Task, ScheduleItem, Contact } from '@/types'
 import { CloseoutPanel } from '@/components/jobs/CloseoutPanel'
+import { JobContactsPanel } from '@/components/jobs/JobContactsPanel'
 
 type JobDetail = Job & {
   pm: { full_name: string | null } | null
@@ -58,7 +59,7 @@ export default async function JobDetailPage({
 
   const { data: jobPerm } = await admin
     .from('user_permissions')
-    .select('can_view, can_edit')
+    .select('can_view, can_edit, can_create')
     .eq('user_id', user.id)
     .eq('module', 'jobs')
     .single()
@@ -100,7 +101,7 @@ export default async function JobDetailPage({
   const canCreateLog     = logsPerm?.can_create    ?? false
 
   // Parallel data fetch for dashboard cards — only what user has permission to see
-  const [logsResult, tasksResult, scheduleResult, budgetResult] = await Promise.all([
+  const [logsResult, tasksResult, scheduleResult, budgetResult, contactsResult] = await Promise.all([
     canSeeLogs
       ? admin.from('daily_logs').select('id, log_date, work_performed, weather_summary, manpower_count').eq('job_id', id).order('log_date', { ascending: false }).limit(3)
       : Promise.resolve({ data: null }),
@@ -113,12 +114,14 @@ export default async function JobDetailPage({
     canSeeBudget
       ? admin.from('budget_lines').select('revised_budget, committed_cost, forecast_cost').eq('job_id', id)
       : Promise.resolve({ data: null }),
+    admin.from('contacts').select('*').eq('job_id', id).order('is_primary', { ascending: false }).order('full_name'),
   ])
 
   const recentLogs    = (logsResult.data ?? []) as Pick<DailyLog, 'id' | 'log_date' | 'work_performed' | 'weather_summary' | 'manpower_count'>[]
   const openTasks     = (tasksResult.data ?? []) as Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'due_date'>[]
   const scheduleItems = (scheduleResult.data ?? []) as Pick<ScheduleItem, 'id' | 'title' | 'status' | 'start_date' | 'end_date' | 'percent_complete'>[]
   const budgetLines   = (budgetResult.data ?? []) as { revised_budget: number; committed_cost: number; forecast_cost: number | null }[]
+  const jobContacts   = (contactsResult.data ?? []) as Contact[]
 
   const thisWeekItems = scheduleItems.filter(s =>
     isThisWeek(s.start_date) || isThisWeek(s.end_date) ||
@@ -331,7 +334,14 @@ export default async function JobDetailPage({
         )}
       </div>
 
-      {/* Card 4 — This Week's Schedule */}
+      {/* Card 4 — Contacts */}
+      <JobContactsPanel
+        jobId={id}
+        initialContacts={jobContacts}
+        canCreate={jobPerm?.can_create ?? false}
+      />
+
+      {/* Card 5 — This Week's Schedule */}
       <div className="bg-white rounded-xl border border-border p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-semibold text-navy-900 text-base">This Week</h3>

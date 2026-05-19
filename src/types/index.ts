@@ -142,6 +142,7 @@ export interface Job {
   state: string | null;
   postal_code: string | null;
   status: JobStatus;
+  lead_id: string | null;
   start_date: string | null;
   target_completion_date: string | null;
   actual_completion_date: string | null;
@@ -459,4 +460,65 @@ export interface LeadActivity {
   note: string
   created_by: string
   created_at: string
+}
+
+// ─────────────────────────────────────────────
+// ESTIMATE BUILDER
+// ─────────────────────────────────────────────
+
+export type EstimateStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'voided'
+
+export interface CostCatalogItem {
+  id: string
+  cost_code: string
+  division_num: string
+  division_name: string
+  phase: string | null
+  title: string
+  description: string | null
+  uom: string
+  unit_cost: number
+  labor_cost: number
+  material_cost: number
+  cost_type: string | null
+  taxable: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Estimate {
+  id: string
+  lead_id: string | null
+  job_name: string
+  job_type: string
+  markup_pct: number
+  status: EstimateStatus
+  scope_text: string | null
+  scope_confirmed: boolean
+  internal_notes: string | null
+  title: string | null
+  version: number
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EstimateLine {
+  id: string
+  estimate_id: string
+  lead_id: string
+  cost_item_id: string | null
+  description: string
+  phase: string | null
+  cost_code: string | null
+  uom: string
+  quantity: number
+  unit_cost: number
+  markup_pct: number
+  sort_order: number
+  notes: string | null
+  created_at: string
+  updated_at: string
 }

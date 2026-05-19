@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   ArrowLeft,
   Mail,
@@ -12,6 +13,9 @@ import {
   Briefcase,
   AlertCircle,
   Send,
+  ExternalLink,
+  ClipboardList,
+  Loader2,
 } from 'lucide-react'
 import { AddLeadModal } from './AddLeadModal'
 import type { Lead, LeadActivity, LeadStatus, LeadSource } from '@/types'
@@ -72,6 +76,8 @@ export function LeadDetailClient({ lead: initialLead, initialActivities, permiss
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showConvertConfirm, setShowConvertConfirm] = useState(false)
+  const [converting, setConverting] = useState(false)
 
   async function addNote(e: React.FormEvent) {
     e.preventDefault()
@@ -101,6 +107,29 @@ export function LeadDetailClient({ lead: initialLead, initialActivities, permiss
   function handleSaved(saved: Lead) {
     setLead(saved)
     setShowEdit(false)
+  }
+
+  async function convertToJob() {
+    setConverting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/convert`, { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // 409 = already converted — just redirect to the existing job
+        if (res.status === 409 && body.job_id) {
+          router.push(`/jobs/${body.job_id}`)
+          return
+        }
+        throw new Error(body.error ?? `Error ${res.status}`)
+      }
+      // Update local lead state so the "Convert" button disappears
+      setLead(prev => ({ ...prev, converted_job_id: body.job.id, status: 'won' }))
+      router.push(`/jobs/${body.job.id}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to convert lead to job.')
+      setConverting(false)
+    }
   }
 
   const canConvert = lead.status === 'won' && !lead.converted_job_id
@@ -139,9 +168,28 @@ export function LeadDetailClient({ lead: initialLead, initialActivities, permiss
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {canConvert && (
+            {/* Estimate builder link */}
+            <Link
+              href={`/leads/${lead.id}/estimate`}
+              className="flex items-center gap-1.5 border border-gold-300 bg-gold-50 text-gold-700 hover:bg-gold-100 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+            >
+              <ClipboardList size={14} />
+              Estimate
+            </Link>
+            {/* Already converted — show link to job */}
+            {lead.converted_job_id && (
               <button
-                onClick={() => alert('Convert to Job — Coming soon')}
+                onClick={() => router.push(`/jobs/${lead.converted_job_id}`)}
+                className="flex items-center gap-1.5 border border-green-300 bg-green-50 text-green-700 text-sm font-medium px-3 py-2 rounded-lg transition-colors hover:bg-green-100"
+              >
+                <ExternalLink size={14} />
+                View Job
+              </button>
+            )}
+            {/* Not yet converted — show convert button */}
+            {canConvert && permissions.can_create && (
+              <button
+                onClick={() => setShowConvertConfirm(true)}
                 className="flex items-center gap-1.5 border border-green-300 text-green-700 hover:bg-green-50 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
               >
                 <Briefcase size={14} />
@@ -265,6 +313,79 @@ export function LeadDetailClient({ lead: initialLead, initialActivities, permiss
           onClose={() => setShowEdit(false)}
           onSaved={handleSaved}
         />
+      )}
+
+      {/* Convert-to-Job confirmation dialog */}
+      {showConvertConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 bg-green-100 rounded-full p-2">
+                <Briefcase size={20} className="text-green-700" />
+              </div>
+              <div>
+                <h2 className="font-display font-semibold text-navy-900 text-base">Convert to Job?</h2>
+                <p className="text-sm text-gray-500 mt-0.5">This will create a new job from this lead.</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-border rounded-lg px-4 py-3 space-y-1.5 text-sm">
+              <p className="text-navy-800"><span className="text-gray-500 font-medium">Name: </span>{lead.title}</p>
+              {lead.client_name && (
+                <p className="text-navy-800"><span className="text-gray-500 font-medium">Client: </span>{lead.client_name}</p>
+              )}
+              {lead.address && (
+                <p className="text-navy-800"><span className="text-gray-500 font-medium">Address: </span>{lead.address}</p>
+              )}
+              {lead.estimated_value != null && (
+                <p className="text-navy-800">
+                  <span className="text-gray-500 font-medium">Contract value: </span>
+                  {formatCurrency(lead.estimated_value)}
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-400">
+              The job will be created in <strong>Presale</strong> status. You can update its details, address, and team after creation.
+            </p>
+
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                <AlertCircle size={15} className="shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => { setShowConvertConfirm(false); setError(null) }}
+                disabled={converting}
+                className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={convertToJob}
+                disabled={converting}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {converting ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Converting…
+                  </>
+                ) : (
+                  <>
+                    <Briefcase size={15} />
+                    Create Job
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

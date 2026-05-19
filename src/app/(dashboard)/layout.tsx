@@ -7,6 +7,7 @@ import { Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut, Chevron
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
+import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
 
 const TABS = [
   { key: 'leads',      label: 'Leads',      icon: Target      },
@@ -186,6 +187,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           currentJobId={jobId}
         />
       )}
+
+      {/* Hermes AI chat button — Phase 10b: will open full chat panel */}
+      <HermesChatPanel />
     </div>
   )
 }
