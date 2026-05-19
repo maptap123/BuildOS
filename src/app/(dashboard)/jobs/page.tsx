@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Clock, CheckSquare, CalendarDays, Plus, FileText, Cloud, Users, Briefcase } from 'lucide-react'
@@ -167,7 +168,7 @@ function LogRow({ entry, router }: { entry: AgendaLogEntry; router: ReturnType<t
   )
 }
 
-export default function JobsDashboardPage() {
+function JobsDashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [showAddJob, setShowAddJob] = useState(false)
@@ -315,5 +316,13 @@ export default function JobsDashboardPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function JobsDashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <JobsDashboardContent />
+    </Suspense>
   )
 }
