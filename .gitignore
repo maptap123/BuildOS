@@ -45,6 +45,8 @@ next-env.d.ts
 bt-export/
 
 # local automation / temporary artifacts
+.git-broken/
+.git-meta/
 .playwright-mcp/
 .tmp_pdf_lib/
 tmp_althoff_logs_pages/
