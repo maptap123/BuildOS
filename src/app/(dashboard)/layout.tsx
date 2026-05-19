@@ -23,6 +23,8 @@ const TABS = [
   { key: 'admin',      label: 'Admin',      icon: ShieldCheck },
 ]
 
+const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'profitability'])
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -46,7 +48,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (key === 'time-clock') return '/time-clock'
     if (key === 'contacts')   return '/contacts'
     if (key === 'documents')  return '/documents'
-    if (!jobId) return null
+    if (!jobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
+    if (!jobId) return '/jobs'
     return `/jobs/${jobId}/${key}`
   }
 
@@ -59,10 +62,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (key === 'documents')  return pathname.startsWith('/documents')
     if (!jobId) return false
     return pathname.startsWith(`/jobs/${jobId}/${key}`)
-  }
-
-  function isEnabled(key: string): boolean {
-    return key === 'leads' || key === 'jobs' || key === 'admin' || key === 'time-clock' || key === 'contacts' || key === 'documents' || jobId !== null
   }
 
   return (
@@ -79,20 +78,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {TABS.map(({ key, label, icon: Icon }) => {
             const href = tabHref(key)
             const active = isActive(key)
-            const enabled = isEnabled(key)
-
-            if (!enabled) {
-              return (
-                <span
-                  key={key}
-                  title="Select a job first"
-                  className="flex items-center gap-1.5 px-3 py-3 text-sm font-medium text-gray-300 cursor-not-allowed select-none"
-                >
-                  <Icon size={15} />
-                  {label}
-                </span>
-              )
-            }
 
             return (
               <Link
@@ -158,16 +143,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {TABS.map(({ key, label, icon: Icon }) => {
             const href = tabHref(key)
             const active = isActive(key)
-            const enabled = isEnabled(key)
 
             return (
               <Link
                 key={key}
-                href={enabled && href ? href : '#'}
+                href={href ?? '/jobs'}
                 className={`flex-1 flex flex-col items-center py-2.5 text-xs font-medium transition-colors ${
-                  !enabled
-                    ? 'text-navy-700 pointer-events-none'
-                    : active
+                  active
                     ? 'text-gold-400'
                     : 'text-navy-400 hover:text-white'
                 }`}

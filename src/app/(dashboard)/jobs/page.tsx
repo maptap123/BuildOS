@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Clock, CheckSquare, CalendarDays, Plus, FileText, Cloud, Users } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Clock, CheckSquare, CalendarDays, Plus, FileText, Cloud, Users, Briefcase } from 'lucide-react'
 import { useAgenda } from '@/hooks/useAgenda'
 import { useJobs } from '@/hooks/useJobs'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -57,6 +57,14 @@ function AgendaCard({
 
 function Empty({ message }: { message: string }) {
   return <p className="text-xs text-gray-400 py-1">{message}</p>
+}
+
+const SELECT_JOB_LABELS: Record<string, string> = {
+  budget: 'Budget',
+  schedule: 'Schedule',
+  tasks: 'Tasks',
+  logs: 'Logs',
+  profitability: 'Profitability',
 }
 
 function TaskRow({ task, router }: { task: AgendaTask; router: ReturnType<typeof useRouter> }) {
@@ -161,12 +169,15 @@ function LogRow({ entry, router }: { entry: AgendaLogEntry; router: ReturnType<t
 
 export default function JobsDashboardPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showAddJob, setShowAddJob] = useState(false)
 
   const agenda = useAgenda()
   const { jobs: activeJobs, loading: jobsLoading } = useJobs({ status: 'active' })
   const { can, isAdmin } = usePermissions()
   const canCreate = can('jobs', 'create') || isAdmin()
+  const selectJobFor = searchParams.get('selectJob')
+  const selectJobLabel = selectJobFor ? SELECT_JOB_LABELS[selectJobFor] : null
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -198,6 +209,20 @@ export default function JobsDashboardPage() {
           </button>
         )}
       </div>
+
+      {selectJobLabel && (
+        <div className="bg-gold-50 border border-gold-200 rounded-xl px-4 py-3 mb-6 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gold-100 flex items-center justify-center shrink-0">
+            <Briefcase size={16} className="text-gold-700" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-navy-900">Select a job to open {selectJobLabel}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Pick a job from the left panel, then that tab will open for the selected job.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
