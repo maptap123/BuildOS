@@ -433,6 +433,26 @@ export interface PurchaseOrder {
   budget_lines?: { cost_code: string; description: string } | null
 }
 
+export type BillingMilestoneStatus = 'pending' | 'invoiced' | 'paid'
+
+export interface BillingMilestone {
+  id: string
+  job_id: string
+  title: string
+  description: string | null
+  amount: number
+  status: BillingMilestoneStatus
+  due_date: string | null
+  invoiced_date: string | null
+  paid_date: string | null
+  invoice_number: string | null
+  notes: string | null
+  sort_order: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
 export type LeadSource = 'referral' | 'website' | 'cold_call' | 'repeat' | 'other'
 
@@ -527,4 +547,51 @@ export interface EstimateLine {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export type VendorType = 'subcontractor' | 'supplier' | 'equipment' | 'other'
+
+export interface Vendor {
+  id: string
+  name: string
+  contact_name: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  vendor_type: VendorType
+  trade: string | null
+  license_number: string | null
+  insurance_expiry: string | null
+  notes: string | null
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WorkOrderStatus = 'draft' | 'sent' | 'accepted' | 'in_progress' | 'completed' | 'cancelled'
+
+export interface WorkOrder {
+  id: string
+  job_id: string
+  vendor_id: string | null
+  budget_line_id: string | null
+  wo_number: string
+  title: string
+  description: string | null
+  scope_of_work: string | null
+  amount: number
+  status: WorkOrderStatus
+  issued_date: string | null
+  start_date: string | null
+  completion_date: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  vendors?: Pick<Vendor, 'id' | 'name' | 'trade' | 'vendor_type'> | null
+  budget_lines?: Pick<BudgetLine, 'id' | 'cost_code' | 'description'> | null
 }

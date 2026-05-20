@@ -20,10 +20,19 @@ export async function PATCH(
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
+  const allowed = [
+    'cost_code', 'category', 'description', 'status', 'original_budget',
+    'revised_budget', 'committed_cost', 'forecast_cost', 'notes',
+  ]
+  const updates: Record<string, unknown> = {}
+  for (const key of allowed) {
+    if (key in body) updates[key] = body[key]
+  }
+
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('budget_lines')
-    .update(body)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()
@@ -52,5 +61,5 @@ export async function DELETE(
   const admin = createAdminClient()
   const { error } = await admin.from('budget_lines').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return new NextResponse(null, { status: 204 })
+  return NextResponse.json({ success: true })
 }

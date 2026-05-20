@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut, ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp } from 'lucide-react'
+import { Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut, ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp, HardHat } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
@@ -17,6 +17,7 @@ const TABS = [
   { key: 'tasks',      label: 'Tasks',      icon: CheckSquare },
   { key: 'logs',            label: 'Logs',          icon: FileText    },
   { key: 'profitability',   label: 'Profitability', icon: TrendingUp  },
+  { key: 'vendors',         label: 'Vendors',       icon: HardHat     },
   { key: 'contacts',        label: 'Contacts',      icon: Users       },
   { key: 'documents',  label: 'Documents',  icon: Folder      },
   { key: 'time-clock', label: 'Time Clock', icon: Clock       },
@@ -46,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (key === 'jobs')       return '/jobs'
     if (key === 'admin')      return '/admin'
     if (key === 'time-clock') return '/time-clock'
+    if (key === 'vendors')    return '/vendors'
     if (key === 'contacts')   return '/contacts'
     if (key === 'documents')  return '/documents'
     if (!jobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
@@ -58,6 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (key === 'jobs')       return pathname === '/jobs' || (!!jobId && segments.length === 2)
     if (key === 'admin')      return pathname.startsWith('/admin')
     if (key === 'time-clock') return pathname.startsWith('/time-clock')
+    if (key === 'vendors')    return pathname.startsWith('/vendors')
     if (key === 'contacts')   return pathname.startsWith('/contacts')
     if (key === 'documents')  return pathname.startsWith('/documents')
     if (!jobId) return false

@@ -25,9 +25,9 @@ CRM pipeline     →   Convert → Job   →   Change orders      →   Portfoli
 | Stage | BT Capability | JDC Status | Gap |
 |-------|--------------|------------|-----|
 | **Lead Intake** | Lead pipeline, source tracking, follow-up history | ✅ Built | — |
-| **Estimating** | Estimate builder, cost catalog, assemblies | Not built | UI for 4,600-row cost book |
-| **Proposal** | PDF + e-signature + link | Not built | Proposal generator + accept flow |
-| **Convert → Job** | Estimate becomes budget + schedule | Placeholder | Conversion bridge |
+| **Estimating** | Estimate builder, cost catalog, assemblies | ✅ Built | Assemblies / AI scope matching remain |
+| **Proposal** | PDF + e-signature + link | ✅ Built | Email delivery / reminders remain |
+| **Convert → Job** | Estimate becomes budget + schedule | ✅ Built | Starter schedule is phase-based and should be refined |
 | **Budget setup** | Phases, cost codes, budget lines | ✅ Built | Phase grouping, cost code catalog |
 | **Schedule** | Gantt + milestones + subs | ✅ Built | Client-visible milestones |
 | **Daily logs** | Photos, weather, manpower | ✅ Built | Mobile flow, weather helper |
@@ -47,8 +47,8 @@ CRM pipeline     →   Convert → Job   →   Change orders      →   Portfoli
 
 ## The Three Biggest Gaps
 
-**1. Lead Intake → Estimate → Job (nothing exists)**
-BT's killer feature is this funnel. Without it, jobs get created manually with no paper trail from the sale. The 4,600-row cost book is already in the DB — you need the estimate builder UI that reads from it, a proposal PDF, and a one-click "Accept → Create Job + Budget" conversion.
+**1. Lead Intake → Estimate → Job (core loop built)**
+BT's killer feature is this funnel. JDC now has the estimate builder UI, printable proposal, public client accept/decline link, and accepted proposal → job + budget + starter schedule conversion. The next lift is polish: assemblies, email delivery, better schedule templates, and AI-assisted scope matching.
 
 **2. Bills / Purchase Orders / Progress Billing (the money middle)**
 Budget lines and actuals exist but there's no way to track *commitments* (POs to subs/vendors) or *billing to the client* (draw schedule). This is the core of job cost control. BT users live here daily.
@@ -66,11 +66,11 @@ The **4,600-row cost book** is already in the DB. BT users build estimates from 
 
 ## Recommended Build Order (Sprints)
 
-### Sprint A — Close the Revenue Loop (Phase 5 first) — PARTIALLY DONE
+### Sprint A — Close the Revenue Loop (Phase 5 first) — DONE
 1. ✅ Lead pipeline view (kanban: New → Contacted → Proposal → Won → Lost)
 2. ✅ Lead detail: contact info, project notes, status, follow-up log
-3. ⬜ Estimate builder: pulls from cost book, groups by phase, sets markup
-4. ⬜ Proposal PDF generation + "Accept" button → auto-creates job + budget lines
+3. ✅ Estimate builder: pulls from cost book, groups by phase, sets markup
+4. ✅ Proposal PDF generation + "Accept" button → auto-creates job + budget lines
 5. ✅ Lead source tracking on jobs
 
 ### Sprint B — Strengthen Job Cost Control (Phase 3) — DONE
@@ -91,19 +91,19 @@ The **4,600-row cost book** is already in the DB. BT users build estimates from 
 16. ⬜ Budget overrun risk alerts
 17. ⬜ Natural language search across jobs
 
-### Sprint E — Complete the Revenue Loop (remaining Sprint A items)
-18. ⬜ Estimate builder UI (pulls from 4,600-row cost book already in DB)
-19. ⬜ Proposal PDF generation + client accept flow
-20. ⬜ Convert accepted proposal → job + budget lines
-21. ⬜ Show contacts on job detail panel (quick win)
+### Sprint E — Complete the Revenue Loop (remaining Sprint A items) — DONE
+18. ✅ Estimate builder UI (pulls from 4,600-row cost book already in DB)
+19. ✅ Proposal PDF generation + client accept flow
+20. ✅ Convert accepted proposal → job + budget lines + starter schedule
+21. ✅ Show contacts on job detail panel (quick win)
 
 | Sprint | Maps to Phase | Status |
 |--------|---------------|--------|
-| Sprint A | Phase 5 (Sales, Estimating, Proposals) | Partial — CRM done, estimates/proposals remain |
+| Sprint A | Phase 5 (Sales, Estimating, Proposals) | Done — CRM, estimates, proposals, client accept, and conversion built |
 | Sprint B | Phase 3 (Money and Commitments) | Done |
 | Sprint C | Phase 3 + Phase 2 (Field OS) | Done |
 | Sprint D | Phase 7 (AI Advantage) | Not started |
-| Sprint E | Phase 5 remainder | Not started |
+| Sprint E | Phase 5 remainder | Done |
 | Sprint F | Phase 10 (Hermes Agent Platform) | Not started |
 
 ---
@@ -129,6 +129,11 @@ The **4,600-row cost book** is already in the DB. BT users build estimates from 
 - [x] Internal agent endpoint with job/task/schedule/budget/log tools
 - [x] QuickBooks integration placeholder
 - [x] Outlook integration placeholder
+- [x] Estimate builder with cost catalog search, phase grouping, markup, and totals
+- [x] Printable proposal / browser Save as PDF flow
+- [x] Public proposal accept/decline flow with typed signature
+- [x] Accepted proposal conversion into job, approved budget lines, and starter schedule milestones
+- [x] All top-level tabs remain clickable and prompt for job selection when needed
 
 ---
 
@@ -161,7 +166,7 @@ Goal: make the app useful to the field every day.
 - [x] Add file preview/download links
 - [ ] Connect documents to jobs, logs, tasks, budget lines, and change orders
 - [x] Build contacts/client directory UI
-- [ ] Show contacts on job detail
+- [x] Show contacts on job detail
 - [x] Add contact create/edit/delete flows
 - [x] Add log photo upload
 - [x] Show log photos in daily log feed
@@ -223,14 +228,14 @@ Goal: cover the pre-construction workflow that Buildertrend and JobTread users e
 - [ ] Add lead notification when a new website inquiry comes in
 - [x] Add lead source tracking
 - [x] Add lead detail page with contact info, project notes, status, and follow-up history
-- [ ] Add convert lead to job/project flow (placeholder only — wires in after estimate builder)
-- [ ] Add estimate table
-- [ ] Add estimate builder UI
-- [ ] Add cost catalog / assemblies
-- [ ] Add proposal builder
-- [ ] Add proposal PDF generation
-- [ ] Add proposal approval/signature flow
-- [ ] Convert accepted proposal into job, budget, and schedule
+- [x] Add convert lead to job/project flow
+- [x] Add estimate table
+- [x] Add estimate builder UI
+- [ ] Add cost catalog assemblies
+- [x] Add proposal builder / printable proposal view
+- [x] Add proposal PDF generation via browser print / Save as PDF
+- [x] Add proposal approval/signature flow
+- [x] Convert accepted proposal into job, budget, and schedule
 - [ ] Add bid requests
 - [ ] Add vendor bid comparison / bid leveling
 - [ ] Add basic takeoff placeholder workflow
@@ -472,11 +477,11 @@ Goal: once the job and budget modules are more fully built out, allow admins to 
 
 Start here unless we intentionally reprioritize.
 
-- [ ] Show contacts on job detail panel (quick win — contacts table exists, job_id is linked)
-- [ ] Add convert lead to job/project flow (Lead status = Won → auto-create job + budget)
-- [ ] Add estimate builder UI (pulls from 4,600-row cost book already in DB)
+- [x] Show contacts on job detail panel (quick win — contacts table exists, job_id is linked)
+- [x] Add convert lead to job/project flow (Lead status = Won → auto-create job; accepted proposal → job + budget + schedule)
+- [x] Add estimate builder UI (pulls from 4,600-row cost book already in DB)
 - [ ] **[Price Intelligence]** Decide which retailers to include, then start Phase 5a (Apify client + price_cache schema + HD scraper)
-- [ ] Add proposal PDF generation + client accept flow
+- [x] Add proposal PDF generation + client accept flow
 - [ ] Add mobile-friendly daily log creation flow
 - [ ] Add job activity feed
 - [ ] Phase 7: AI daily brief + budget overrun risk detection (Sprint D)

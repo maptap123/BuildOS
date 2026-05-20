@@ -13,7 +13,11 @@ import { AddChangeOrderModal } from './AddChangeOrderModal'
 import { BillsTable } from './BillsTable'
 import { PurchaseOrderTable } from './PurchaseOrderTable'
 import { AddPOModal } from './AddPOModal'
+import { BillingMilestonesTable } from './BillingMilestonesTable'
+import { WorkOrderTable } from './WorkOrderTable'
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders'
+import { useBillingMilestones } from '@/hooks/useBillingMilestones'
+import { useWorkOrders } from '@/hooks/useWorkOrders'
 import type { Job, BudgetLine, Actual, ChangeOrder, PurchaseOrder, QBSyncStatus } from '@/types'
 
 interface Permissions {
@@ -32,7 +36,7 @@ interface Props {
   currentUserId: string
 }
 
-type Tab = 'budget' | 'change_orders' | 'bills' | 'purchase_orders'
+type Tab = 'budget' | 'change_orders' | 'bills' | 'purchase_orders' | 'work_orders' | 'billing'
 
 const QB_STATUS: Record<QBSyncStatus, { icon: React.ReactNode; text: string; color: string }> = {
   not_synced: { icon: <Clock size={12} />,       text: 'Not synced to QuickBooks', color: 'text-gray-400'    },
@@ -62,6 +66,8 @@ export function BudgetClient({
   const { lines, actuals, loading: budgetLoading, error: budgetError, refresh: refreshBudget } = useBudget(jobId, initialLines, initialActuals)
   const { orders, loading: coLoading, error: coError, refresh: refreshCOs } = useChangeOrders(jobId, initialChangeOrders)
   const { pos, loading: poLoading, error: poError, refresh: refreshPOs } = usePurchaseOrders(jobId)
+  const { workOrders, loading: woLoading, error: woError, refresh: refreshWOs } = useWorkOrders(jobId)
+  const { milestones, loading: billingLoading, error: billingError, refresh: refreshMilestones } = useBillingMilestones(jobId)
 
   const [tab, setTab] = useState<Tab>('budget')
   const [showAddLine, setShowAddLine]           = useState(false)
@@ -72,8 +78,8 @@ export function BudgetClient({
   const [showAddPO, setShowAddPO]               = useState(false)
   const [editPO, setEditPO]                     = useState<PurchaseOrder | null>(null)
 
-  const loading = tab === 'budget' ? budgetLoading : tab === 'change_orders' ? coLoading : tab === 'purchase_orders' ? poLoading : false
-  const error   = tab === 'budget' ? budgetError   : tab === 'change_orders' ? coError   : tab === 'purchase_orders' ? poError   : null
+  const loading = tab === 'budget' ? budgetLoading : tab === 'change_orders' ? coLoading : tab === 'purchase_orders' ? poLoading : tab === 'work_orders' ? woLoading : tab === 'billing' ? billingLoading : false
+  const error   = tab === 'budget' ? budgetError   : tab === 'change_orders' ? coError   : tab === 'purchase_orders' ? poError   : tab === 'work_orders' ? woError   : tab === 'billing' ? billingError   : null
 
   const approvedCOTotal = orders
     .filter(co => co.status === 'approved')
@@ -136,6 +142,24 @@ export function BudgetClient({
           Purchase Orders
           <span className={`ml-2 text-[11px] ${tab === 'purchase_orders' ? 'text-white/70' : 'text-gray-400'}`}>{pos.length}</span>
         </button>
+        <button
+          onClick={() => setTab('work_orders')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'work_orders' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+          }`}
+        >
+          Work Orders
+          <span className={`ml-2 text-[11px] ${tab === 'work_orders' ? 'text-white/70' : 'text-gray-400'}`}>{workOrders.length}</span>
+        </button>
+        <button
+          onClick={() => setTab('billing')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'billing' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+          }`}
+        >
+          Draw Schedule
+          <span className={`ml-2 text-[11px] ${tab === 'billing' ? 'text-white/70' : 'text-gray-400'}`}>{milestones.length}</span>
+        </button>
       </div>
 
       {error && (
@@ -147,7 +171,7 @@ export function BudgetClient({
 
       {loading ? (
         <div className="bg-white rounded-xl border border-border p-8 text-center text-gray-400 text-sm">
-          Loading {tab === 'budget' ? 'budget' : tab === 'change_orders' ? 'change orders' : tab === 'purchase_orders' ? 'purchase orders' : 'bills'}…
+          Loading {tab === 'budget' ? 'budget' : tab === 'change_orders' ? 'change orders' : tab === 'purchase_orders' ? 'purchase orders' : tab === 'work_orders' ? 'work orders' : tab === 'billing' ? 'draw schedule' : 'bills'}…
         </div>
       ) : tab === 'budget' ? (
         <BudgetLineTable
@@ -178,6 +202,21 @@ export function BudgetClient({
                 .catch(() => {})
             }
           }}
+        />
+      ) : tab === 'work_orders' ? (
+        <WorkOrderTable
+          jobId={jobId}
+          workOrders={workOrders}
+          lines={lines}
+          permissions={permissions}
+          onRefresh={refreshWOs}
+        />
+      ) : tab === 'billing' ? (
+        <BillingMilestonesTable
+          jobId={jobId}
+          milestones={milestones}
+          permissions={permissions}
+          onRefresh={refreshMilestones}
         />
       ) : (
         <BillsTable

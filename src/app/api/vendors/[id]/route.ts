@@ -15,29 +15,26 @@ export async function PATCH(
     .from('user_permissions')
     .select('can_edit')
     .eq('user_id', user.id)
-    .eq('module', 'budget')
+    .eq('module', 'jobs')
     .single()
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const allowed = [
-    'vendor_name', 'invoice_number', 'description', 'amount', 'status',
-    'incurred_date', 'budget_line_id', 'payment_method', 'po_number',
-  ]
   const updates: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in body) updates[key] = body[key]
-  }
 
-  // When approving, stamp approved_by and approved_at
-  if (updates.status === 'approved') {
-    updates.approved_by = user.id
-    updates.approved_at = new Date().toISOString()
+  const stringFields = ['name', 'contact_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'trade', 'license_number', 'notes']
+  for (const field of stringFields) {
+    if (field in body) {
+      updates[field] = body[field] ? String(body[field]).trim() : null
+    }
   }
+  if ('vendor_type' in body) updates.vendor_type = body.vendor_type
+  if ('insurance_expiry' in body) updates.insurance_expiry = body.insurance_expiry || null
+  if ('is_active' in body) updates.is_active = body.is_active
 
   const admin = createAdminClient()
   const { data, error } = await admin
-    .from('actuals')
+    .from('vendors')
     .update(updates)
     .eq('id', id)
     .select()
@@ -60,12 +57,18 @@ export async function DELETE(
     .from('user_permissions')
     .select('can_delete')
     .eq('user_id', user.id)
-    .eq('module', 'budget')
+    .eq('module', 'jobs')
     .single()
   if (!perm?.can_delete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
-  const { error } = await admin.from('actuals').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const { data, error } = await admin
+    .from('vendors')
+    .update({ is_active: false })
+    .eq('id', id)
+    .select('id')
+    .single()
+
+  if (error || !data) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
   return NextResponse.json({ success: true })
 }

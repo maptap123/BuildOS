@@ -67,7 +67,25 @@ export async function DELETE(
   if (!perm?.can_delete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
+
+  const { data: existing, error: fetchErr } = await admin
+    .from('change_orders')
+    .select('status')
+    .eq('id', id)
+    .single()
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: 'Change order not found' }, { status: 404 })
+  }
+
+  if (existing.status !== 'draft' && existing.status !== 'voided') {
+    return NextResponse.json(
+      { error: 'Only draft or voided change orders can be deleted' },
+      { status: 409 }
+    )
+  }
+
   const { error } = await admin.from('change_orders').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return new NextResponse(null, { status: 204 })
+  return NextResponse.json({ success: true })
 }
