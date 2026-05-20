@@ -28,27 +28,27 @@ interface Props {
 export function DesktopJobPanel({ currentJobId }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<JobStatus | ''>('')
+  const [statuses, setStatuses] = useState<JobStatus[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [activeManager, setActiveManager] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [showAddJob, setShowAddJob] = useState(false)
 
-  const { defaultStatus, defaultTags, saveDefault, loading: prefLoading } = useJobFilterPrefs()
+  const { defaultStatuses, defaultTags, saveDefault, loading: prefLoading } = useJobFilterPrefs()
   const { tags: tagOptions } = useTagOptions()
   const { users } = useUsers()
   const { can, isAdmin } = usePermissions()
   const canCreate = can('jobs', 'create') || isAdmin()
 
   const { jobs, loading } = useJobs({
-    status: status || undefined,
+    statuses: statuses.length > 0 ? statuses : undefined,
     tags: selectedTags.length > 0 ? selectedTags : undefined,
     manager_id: activeManager,
   })
 
   useEffect(() => {
     if (!prefLoading) {
-      setStatus(defaultStatus)
+      setStatuses(defaultStatuses)
       setSelectedTags(defaultTags)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,16 +63,17 @@ export function DesktopJobPanel({ currentJobId }: Props) {
     : jobs
 
   const activeFilterCount =
-    (status ? 1 : 0) + (selectedTags.length > 0 ? 1 : 0) + (activeManager ? 1 : 0)
+    (statuses.length > 0 ? 1 : 0) + (selectedTags.length > 0 ? 1 : 0) + (activeManager ? 1 : 0)
 
   const isCurrentDefault =
-    status === defaultStatus &&
+    statuses.length === defaultStatuses.length &&
+    statuses.every(s => defaultStatuses.includes(s)) &&
     selectedTags.length === defaultTags.length &&
     selectedTags.every(t => defaultTags.includes(t))
 
   function toggleStatus(v: JobStatus) {
     setSaved(false)
-    setStatus(prev => prev === v ? '' : v)
+    setStatuses(prev => prev.includes(v) ? prev.filter(s => s !== v) : [...prev, v])
   }
 
   function toggleTag(t: string) {
@@ -82,18 +83,18 @@ export function DesktopJobPanel({ currentJobId }: Props) {
 
   function toggleManager(id: string) {
     setSaved(false)
-    setActiveManager(prev => prev === id ? null : id)
+    setActiveManager(prev => (prev === id ? null : id))
   }
 
   function clearFilters() {
     setSaved(false)
-    setStatus('')
+    setStatuses([])
     setSelectedTags([])
     setActiveManager(null)
   }
 
   async function handleSaveDefault() {
-    await saveDefault(status, selectedTags)
+    await saveDefault(statuses, selectedTags)
     setSaved(true)
   }
 
@@ -144,13 +145,13 @@ export function DesktopJobPanel({ currentJobId }: Props) {
                   key={o.value}
                   onClick={() => toggleStatus(o.value)}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    status === o.value
+                    statuses.includes(o.value)
                       ? 'bg-navy-900 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
                   {o.label}
-                  {status === o.value && <X size={10} />}
+                  {statuses.includes(o.value) && <X size={10} />}
                 </button>
               ))}
             </div>

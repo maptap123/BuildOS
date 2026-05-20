@@ -10,12 +10,11 @@ import { useJobFilterPrefs } from '@/hooks/useJobFilterPrefs'
 import { JobStatusBadge } from './JobStatusBadge'
 import type { JobStatus } from '@/types'
 
-const STATUS_CHIPS: { value: JobStatus | ''; label: string }[] = [
-  { value: '',        label: 'All'     },
-  { value: 'active',  label: 'Active'  },
-  { value: 'presale', label: 'Presale' },
-  { value: 'lead',    label: 'Lead'    },
-  { value: 'closed',  label: 'Closed'  },
+const STATUS_CHIPS: { value: JobStatus; label: string }[] = [
+  { value: 'active',   label: 'Active'   },
+  { value: 'presale',  label: 'Presale'  },
+  { value: 'lead',     label: 'Lead'     },
+  { value: 'closed',   label: 'Closed'   },
 ]
 
 interface Props {
@@ -26,25 +25,25 @@ interface Props {
 export function JobPickerSheet({ onClose, currentJobId }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<JobStatus | ''>('')
+  const [statuses, setStatuses] = useState<JobStatus[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [activeManager, setActiveManager] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const { defaultStatus, defaultTags, saveDefault, loading: prefLoading } = useJobFilterPrefs()
+  const { defaultStatuses, defaultTags, saveDefault, loading: prefLoading } = useJobFilterPrefs()
   const { tags: tagOptions } = useTagOptions()
   const { users } = useUsers()
 
   const { jobs, loading } = useJobs({
-    status: status || undefined,
+    statuses: statuses.length > 0 ? statuses : undefined,
     tags: selectedTags.length > 0 ? selectedTags : undefined,
     manager_id: activeManager,
   })
 
   useEffect(() => {
     if (!prefLoading) {
-      setStatus(defaultStatus)
+      setStatuses(defaultStatuses)
       setSelectedTags(defaultTags)
       if (defaultTags.length > 0) setFiltersOpen(true)
     }
@@ -63,9 +62,20 @@ export function JobPickerSheet({ onClose, currentJobId }: Props) {
     (selectedTags.length > 0 ? 1 : 0) + (activeManager ? 1 : 0)
 
   const isCurrentDefault =
-    status === defaultStatus &&
+    statuses.length === defaultStatuses.length &&
+    statuses.every(s => defaultStatuses.includes(s)) &&
     selectedTags.length === defaultTags.length &&
     selectedTags.every(t => defaultTags.includes(t))
+
+  function toggleStatus(v: JobStatus) {
+    setSaved(false)
+    setStatuses(prev => prev.includes(v) ? prev.filter(s => s !== v) : [...prev, v])
+  }
+
+  function clearStatuses() {
+    setSaved(false)
+    setStatuses([])
+  }
 
   function toggleTag(t: string) {
     setSaved(false)
@@ -84,7 +94,7 @@ export function JobPickerSheet({ onClose, currentJobId }: Props) {
   }
 
   async function handleSaveDefault() {
-    await saveDefault(status, selectedTags)
+    await saveDefault(statuses, selectedTags)
     setSaved(true)
   }
 
@@ -129,17 +139,28 @@ export function JobPickerSheet({ onClose, currentJobId }: Props) {
 
         {/* Status chips */}
         <div className="flex gap-2 px-4 pb-2 overflow-x-auto shrink-0">
+          <button
+            onClick={clearStatuses}
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              statuses.length === 0
+                ? 'bg-navy-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            All
+          </button>
           {STATUS_CHIPS.map(chip => (
             <button
               key={chip.value}
-              onClick={() => { setSaved(false); setStatus(chip.value) }}
-              className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                status === chip.value
+              onClick={() => toggleStatus(chip.value)}
+              className={`shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                statuses.includes(chip.value)
                   ? 'bg-navy-900 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {chip.label}
+              {statuses.includes(chip.value) && <X size={9} />}
             </button>
           ))}
         </div>

@@ -174,7 +174,7 @@ function JobsDashboardContent() {
   const [showAddJob, setShowAddJob] = useState(false)
 
   const agenda = useAgenda()
-  const { jobs: activeJobs, loading: jobsLoading } = useJobs({ status: 'active' })
+  const { jobs: activeJobs, loading: jobsLoading } = useJobs({ statuses: ['active'] })
   const { can, isAdmin } = usePermissions()
   const canCreate = can('jobs', 'create') || isAdmin()
   const selectJobFor = searchParams.get('selectJob')

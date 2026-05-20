@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
-  const status = searchParams.get('status')
+  const statusValues = searchParams.getAll('status').filter(Boolean)
   const search = searchParams.get('search')?.trim()
   const tags = searchParams.getAll('tag').map(t => t.trim()).filter(Boolean)
   const managerId = searchParams.get('manager_id')
@@ -34,8 +34,8 @@ export async function GET(request: Request) {
   const canSeeBudget = budgetPerm?.can_view ?? false
 
   let query = admin.from('jobs').select('*').order('created_at', { ascending: false })
-  if (status) {
-    query = query.eq('status', status)
+  if (statusValues.length > 0) {
+    query = query.in('status', statusValues)
   } else {
     // Exclude archived jobs from the default list
     query = query.neq('status', 'archived')

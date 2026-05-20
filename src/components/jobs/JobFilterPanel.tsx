@@ -16,50 +16,51 @@ const STATUS_OPTIONS: { value: JobStatus; label: string }[] = [
 interface Props {
   open: boolean
   onClose: () => void
-  activeStatus: JobStatus | ''
+  activeStatuses: JobStatus[]
   activeTags: string[]
   availableTags: string[]
   activeManager: string | null
   availableManagers: UserOption[]
-  defaultStatus?: JobStatus | ''
+  defaultStatuses?: JobStatus[]
   defaultTags?: string[]
-  onApply: (status: JobStatus | '', tags: string[], manager: string | null) => void
+  onApply: (statuses: JobStatus[], tags: string[], manager: string | null) => void
   onClear: () => void
-  onSaveDefault?: (status: JobStatus | '', tags: string[]) => Promise<void>
+  onSaveDefault?: (statuses: JobStatus[], tags: string[]) => Promise<void>
 }
 
 export function JobFilterPanel({
-  open, onClose, activeStatus, activeTags, availableTags,
+  open, onClose, activeStatuses, activeTags, availableTags,
   activeManager, availableManagers,
-  defaultStatus = '', defaultTags = [],
+  defaultStatuses = [], defaultTags = [],
   onApply, onClear, onSaveDefault,
 }: Props) {
-  const [pendingStatus, setPendingStatus] = useState<JobStatus | ''>(activeStatus)
+  const [pendingStatuses, setPendingStatuses] = useState<JobStatus[]>(activeStatuses)
   const [pendingTags, setPendingTags] = useState<string[]>(activeTags)
   const [pendingManager, setPendingManager] = useState<string | null>(activeManager)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setPendingStatus(activeStatus)
+      setPendingStatuses(activeStatuses)
       setPendingTags(activeTags)
       setPendingManager(activeManager)
     }
-  }, [open, activeStatus, activeTags, activeManager])
+  }, [open, activeStatuses, activeTags, activeManager])
 
   const activeFilterCount =
-    (activeStatus ? 1 : 0) +
+    (activeStatuses.length > 0 ? 1 : 0) +
     (activeTags.length > 0 ? 1 : 0) +
     (activeManager ? 1 : 0)
 
   const isCurrentDefault =
-    pendingStatus === defaultStatus &&
+    pendingStatuses.length === defaultStatuses.length &&
+    pendingStatuses.every(s => defaultStatuses.includes(s)) &&
     pendingTags.length === defaultTags.length &&
     pendingTags.every(t => defaultTags.includes(t))
 
   function toggleStatus(v: JobStatus) {
     setSaved(false)
-    setPendingStatus(prev => (prev === v ? '' : v))
+    setPendingStatuses(prev => prev.includes(v) ? prev.filter(s => s !== v) : [...prev, v])
   }
 
   function toggleTag(t: string) {
@@ -74,7 +75,7 @@ export function JobFilterPanel({
 
   async function handleSaveDefault() {
     if (!onSaveDefault) return
-    await onSaveDefault(pendingStatus, pendingTags)
+    await onSaveDefault(pendingStatuses, pendingTags)
     setSaved(true)
   }
 
@@ -121,7 +122,7 @@ export function JobFilterPanel({
             </p>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPTIONS.map(o => {
-                const active = pendingStatus === o.value
+                const active = pendingStatuses.includes(o.value)
                 return (
                   <button
                     key={o.value}
@@ -202,13 +203,13 @@ export function JobFilterPanel({
         <div className="border-t border-border px-4 py-4 space-y-2">
           <div className="flex gap-3">
             <button
-              onClick={() => { onApply(pendingStatus, pendingTags, pendingManager); onClose() }}
+              onClick={() => { onApply(pendingStatuses, pendingTags, pendingManager); onClose() }}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
             >
               Update Results
             </button>
             <button
-              onClick={() => { setSaved(false); setPendingStatus(''); setPendingTags([]); setPendingManager(null) }}
+              onClick={() => { setSaved(false); setPendingStatuses([]); setPendingTags([]); setPendingManager(null) }}
               className="flex-1 border border-gray-200 text-gray-700 text-sm font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Reset Filters

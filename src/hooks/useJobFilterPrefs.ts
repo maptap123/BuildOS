@@ -4,13 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { JobStatus } from '@/types'
 
-interface JobFilterPrefs {
-  status: JobStatus | ''
-  tags: string[]
-}
-
 export function useJobFilterPrefs() {
-  const [defaultStatus, setDefaultStatus] = useState<JobStatus | ''>('')
+  const [defaultStatuses, setDefaultStatuses] = useState<JobStatus[]>([])
   const [defaultTags, setDefaultTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -26,8 +21,11 @@ export function useJobFilterPrefs() {
         .maybeSingle()
         .then(({ data: row }) => {
           if (row?.jobs_filter) {
-            const f = row.jobs_filter as JobFilterPrefs
-            setDefaultStatus(f.status ?? '')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const f = row.jobs_filter as any
+            // Support legacy single-status format { status: '...' }
+            const statuses: JobStatus[] = f.statuses ?? (f.status ? [f.status as JobStatus] : [])
+            setDefaultStatuses(statuses)
             setDefaultTags(f.tags ?? [])
           }
           setLoading(false)
@@ -35,7 +33,7 @@ export function useJobFilterPrefs() {
     })
   }, [])
 
-  const saveDefault = useCallback(async (status: JobStatus | '', tags: string[]) => {
+  const saveDefault = useCallback(async (statuses: JobStatus[], tags: string[]) => {
     const supabase = createClient()
     const { data } = await supabase.auth.getUser()
     if (!data.user) return
@@ -43,13 +41,13 @@ export function useJobFilterPrefs() {
     await supabase
       .from('user_preferences')
       .upsert(
-        { user_id: data.user.id, jobs_filter: { status, tags } },
+        { user_id: data.user.id, jobs_filter: { statuses, tags } },
         { onConflict: 'user_id' }
       )
 
-    setDefaultStatus(status)
+    setDefaultStatuses(statuses)
     setDefaultTags(tags)
   }, [])
 
-  return { defaultStatus, defaultTags, saveDefault, loading }
+  return { defaultStatuses, defaultTags, saveDefault, loading }
 }

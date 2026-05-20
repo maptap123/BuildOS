@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Job } from '@/types'
 
 interface UseJobsOptions {
-  status?: string
+  statuses?: string[]
   search?: string
   tags?: string[]
   manager_id?: string | null
 }
 
-export function useJobs({ status, search, tags, manager_id }: UseJobsOptions = {}) {
+export function useJobs({ statuses, search, tags, manager_id }: UseJobsOptions = {}) {
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +21,7 @@ export function useJobs({ status, search, tags, manager_id }: UseJobsOptions = {
 
     try {
       const params = new URLSearchParams()
-      if (status) params.set('status', status)
+      statuses?.forEach(s => { if (s.trim()) params.append('status', s.trim()) })
       if (search?.trim()) params.set('search', search.trim())
       tags?.forEach(t => { if (t.trim()) params.append('tag', t.trim()) })
       if (manager_id) params.set('manager_id', manager_id)
@@ -39,7 +39,7 @@ export function useJobs({ status, search, tags, manager_id }: UseJobsOptions = {
       setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, search, tags?.join(','), manager_id])
+  }, [statuses?.join(','), search, tags?.join(','), manager_id])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
