@@ -24,7 +24,20 @@ export async function GET(request: Request) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  const includePredecessors = searchParams.get('include_predecessors') === 'true'
+  if (!includePredecessors || !jobId) {
+    return NextResponse.json(data ?? [])
+  }
+
+  const admin = createAdminClient()
+  const { data: predecessors, error: predError } = await admin
+    .from('schedule_item_predecessors')
+    .select('id, item_id, predecessor_id, type, lag_days')
+    .eq('job_id', jobId)
+
+  if (predError) return NextResponse.json({ error: predError.message }, { status: 500 })
+  return NextResponse.json({ items: data ?? [], predecessors: predecessors ?? [] })
 }
 
 export async function POST(request: Request) {
@@ -43,6 +56,7 @@ export async function POST(request: Request) {
   const body = await request.json()
   const {
     job_id, title, description, status = 'not_started',
+    type = 'phase',
     start_date, end_date, all_day = true,
     assigned_user_id, predecessor_id, sort_order = 0,
     percent_complete = 0, trade, color,
@@ -56,6 +70,7 @@ export async function POST(request: Request) {
     .from('schedule_items')
     .insert({
       job_id, title, description: description ?? null, status,
+      type: type === 'milestone' ? 'milestone' : 'phase',
       start_date, end_date, all_day,
       assigned_user_id: assigned_user_id ?? null,
       predecessor_id: predecessor_id ?? null,

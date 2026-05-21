@@ -20,7 +20,7 @@ export async function PATCH(
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const allowed = ['title', 'description', 'status', 'start_date', 'end_date', 'all_day', 'sort_order', 'assigned_user_id', 'predecessor_id', 'percent_complete', 'trade', 'color']
+  const allowed = ['title', 'description', 'status', 'type', 'start_date', 'end_date', 'all_day', 'sort_order', 'assigned_user_id', 'predecessor_id', 'percent_complete', 'trade', 'color']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]

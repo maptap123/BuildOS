@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, Clock, CloudUpload, ClipboardList } from 'lucide-react'
+import { AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, Clock, CloudUpload, ClipboardList, Download } from 'lucide-react'
 import { useBudget } from '@/hooks/useBudget'
 import { useChangeOrders } from '@/hooks/useChangeOrders'
 import { BudgetSummary } from './BudgetSummary'
@@ -98,7 +98,72 @@ export function BudgetClient({
     }
   }, [jobId])
 
+  function exportBudgetCSV() {
+    const today = new Date().toISOString().slice(0, 10)
+    const headers = ['Phase', 'Cost Code', 'Category', 'Description', 'Status', 'Original Budget', 'Revised Budget', 'Committed Cost', 'Forecast Cost', 'Variance']
+    const rows = lines.map(l => {
+      const forecast = l.forecast_cost ?? l.revised_budget
+      return [
+        l.phase ?? '',
+        l.cost_code,
+        l.category,
+        l.description,
+        l.status,
+        l.original_budget,
+        l.revised_budget,
+        l.committed_cost,
+        forecast,
+        l.revised_budget - forecast,
+      ]
+    })
+    const totalForecast = lines.reduce((s, l) => s + (l.forecast_cost ?? l.revised_budget), 0)
+    const totals = [
+      'TOTALS', '', '', '', '',
+      lines.reduce((s, l) => s + l.original_budget, 0),
+      lines.reduce((s, l) => s + l.revised_budget, 0),
+      lines.reduce((s, l) => s + l.committed_cost, 0),
+      totalForecast,
+      lines.reduce((s, l) => s + l.revised_budget, 0) - totalForecast,
+    ]
+    const csv = [headers, ...rows, totals]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const url = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budget-${jobId}-${today}.csv`
+    a.click()
+  }
+
+  function exportBillsCSV() {
+    const today = new Date().toISOString().slice(0, 10)
+    const lineMap = new Map(lines.map(l => [l.id, l]))
+    const headers = ['Date', 'Vendor', 'Invoice #', 'Description', 'Budget Line', 'Amount', 'Status']
+    const rows = actuals.map(a => {
+      const bl = a.budget_line_id ? lineMap.get(a.budget_line_id) : undefined
+      return [
+        a.incurred_date,
+        a.vendor_name ?? '',
+        a.invoice_number ?? '',
+        a.description,
+        bl ? `${bl.cost_code} · ${bl.description}` : '',
+        a.amount,
+        a.status,
+      ]
+    })
+    const total = ['TOTALS', '', '', '', '', actuals.reduce((s, a) => s + a.amount, 0), '']
+    const csv = [headers, ...rows, total]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const url = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `bills-${jobId}-${today}.csv`
+    a.click()
+  }
+
   const [showAddLine, setShowAddLine]           = useState(false)
+  const [editLine, setEditLine]                 = useState<BudgetLine | null>(null)
   const [addActualForLine, setAddActualForLine] = useState<string | null>(null)
   const [showAddBill, setShowAddBill]           = useState(false)
   const [showAddCO, setShowAddCO]               = useState(false)
@@ -224,6 +289,17 @@ export function BudgetClient({
         </div>
       ) : tab === 'budget' ? (
         <>
+          {lines.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={exportBudgetCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors"
+              >
+                <Download size={12} />
+                Export CSV
+              </button>
+            </div>
+          )}
           {lines.length === 0 && leadId && (
             <div className="flex items-center justify-between bg-navy-50 border border-navy-100 rounded-xl px-4 py-3">
               <div className="flex items-center gap-2.5 text-sm text-navy-700">
@@ -244,6 +320,7 @@ export function BudgetClient({
             permissions={permissions}
             onAddLine={() => setShowAddLine(true)}
             onAddActual={lineId => setAddActualForLine(lineId)}
+            onEdit={line => setEditLine(line)}
           />
         </>
       ) : tab === 'change_orders' ? (
@@ -284,14 +361,27 @@ export function BudgetClient({
           onRefresh={refreshMilestones}
         />
       ) : (
-        <BillsTable
-          actuals={actuals}
-          lines={lines}
-          permissions={permissions}
-          currentUserId={currentUserId}
-          onAdd={() => setShowAddBill(true)}
-          onRefresh={refreshBudget}
-        />
+        <>
+          {actuals.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={exportBillsCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors"
+              >
+                <Download size={12} />
+                Export CSV
+              </button>
+            </div>
+          )}
+          <BillsTable
+            actuals={actuals}
+            lines={lines}
+            permissions={permissions}
+            currentUserId={currentUserId}
+            onAdd={() => setShowAddBill(true)}
+            onRefresh={refreshBudget}
+          />
+        </>
       )}
 
       {showAddLine && (
@@ -299,6 +389,15 @@ export function BudgetClient({
           jobId={jobId}
           onClose={() => setShowAddLine(false)}
           onCreated={() => { setShowAddLine(false); refreshBudget() }}
+        />
+      )}
+
+      {editLine && (
+        <AddBudgetLineModal
+          jobId={jobId}
+          initialData={editLine}
+          onClose={() => setEditLine(null)}
+          onCreated={() => { setEditLine(null); refreshBudget() }}
         />
       )}
 

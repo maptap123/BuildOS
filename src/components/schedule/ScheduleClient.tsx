@@ -129,9 +129,11 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
       ) : (
         <ScheduleList
           items={items}
+          jobId={jobId}
           canCreate={permissions.can_create}
           onAdd={() => setShowAdd(true)}
           onEdit={handleEdit}
+          onRefresh={refresh}
         />
       )}
 

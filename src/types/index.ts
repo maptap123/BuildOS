@@ -37,6 +37,8 @@ export type ScheduleItemStatus =
   | "completed"
   | "delayed";
 
+export type ScheduleItemType = "phase" | "milestone";
+
 export type OutlookSyncStatus = "not_synced" | "pending" | "synced" | "error";
 
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done" | "archived";
@@ -239,6 +241,7 @@ export interface ScheduleItem {
   title: string;
   description: string | null;
   status: ScheduleItemStatus;
+  type: ScheduleItemType;
   start_date: string;
   end_date: string;
   all_day: boolean;

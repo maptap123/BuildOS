@@ -1,11 +1,21 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Plus, Calendar, List, BarChart2, CalendarDays, CalendarRange,
   Search, X, ChevronLeft, ChevronRight, SlidersHorizontal,
 } from 'lucide-react'
-import type { ScheduleItem, ScheduleItemStatus } from '@/types'
+import type { ScheduleItem, ScheduleItemStatus, PredecessorType } from '@/types'
+
+// ─── Predecessor types (local, trimmed from SchedulePredecessor for Gantt) ────
+
+interface GanttPredecessor {
+  id: string
+  item_id: string
+  predecessor_id: string
+  type: PredecessorType
+  lag_days: number
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,9 +106,66 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
   )
 }
 
+// ─── MILESTONE DIAMOND ────────────────────────────────────────────────────────
+
+function MilestoneDiamond({ size = 14 }: { size?: number }) {
+  return (
+    <span
+      className="text-amber-500 shrink-0 select-none"
+      style={{ fontSize: size, lineHeight: 1 }}
+      aria-label="Milestone"
+    >
+      ◆
+    </span>
+  )
+}
+
+// ─── INLINE DATE INPUT ────────────────────────────────────────────────────────
+
+interface InlineDateInputProps {
+  itemId: string
+  field: 'start_date' | 'end_date'
+  value: string
+  onSaved: () => void
+}
+
+function InlineDateInput({ itemId, field, value, onSaved }: InlineDateInputProps) {
+  const [saving, setSaving] = useState(false)
+
+  async function handleChange(newValue: string) {
+    if (!newValue || newValue === value) return
+    setSaving(true)
+    try {
+      await fetch(`/api/schedule/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: newValue }),
+      })
+      onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <input
+      type="date"
+      defaultValue={value}
+      disabled={saving}
+      onClick={e => e.stopPropagation()}
+      onBlur={e => handleChange(e.target.value)}
+      onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
+      className={`text-gray-600 text-sm bg-transparent border border-transparent rounded px-1 py-0.5 whitespace-nowrap
+        hover:border-gray-300 focus:border-gold-400 focus:ring-1 focus:ring-gold-400 focus:outline-none
+        transition-colors tabular-nums cursor-pointer
+        ${saving ? 'opacity-50' : ''}`}
+    />
+  )
+}
+
 // ─── LIST VIEW ────────────────────────────────────────────────────────────────
 
-function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
+function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void; onRefresh: () => void }) {
   return (
     <>
       {/* Desktop table */}
@@ -122,6 +189,7 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
               const e = parseDay(item.end_date)
               const dur = Math.ceil((e.getTime() - s.getTime()) / 86_400_000) + 1
               const color = itemBarColor(item)
+              const isMilestone = item.type === 'milestone'
               return (
                 <tr
                   key={item.id}
@@ -131,10 +199,10 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
                   <td className="px-4 py-3 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-3 h-3 rounded-sm shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
+                      {isMilestone
+                        ? <MilestoneDiamond />
+                        : <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                      }
                       <div className="min-w-0">
                         <p className="font-medium text-navy-800 group-hover:text-navy-900">{item.title}</p>
                         {item.description && (
@@ -144,12 +212,24 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{item.trade ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtShort(s)}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtShort(e)}</td>
-                  <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{dur}d</td>
-                  <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <InlineDateInput itemId={item.id} field="start_date" value={item.start_date} onSaved={onRefresh} />
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {isMilestone
+                      ? <span className="text-gray-400 text-sm px-1">—</span>
+                      : <InlineDateInput itemId={item.id} field="end_date" value={item.end_date} onSaved={onRefresh} />
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{isMilestone ? '—' : `${dur}d`}</td>
+                  <td className="px-4 py-3">
+                    {isMilestone
+                      ? <MilestoneDiamond size={16} />
+                      : <StatusBadge status={item.status} />
+                    }
+                  </td>
                   <td className="px-4 py-3 w-36">
-                    <ProgressBar pct={item.percent_complete} color={color} />
+                    {isMilestone ? null : <ProgressBar pct={item.percent_complete} color={color} />}
                   </td>
                 </tr>
               )
@@ -162,6 +242,7 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
       <div className="md:hidden divide-y divide-gray-100">
         {items.map((item, idx) => {
           const color = itemBarColor(item)
+          const isMilestone = item.type === 'milestone'
           return (
             <button
               key={item.id}
@@ -172,17 +253,23 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
                 <div className="min-w-0 flex items-start gap-2.5">
                   <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
                     <span className="text-[10px] text-gray-400 tabular-nums">{idx + 1}</span>
-                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+                    {isMilestone
+                      ? <MilestoneDiamond />
+                      : <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+                    }
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-navy-800 leading-snug">{item.title}</p>
                     {item.trade && <p className="text-[11px] text-gray-400">{item.trade}</p>}
                   </div>
                 </div>
-                <StatusBadge status={item.status} />
+                {isMilestone
+                  ? <MilestoneDiamond size={16} />
+                  : <StatusBadge status={item.status} />
+                }
               </div>
               <p className="text-xs text-gray-400 mb-2">{fmtRange(item.start_date, item.end_date)}</p>
-              {item.percent_complete > 0 && (
+              {!isMilestone && item.percent_complete > 0 && (
                 <ProgressBar pct={item.percent_complete} color={color} />
               )}
             </button>
@@ -196,8 +283,27 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
 // ─── GANTT VIEW ───────────────────────────────────────────────────────────────
 
 const PX_PER_DAY = 16  // fixed pixel width per day — bars always legible regardless of total span
+const ROW_H      = 44  // px — must match h-11 (44px) used on bar rows
+const BAR_MID_Y  = ROW_H / 2  // vertical center of a bar row
+const RULER_H    = 32  // px — height of the month ruler (h-8)
 
-function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
+interface GanttViewProps {
+  items: ScheduleItem[]
+  jobId: string
+  onEdit: (i: ScheduleItem) => void
+}
+
+function GanttView({ items, jobId, onEdit }: GanttViewProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [predecessors, setPredecessors] = useState<GanttPredecessor[]>([])
+
+  // Build a stable id-to-row-index map for arrow rendering
+  const itemIndexMap = useMemo(() => {
+    const m = new Map<string, number>()
+    items.forEach((item, idx) => m.set(item.id, idx))
+    return m
+  }, [items])
+
   const { minDate, months, totalDays } = useMemo(() => {
     if (!items.length) return { minDate: new Date(), months: [] as { label: string; left: number }[], totalDays: 30 }
 
@@ -225,16 +331,128 @@ function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
   const todayLeft = totalDays > 0 ? daysBetween(minDate, today) * PX_PER_DAY : null
   const showToday = todayLeft !== null && todayLeft >= 0 && todayLeft <= totalDays * PX_PER_DAY
 
-  function barStyle(item: ScheduleItem): React.CSSProperties {
+  // ── Fetch all predecessors for this job ──────────────────────────────────
+  useEffect(() => {
+    if (!jobId) return
+    fetch(`/api/schedule?job_id=${jobId}&include_predecessors=true`)
+      .then(r => r.ok ? r.json() : null)
+      .then((res: { items: ScheduleItem[]; predecessors: GanttPredecessor[] } | null) => {
+        if (res?.predecessors) setPredecessors(res.predecessors)
+      })
+      .catch(() => { /* non-fatal — arrows just won't render */ })
+  }, [jobId])
+
+  // ── Auto-scroll to today on mount ────────────────────────────────────────
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container || todayLeft === null) return
+    if (!showToday) return
+    // Center today horizontally in the scrollable area
+    container.scrollLeft = todayLeft - container.clientWidth / 2
+  // Run once after items load (todayLeft/showToday derive from items)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length > 0])
+
+  function barLeft(item: ScheduleItem): number {
+    const s = parseDay(item.start_date)
+    return Math.max(0, daysBetween(minDate, s)) * PX_PER_DAY
+  }
+
+  function barRight(item: ScheduleItem): number {
     const s = parseDay(item.start_date)
     const e = parseDay(item.end_date)
     const left = Math.max(0, daysBetween(minDate, s)) * PX_PER_DAY
     const width = Math.max(PX_PER_DAY, (daysBetween(s, e) + 1) * PX_PER_DAY)
+    return left + width
+  }
+
+  function barStyle(item: ScheduleItem): React.CSSProperties {
+    const left = barLeft(item)
+    const s = parseDay(item.start_date)
+    const e = parseDay(item.end_date)
+    const width = Math.max(PX_PER_DAY, (daysBetween(s, e) + 1) * PX_PER_DAY)
     return { left, width }
   }
 
+  // ── Build SVG arrows for predecessor relationships ────────────────────────
+  const arrows = useMemo(() => {
+    if (!predecessors.length || !items.length) return null
+
+    const svgH = RULER_H + items.length * ROW_H
+    const svgW = totalDays * PX_PER_DAY
+
+    const paths: React.ReactNode[] = []
+
+    for (const pred of predecessors) {
+      const fromIdx = itemIndexMap.get(pred.predecessor_id)
+      const toIdx   = itemIndexMap.get(pred.item_id)
+      // Skip if either item is filtered out
+      if (fromIdx === undefined || toIdx === undefined) continue
+
+      const fromItem = items[fromIdx]
+      const toItem   = items[toIdx]
+
+      // Compute coordinates based on relationship type
+      let x1: number, y1: number, x2: number, y2: number
+
+      const fromRowTop = RULER_H + fromIdx * ROW_H
+      const toRowTop   = RULER_H + toIdx   * ROW_H
+
+      if (pred.type === 'SS') {
+        x1 = barLeft(fromItem)
+        x2 = barLeft(toItem)
+      } else if (pred.type === 'FF') {
+        x1 = barRight(fromItem)
+        x2 = barRight(toItem)
+      } else if (pred.type === 'SF') {
+        x1 = barLeft(fromItem)
+        x2 = barRight(toItem)
+      } else {
+        // FS (default)
+        x1 = barRight(fromItem)
+        x2 = barLeft(toItem)
+      }
+
+      y1 = fromRowTop + BAR_MID_Y
+      y2 = toRowTop   + BAR_MID_Y
+
+      const arrowColor = '#94a3b8' // slate-400
+      const arrowSize  = 5
+
+      // Simple elbow path: horizontal leg, then diagonal to target
+      const midX = (x1 + x2) / 2
+      const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+
+      // Arrowhead pointing right (for FS/FF) or left (for SS/SF)
+      const pointingRight = x2 >= x1
+      const arrowD = pointingRight
+        ? `M ${x2} ${y2} l ${-arrowSize} ${-arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`
+        : `M ${x2} ${y2} l ${arrowSize} ${-arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`
+
+      paths.push(
+        <g key={`${pred.predecessor_id}-${pred.item_id}`}>
+          <path d={d} fill="none" stroke={arrowColor} strokeWidth={1.5} strokeDasharray={pred.type !== 'FS' ? '4 3' : undefined} />
+          <path d={arrowD} fill={arrowColor} stroke="none" />
+        </g>
+      )
+    }
+
+    if (!paths.length) return null
+
+    return (
+      <svg
+        className="absolute top-0 left-0 pointer-events-none z-20"
+        width={svgW}
+        height={svgH}
+        style={{ overflow: 'visible' }}
+      >
+        {paths}
+      </svg>
+    )
+  }, [predecessors, items, itemIndexMap, totalDays, minDate])
+
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" ref={scrollRef}>
       <div className="flex">
 
         {/* Label column */}
@@ -262,6 +480,9 @@ function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
 
         {/* Bar chart — fixed pixel width so bars stay legible at any timeline span */}
         <div className="relative shrink-0" style={{ width: totalDays * PX_PER_DAY }}>
+          {/* SVG predecessor arrows overlay */}
+          {arrows}
+
           {/* Month ruler */}
           <div className="relative h-8 bg-gray-50 border-b border-gray-100 overflow-hidden">
             {months.map(m => (
@@ -287,6 +508,37 @@ function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
           {/* Bars */}
           {items.map(item => {
             const color = itemBarColor(item)
+            const isMilestone = item.type === 'milestone'
+            if (isMilestone) {
+              const diamondLeft = Math.max(0, daysBetween(minDate, parseDay(item.start_date))) * PX_PER_DAY
+              const DIAMOND_SIZE = 16
+              return (
+                <div key={item.id} className="relative h-11 border-b border-gray-50 flex items-center">
+                  <div
+                    onClick={() => onEdit(item)}
+                    title={`${item.title} · ${fmtShort(parseDay(item.start_date))} (Milestone)`}
+                    className="absolute cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{
+                      left: diamondLeft - DIAMOND_SIZE / 2,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: DIAMOND_SIZE,
+                      height: DIAMOND_SIZE,
+                    }}
+                  >
+                    <div
+                      className="bg-amber-500"
+                      style={{
+                        width: DIAMOND_SIZE,
+                        height: DIAMOND_SIZE,
+                        transform: 'rotate(45deg)',
+                        borderRadius: 2,
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            }
             return (
               <div key={item.id} className="relative h-11 border-b border-gray-50 flex items-center">
                 <div
@@ -845,12 +1097,14 @@ function YearView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
 
 interface Props {
   items: ScheduleItem[]
+  jobId: string
   canCreate: boolean
   onAdd: () => void
   onEdit: (item: ScheduleItem) => void
+  onRefresh?: () => void
 }
 
-export function ScheduleList({ items, canCreate, onAdd, onEdit }: Props) {
+export function ScheduleList({ items, jobId, canCreate, onAdd, onEdit, onRefresh }: Props) {
   const [view, setView] = useState<ScheduleView>('gantt')
   const [filters, setFilters] = useState<Filters>({ search: '', statuses: [], trades: [] })
   const [showFilters, setShowFilters] = useState(false)
@@ -1087,8 +1341,8 @@ export function ScheduleList({ items, canCreate, onAdd, onEdit }: Props) {
         </div>
       ) : (
         <>
-          {view === 'list'  && <ListView  items={filteredItems} onEdit={onEdit} />}
-          {view === 'gantt' && <GanttView items={filteredItems} onEdit={onEdit} />}
+          {view === 'list'  && <ListView  items={filteredItems} onEdit={onEdit} onRefresh={onRefresh ?? (() => {})} />}
+          {view === 'gantt' && <GanttView items={filteredItems} jobId={jobId} onEdit={onEdit} />}
           {view === 'week'  && <WeekView  items={filteredItems} onEdit={onEdit} />}
           {view === 'month' && <MonthView items={filteredItems} onEdit={onEdit} />}
           {view === 'year'  && <YearView  items={filteredItems} onEdit={onEdit} />}

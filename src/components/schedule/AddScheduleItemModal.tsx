@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Link2 } from 'lucide-react'
-import type { ScheduleItem, ScheduleItemStatus, PredecessorType } from '@/types'
+import type { ScheduleItem, ScheduleItemStatus, ScheduleItemType, PredecessorType } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -82,6 +82,7 @@ export function AddScheduleItemModal({
     title:            item?.title ?? '',
     description:      item?.description ?? '',
     status:           (item?.status ?? 'not_started') as ScheduleItemStatus,
+    type:             (item?.type ?? 'phase') as ScheduleItemType,
     start_date:       item?.start_date ?? todayISO,
     end_date:         item?.end_date ?? todayISO,
     sort_order:       String(item?.sort_order ?? 0),
@@ -143,13 +144,15 @@ export function AddScheduleItemModal({
     setSaving(true)
     setError(null)
     try {
+      const isMilestone = form.type === 'milestone'
       const payload = {
         job_id: jobId,
         title: form.title.trim(),
         description: form.description.trim() || null,
         status: form.status,
+        type: form.type,
         start_date: form.start_date,
-        end_date: form.end_date,
+        end_date: isMilestone ? form.start_date : form.end_date,
         all_day: true,
         sort_order: parseInt(form.sort_order) || 0,
         percent_complete: parseInt(form.percent_complete) || 0,
@@ -218,7 +221,9 @@ export function AddScheduleItemModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="font-display font-semibold text-navy-900 text-base">
-            {isEdit ? 'Edit Phase' : 'Add Phase'}
+            {isEdit
+              ? (form.type === 'milestone' ? 'Edit Milestone' : 'Edit Phase')
+              : (form.type === 'milestone' ? 'Add Milestone' : 'Add Phase')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={20} />
@@ -259,6 +264,30 @@ export function AddScheduleItemModal({
           {tab === 'details' && (
             <div className="px-6 py-5 space-y-4">
 
+              {/* Type selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Item Type</label>
+                <div className="flex gap-2">
+                  {([
+                    { value: 'phase',     label: 'Phase / Task' },
+                    { value: 'milestone', label: 'Milestone ◆' },
+                  ] as { value: ScheduleItemType; label: string }[]).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setField('type', opt.value)}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-all ${
+                        form.type === opt.value
+                          ? 'bg-navy-900 text-white border-navy-900'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Title + color dot */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Phase / Task Name *</label>
@@ -294,36 +323,49 @@ export function AddScheduleItemModal({
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
+              {form.type === 'milestone' ? (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Start Date *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Date *</label>
                   <input
                     required
                     type="date"
                     value={form.start_date}
-                    onChange={e => {
-                      const d = e.target.value
-                      setForm(f => ({
-                        ...f,
-                        start_date: d,
-                        end_date: (!f.end_date || f.end_date < d) ? d : f.end_date,
-                      }))
-                    }}
+                    onChange={e => setForm(f => ({ ...f, start_date: e.target.value, end_date: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">End Date *</label>
-                  <input
-                    required
-                    type="date"
-                    value={form.end_date}
-                    min={form.start_date || undefined}
-                    onChange={e => setField('end_date', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Start Date *</label>
+                    <input
+                      required
+                      type="date"
+                      value={form.start_date}
+                      onChange={e => {
+                        const d = e.target.value
+                        setForm(f => ({
+                          ...f,
+                          start_date: d,
+                          end_date: (!f.end_date || f.end_date < d) ? d : f.end_date,
+                        }))
+                      }}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">End Date *</label>
+                    <input
+                      required
+                      type="date"
+                      value={form.end_date}
+                      min={form.start_date || undefined}
+                      onChange={e => setField('end_date', e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Trade + Status */}
               <div className="grid grid-cols-2 gap-4">
@@ -529,7 +571,7 @@ export function AddScheduleItemModal({
               disabled={saving}
               className="flex-1 bg-gold-500 hover:bg-gold-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
             >
-              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Phase'}
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : form.type === 'milestone' ? 'Add Milestone' : 'Add Phase'}
             </button>
           </div>
         </form>

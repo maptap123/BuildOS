@@ -2,23 +2,26 @@
 
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import type { BudgetLine } from '@/types'
 
 interface Props {
   jobId: string
   onClose: () => void
   onCreated: () => void
+  initialData?: BudgetLine
 }
 
-export function AddBudgetLineModal({ jobId, onClose, onCreated }: Props) {
+export function AddBudgetLineModal({ jobId, onClose, onCreated, initialData }: Props) {
+  const isEdit = initialData != null
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
-    cost_code: '',
-    category: '',
-    description: '',
-    status: 'draft' as const,
-    original_budget: '',
-    notes: '',
+    cost_code: initialData?.cost_code ?? '',
+    category: initialData?.category ?? '',
+    description: initialData?.description ?? '',
+    status: (initialData?.status ?? 'draft') as BudgetLine['status'],
+    original_budget: initialData?.original_budget != null ? String(initialData.original_budget) : '',
+    notes: initialData?.notes ?? '',
   })
 
   function set(field: string, value: string) {
@@ -30,19 +33,33 @@ export function AddBudgetLineModal({ jobId, onClose, onCreated }: Props) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/budget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          job_id: jobId,
-          cost_code: form.cost_code.trim(),
-          category: form.category.trim(),
-          description: form.description.trim(),
-          status: form.status,
-          original_budget: parseFloat(form.original_budget) || 0,
-          notes: form.notes.trim() || null,
-        }),
-      })
+      const originalBudget = parseFloat(form.original_budget) || 0
+      const payload = isEdit
+        ? {
+            cost_code: form.cost_code.trim(),
+            category: form.category.trim(),
+            description: form.description.trim(),
+            status: form.status,
+            original_budget: originalBudget,
+            notes: form.notes.trim() || null,
+          }
+        : {
+            job_id: jobId,
+            cost_code: form.cost_code.trim(),
+            category: form.category.trim(),
+            description: form.description.trim(),
+            status: form.status,
+            original_budget: originalBudget,
+            notes: form.notes.trim() || null,
+          }
+      const res = await fetch(
+        isEdit ? `/api/budget/${initialData!.id}` : '/api/budget',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      )
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? `Error ${res.status}`)
@@ -59,7 +76,9 @@ export function AddBudgetLineModal({ jobId, onClose, onCreated }: Props) {
       <div className="bg-white w-full md:max-w-lg md:rounded-xl rounded-t-2xl">
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="font-display font-semibold text-navy-900 text-base">Add Budget Line</h2>
+          <h2 className="font-display font-semibold text-navy-900 text-base">
+            {isEdit ? 'Edit Budget Line' : 'Add Budget Line'}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={20} />
           </button>
@@ -159,7 +178,7 @@ export function AddBudgetLineModal({ jobId, onClose, onCreated }: Props) {
               disabled={saving}
               className="flex-1 bg-gold-500 hover:bg-gold-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
             >
-              {saving ? 'Saving…' : 'Add Line'}
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Line'}
             </button>
           </div>
         </form>

@@ -21,8 +21,8 @@ export async function PATCH(
 
   const body = await request.json()
   const allowed = [
-    'cost_code', 'category', 'description', 'status', 'original_budget',
-    'revised_budget', 'committed_cost', 'forecast_cost', 'notes',
+    'cost_code', 'category', 'description', 'status', 'phase',
+    'original_budget', 'notes',
   ]
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
@@ -30,6 +30,19 @@ export async function PATCH(
   }
 
   const admin = createAdminClient()
+
+  // When original_budget changes, sync revised_budget only if no CO has adjusted it
+  if ('original_budget' in updates) {
+    const { data: existing } = await admin
+      .from('budget_lines')
+      .select('original_budget, revised_budget')
+      .eq('id', id)
+      .single()
+    if (existing && existing.original_budget === existing.revised_budget) {
+      updates.revised_budget = updates.original_budget
+    }
+  }
+
   const { data, error } = await admin
     .from('budget_lines')
     .update(updates)
