@@ -70,18 +70,31 @@ export async function POST(request: Request) {
 
   let autoWeather: Awaited<ReturnType<typeof getWeatherForJobLocation>> = null
   if (!weather_summary || temperature_high == null || temperature_low == null) {
-    const { data: job } = await admin
+    const { data: job, error: jobError } = await admin
       .from('jobs')
       .select('site_address, city, state, postal_code')
       .eq('id', job_id)
       .single()
 
-    if (job) {
-      try {
-        autoWeather = await getWeatherForJobLocation(job, log_date)
-      } catch {
-        autoWeather = null
-      }
+    if (jobError || !job) {
+      return NextResponse.json({ error: 'Could not load job location for weather.' }, { status: 400 })
+    }
+
+    if (!job.postal_code && !job.city && !job.site_address) {
+      return NextResponse.json({ error: 'Add a job address, city, or ZIP before creating a daily log.' }, { status: 400 })
+    }
+
+    try {
+      autoWeather = await getWeatherForJobLocation(job, log_date)
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Weather lookup failed' },
+        { status: 502 }
+      )
+    }
+
+    if (!autoWeather) {
+      return NextResponse.json({ error: 'Could not find weather for this job location.' }, { status: 502 })
     }
   }
 
