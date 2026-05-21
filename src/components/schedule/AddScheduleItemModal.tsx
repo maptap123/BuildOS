@@ -76,12 +76,14 @@ export function AddScheduleItemModal({
   const [deleting, setDeleting] = useState(false)
   const [error, setError]       = useState<string | null>(null)
 
+  const todayISO = new Date().toISOString().split('T')[0]
+
   const [form, setForm] = useState({
     title:            item?.title ?? '',
     description:      item?.description ?? '',
     status:           (item?.status ?? 'not_started') as ScheduleItemStatus,
-    start_date:       item?.start_date ?? '',
-    end_date:         item?.end_date ?? '',
+    start_date:       item?.start_date ?? todayISO,
+    end_date:         item?.end_date ?? todayISO,
     sort_order:       String(item?.sort_order ?? 0),
     percent_complete: String(item?.percent_complete ?? 0),
     trade:            item?.trade ?? '',
@@ -299,7 +301,14 @@ export function AddScheduleItemModal({
                     required
                     type="date"
                     value={form.start_date}
-                    onChange={e => setField('start_date', e.target.value)}
+                    onChange={e => {
+                      const d = e.target.value
+                      setForm(f => ({
+                        ...f,
+                        start_date: d,
+                        end_date: (!f.end_date || f.end_date < d) ? d : f.end_date,
+                      }))
+                    }}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
                   />
                 </div>

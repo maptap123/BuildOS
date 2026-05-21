@@ -195,9 +195,11 @@ function ListView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
 
 // ─── GANTT VIEW ───────────────────────────────────────────────────────────────
 
+const PX_PER_DAY = 16  // fixed pixel width per day — bars always legible regardless of total span
+
 function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
-  const { minDate, months, range } = useMemo(() => {
-    if (!items.length) return { minDate: new Date(), months: [] as { label: string; left: number }[], range: 1 }
+  const { minDate, months, totalDays } = useMemo(() => {
+    if (!items.length) return { minDate: new Date(), months: [] as { label: string; left: number }[], totalDays: 30 }
 
     const starts = items.map(i => parseDay(i.start_date))
     const ends = items.map(i => parseDay(i.end_date))
@@ -205,35 +207,35 @@ function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
     let max = new Date(Math.max(...ends.map(d => d.getTime())))
     min = new Date(min.getTime() - 7 * 86_400_000)
     max = new Date(max.getTime() + 7 * 86_400_000)
-    const r = max.getTime() - min.getTime()
+    const totalDays = Math.ceil((max.getTime() - min.getTime()) / 86_400_000)
 
     const months: { label: string; left: number }[] = []
     const cur = new Date(min.getFullYear(), min.getMonth(), 1)
     while (cur <= max) {
       months.push({
         label: cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-        left: ((cur.getTime() - min.getTime()) / r) * 100,
+        left: Math.max(0, daysBetween(min, cur)) * PX_PER_DAY,
       })
       cur.setMonth(cur.getMonth() + 1)
     }
-    return { minDate: min, months, range: r }
+    return { minDate: min, months, totalDays }
   }, [items])
 
   const today = new Date()
-  const todayPct = range > 0 ? ((today.getTime() - minDate.getTime()) / range) * 100 : null
-  const showToday = todayPct !== null && todayPct >= 0 && todayPct <= 100
+  const todayLeft = totalDays > 0 ? daysBetween(minDate, today) * PX_PER_DAY : null
+  const showToday = todayLeft !== null && todayLeft >= 0 && todayLeft <= totalDays * PX_PER_DAY
 
   function barStyle(item: ScheduleItem): React.CSSProperties {
     const s = parseDay(item.start_date)
     const e = parseDay(item.end_date)
-    const left = Math.max(0, ((s.getTime() - minDate.getTime()) / range) * 100)
-    const width = Math.max(0.5, ((e.getTime() + 86_400_000 - s.getTime()) / range) * 100)
-    return { left: `${left}%`, width: `${width}%` }
+    const left = Math.max(0, daysBetween(minDate, s)) * PX_PER_DAY
+    const width = Math.max(PX_PER_DAY, (daysBetween(s, e) + 1) * PX_PER_DAY)
+    return { left, width }
   }
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex" style={{ minWidth: 640 }}>
+      <div className="flex">
 
         {/* Label column */}
         <div className="w-56 shrink-0 border-r border-gray-100">
@@ -258,15 +260,15 @@ function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
           })}
         </div>
 
-        {/* Bar chart */}
-        <div className="flex-1 relative min-w-0">
+        {/* Bar chart — fixed pixel width so bars stay legible at any timeline span */}
+        <div className="relative shrink-0" style={{ width: totalDays * PX_PER_DAY }}>
           {/* Month ruler */}
           <div className="relative h-8 bg-gray-50 border-b border-gray-100 overflow-hidden">
             {months.map(m => (
               <div
                 key={m.label}
                 className="absolute top-0 bottom-0 flex items-center"
-                style={{ left: `${m.left}%` }}
+                style={{ left: m.left }}
               >
                 <div className="w-px h-full bg-gray-200" />
                 <span className="text-[10px] text-gray-400 pl-1.5 whitespace-nowrap">{m.label}</span>
@@ -278,7 +280,7 @@ function GanttView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
           {showToday && (
             <div
               className="absolute top-0 bottom-0 w-px bg-gold-500 z-10 pointer-events-none"
-              style={{ left: `${todayPct}%` }}
+              style={{ left: todayLeft ?? 0 }}
             />
           )}
 
@@ -381,7 +383,8 @@ function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
       </div>
 
       {/* Desktop 7-column grid */}
-      <div className="hidden md:grid grid-cols-7 gap-2">
+      <div className="hidden md:block overflow-x-auto">
+      <div className="grid grid-cols-7 gap-2" style={{ minWidth: 700 }}>
         {days.map((day, i) => {
           const isToday = day.toDateString() === today.toDateString()
           const dayItems = itemsForDay(day)
@@ -418,6 +421,7 @@ function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
             </div>
           )
         })}
+      </div>
       </div>
 
       {/* Mobile: list for this week */}
@@ -735,6 +739,7 @@ function YearView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
     return {
       left: `${Math.max(0, left)}%`,
       width: `${Math.min(100 - Math.max(0, left), width)}%`,
+      minWidth: 4,
       backgroundColor: itemBarColor(item),
     }
   }
