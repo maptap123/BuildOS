@@ -8,13 +8,14 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
+  const adminDb = createAdminClient()
+  const { data: perm, error: permErr } = await adminDb
     .from('user_permissions')
     .select('can_view')
     .eq('user_id', user.id)
     .eq('module', 'budget')
     .single()
-  if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!perm?.can_view) return NextResponse.json({ _debug: { userId: user.id, perm, permErr: permErr?.message }, error: 'Forbidden' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const leadId = searchParams.get('lead_id')
