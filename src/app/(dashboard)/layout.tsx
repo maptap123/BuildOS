@@ -78,10 +78,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <DesktopJobPanel currentJobId={jobId} />
 
       {/* ── Right side: top bar + content ── */}
-      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 md:ml-64 flex flex-col min-h-screen min-w-0">
 
         {/* Desktop top tab bar */}
-        <nav className="hidden md:flex items-center gap-1 bg-white border-b border-border px-4 shrink-0">
+        <nav className="hidden md:flex items-center gap-1 bg-white border-b border-border px-4 shrink-0 overflow-x-auto scrollbar-none">
           {TABS.map(({ key, label, icon: Icon }) => {
             const href = tabHref(key)
             const active = isActive(key)
