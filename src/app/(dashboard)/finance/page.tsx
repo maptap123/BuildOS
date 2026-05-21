@@ -21,10 +21,10 @@ export default async function FinancePage() {
     admin
       .from('jobs')
       .select('id, job_number, name, status, contract_amount, estimated_cost, qb_sync_status, qb_last_synced_at')
-      .order('job_number'),
+      .order('name'),
     admin
       .from('budget_lines')
-      .select('job_id, budget_amount'),
+      .select('job_id, original_budget'),
     admin
       .from('actuals')
       .select('job_id, amount, status')
@@ -34,7 +34,7 @@ export default async function FinancePage() {
   // Build lookup maps for O(1) per-job aggregation
   const budgetByJob = new Map<string, number>()
   for (const line of budgetLines ?? []) {
-    budgetByJob.set(line.job_id, (budgetByJob.get(line.job_id) ?? 0) + (line.budget_amount ?? 0))
+    budgetByJob.set(line.job_id, (budgetByJob.get(line.job_id) ?? 0) + (line.original_budget ?? 0))
   }
 
   const actualsByJob = new Map<string, number>()
