@@ -8,7 +8,7 @@ interface Props {
   jobId: string
   log?: DailyLog | null
   onClose: () => void
-  onSaved: () => void
+  onSaved: (log: DailyLog) => void
 }
 
 function todayDate() {
@@ -60,20 +60,21 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
         throw new Error(body.error ?? `Error ${res.status}`)
       }
 
+      const savedLog = await res.json() as DailyLog
+
       if (photos.length > 0 && !isEdit) {
-        const { id: logId } = await res.clone().json().catch(() => ({}))
-        if (logId) {
+        if (savedLog.id) {
           await Promise.all(photos.map(file => {
             const fd = new FormData()
             fd.append('job_id', jobId)
-            fd.append('log_id', logId)
+            fd.append('log_id', savedLog.id)
             fd.append('file', file)
             return fetch('/api/photos', { method: 'POST', body: fd })
           }))
         }
       }
 
-      onSaved()
+      onSaved(savedLog)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
       setSaving(false)
