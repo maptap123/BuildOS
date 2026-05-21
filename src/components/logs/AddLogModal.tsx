@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { X, Sparkles, Loader2, Camera, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Sparkles, Loader2, Camera, Trash2, CloudSun, RefreshCw } from 'lucide-react'
 import type { DailyLog } from '@/types'
 
 interface Props {
@@ -33,6 +33,9 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [aiSummary, setAiSummary] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [weatherMessage, setWeatherMessage] = useState<string | null>(null)
+  const [weatherEdited, setWeatherEdited] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -51,7 +54,43 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
   function set<K extends keyof FormState>(field: K, value: string) {
     setForm(f => ({ ...f, [field]: value }))
     if (aiSummary) setAiSummary(null)
+    if (field === 'weather_summary' || field === 'temperature_high' || field === 'temperature_low') {
+      setWeatherMessage(null)
+      setWeatherEdited(true)
+    }
   }
+
+  async function pullWeather(force = false) {
+    if (!form.log_date || weatherLoading) return
+    if (!force && weatherEdited) return
+
+    setWeatherLoading(true)
+    setWeatherMessage(null)
+    try {
+      const params = new URLSearchParams({ job_id: jobId, date: form.log_date })
+      const res = await fetch(`/api/weather?${params.toString()}`)
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error ?? 'Weather lookup failed')
+
+      setForm(f => ({
+        ...f,
+        weather_summary: body.weather_summary ?? f.weather_summary,
+        temperature_high: body.temperature_high != null ? String(body.temperature_high) : f.temperature_high,
+        temperature_low: body.temperature_low != null ? String(body.temperature_low) : f.temperature_low,
+      }))
+      setWeatherEdited(false)
+      if (body.location) setWeatherMessage(`Pulled from ${body.location}`)
+    } catch (e) {
+      setWeatherMessage(e instanceof Error ? e.message : 'Weather lookup failed')
+    } finally {
+      setWeatherLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isEdit) void pullWeather(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, form.log_date, isEdit])
 
   async function generateSummary() {
     if (!form.work_performed.trim()) return
@@ -265,14 +304,28 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
 
           {/* Weather row */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Weather</label>
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <label className="block text-xs font-medium text-gray-600">Weather</label>
+              <button
+                type="button"
+                onClick={() => pullWeather(true)}
+                disabled={weatherLoading || !form.log_date}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-navy-700 hover:text-navy-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {weatherLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                {weatherLoading ? 'Pulling weather' : 'Auto-pull'}
+              </button>
+            </div>
             <div className="grid grid-cols-3 gap-2">
-              <input
-                value={form.weather_summary}
-                onChange={e => set('weather_summary', e.target.value)}
-                placeholder="e.g. Partly cloudy"
-                className="col-span-3 sm:col-span-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
-              />
+              <div className="col-span-3 sm:col-span-1 relative">
+                <CloudSun size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+                <input
+                  value={form.weather_summary}
+                  onChange={e => set('weather_summary', e.target.value)}
+                  placeholder="e.g. Partly Cloudy with Showers, 0.25&quot; precip, 10 mph wind"
+                  className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
+                />
+              </div>
               <input
                 type="number"
                 value={form.temperature_high}
@@ -288,6 +341,9 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
                 className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
               />
             </div>
+            {weatherMessage && (
+              <p className="mt-1.5 text-[11px] text-gray-400">{weatherMessage}</p>
+            )}
           </div>
 
           {/* Delays */}
