@@ -510,6 +510,7 @@ export interface CostCatalogItem {
 export interface Estimate {
   id: string
   lead_id: string | null
+  job_id: string | null
   job_name: string
   job_type: string
   markup_pct: number
@@ -529,6 +530,11 @@ export interface Estimate {
   created_by: string | null
   created_at: string
   updated_at: string
+  // Proposal visibility settings
+  show_line_details: boolean
+  show_cost_breakdown: boolean
+  proposal_header_text: string | null
+  proposal_footer_text: string | null
 }
 
 export interface EstimateLine {
@@ -547,6 +553,9 @@ export interface EstimateLine {
   notes: string | null
   created_at: string
   updated_at: string
+  // Proposal visibility
+  client_visible: boolean
+  internal_note: string | null
 }
 
 export type VendorType = 'subcontractor' | 'supplier' | 'equipment' | 'other'

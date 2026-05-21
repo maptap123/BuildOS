@@ -233,7 +233,7 @@ export async function convertAcceptedProposalToJob({
 
   await admin
     .from('estimates')
-    .update({ status: 'approved' })
+    .update({ status: 'approved', job_id: job.id })
     .eq('id', estimate.id)
 
   await admin

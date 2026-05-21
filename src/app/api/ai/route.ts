@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { summarizeDailyLog, estimateFromDescription } from '@/lib/ai/claude'
+import { summarizeDailyLog, estimateFromDescription, generateEstimateLines } from '@/lib/ai/claude'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -20,20 +20,26 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { action, text } = body
 
-  if (!action || !text) {
-    return NextResponse.json({ error: 'action and text are required' }, { status: 400 })
+  if (!action) {
+    return NextResponse.json({ error: 'action is required' }, { status: 400 })
   }
 
   try {
-    let result: string
     if (action === 'summarize_log') {
-      result = await summarizeDailyLog(text)
+      if (!text) return NextResponse.json({ error: 'text is required' }, { status: 400 })
+      const result = await summarizeDailyLog(text)
+      return NextResponse.json({ result })
     } else if (action === 'estimate') {
-      result = await estimateFromDescription(text)
+      if (!text) return NextResponse.json({ error: 'text is required' }, { status: 400 })
+      const result = await estimateFromDescription(text)
+      return NextResponse.json({ result })
+    } else if (action === 'generate_estimate_lines') {
+      const { scope, project_type, square_footage, location } = body
+      const lines = await generateEstimateLines(scope ?? text, { project_type, square_footage, location })
+      return NextResponse.json({ result: lines })
     } else {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
-    return NextResponse.json({ result })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'AI error' }, { status: 500 })
   }

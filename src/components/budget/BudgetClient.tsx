@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, Clock } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import Link from 'next/link'
+import { AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, Clock, CloudUpload, ClipboardList } from 'lucide-react'
 import { useBudget } from '@/hooks/useBudget'
 import { useChangeOrders } from '@/hooks/useChangeOrders'
 import { BudgetSummary } from './BudgetSummary'
@@ -29,6 +30,7 @@ interface Permissions {
 interface Props {
   jobId: string
   job: Pick<Job, 'id' | 'contract_amount' | 'estimated_cost' | 'qb_sync_status' | 'qb_last_synced_at' | 'qb_customer_id'>
+  leadId?: string
   initialLines: BudgetLine[]
   initialActuals: Actual[]
   initialChangeOrders: ChangeOrder[]
@@ -61,7 +63,7 @@ function QBSyncBadge({ status, lastSynced }: { status: QBSyncStatus; lastSynced:
 }
 
 export function BudgetClient({
-  jobId, job, initialLines, initialActuals, initialChangeOrders, permissions, currentUserId
+  jobId, job, leadId, initialLines, initialActuals, initialChangeOrders, permissions, currentUserId
 }: Props) {
   const { lines, actuals, loading: budgetLoading, error: budgetError, refresh: refreshBudget } = useBudget(jobId, initialLines, initialActuals)
   const { orders, loading: coLoading, error: coError, refresh: refreshCOs } = useChangeOrders(jobId, initialChangeOrders)
@@ -70,6 +72,32 @@ export function BudgetClient({
   const { milestones, loading: billingLoading, error: billingError, refresh: refreshMilestones } = useBillingMilestones(jobId)
 
   const [tab, setTab] = useState<Tab>('budget')
+  const [qbSyncing, setQbSyncing] = useState(false)
+  const [qbError, setQbError] = useState<string | null>(null)
+
+  const handleSyncToQB = useCallback(async () => {
+    setQbSyncing(true)
+    setQbError(null)
+    try {
+      const res = await fetch('/api/integrations/quickbooks/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity: 'job', id: jobId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setQbError(data.error ?? 'QuickBooks sync failed')
+      } else {
+        // Refresh job data by reloading the page section
+        window.location.reload()
+      }
+    } catch {
+      setQbError('Network error — could not reach QuickBooks sync endpoint')
+    } finally {
+      setQbSyncing(false)
+    }
+  }, [jobId])
+
   const [showAddLine, setShowAddLine]           = useState(false)
   const [addActualForLine, setAddActualForLine] = useState<string | null>(null)
   const [showAddBill, setShowAddBill]           = useState(false)
@@ -93,14 +121,35 @@ export function BudgetClient({
     <div className="space-y-5">
 
       {/* QB sync status bar */}
-      <div className="flex items-center justify-between">
-        <QBSyncBadge status={job.qb_sync_status} lastSynced={job.qb_last_synced_at} />
-        {job.qb_sync_status !== 'not_synced' && (
-          <span className="text-xs text-gray-400">
-            {job.qb_customer_id ? `QB Customer: ${job.qb_customer_id}` : ''}
-          </span>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <QBSyncBadge status={job.qb_sync_status} lastSynced={job.qb_last_synced_at} />
+          {job.qb_sync_status !== 'not_synced' && job.qb_customer_id && (
+            <span className="text-xs text-gray-400">
+              QB Customer: {job.qb_customer_id}
+            </span>
+          )}
+        </div>
+        {permissions.can_edit && (
+          <button
+            onClick={handleSyncToQB}
+            disabled={qbSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {qbSyncing
+              ? <RefreshCw size={12} className="animate-spin" />
+              : <CloudUpload size={12} />
+            }
+            {qbSyncing ? 'Syncing…' : 'Sync to QuickBooks'}
+          </button>
         )}
       </div>
+      {qbError && (
+        <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          <AlertCircle size={13} className="shrink-0" />
+          {qbError}
+        </div>
+      )}
 
       <BudgetSummary job={job} lines={lines} approvedCOTotal={approvedCOTotal} actualsTotal={actualsTotal} />
 
@@ -174,13 +223,29 @@ export function BudgetClient({
           Loading {tab === 'budget' ? 'budget' : tab === 'change_orders' ? 'change orders' : tab === 'purchase_orders' ? 'purchase orders' : tab === 'work_orders' ? 'work orders' : tab === 'billing' ? 'draw schedule' : 'bills'}…
         </div>
       ) : tab === 'budget' ? (
-        <BudgetLineTable
-          lines={lines}
-          actuals={actuals}
-          permissions={permissions}
-          onAddLine={() => setShowAddLine(true)}
-          onAddActual={lineId => setAddActualForLine(lineId)}
-        />
+        <>
+          {lines.length === 0 && leadId && (
+            <div className="flex items-center justify-between bg-navy-50 border border-navy-100 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2.5 text-sm text-navy-700">
+                <ClipboardList size={16} className="text-navy-400 shrink-0" />
+                <span>This job has an estimate — import it as budget lines.</span>
+              </div>
+              <Link
+                href={`/jobs/${jobId}/estimates`}
+                className="text-xs font-semibold text-gold-600 hover:text-gold-700 transition-colors shrink-0 ml-4"
+              >
+                View Estimates →
+              </Link>
+            </div>
+          )}
+          <BudgetLineTable
+            lines={lines}
+            actuals={actuals}
+            permissions={permissions}
+            onAddLine={() => setShowAddLine(true)}
+            onAddActual={lineId => setAddActualForLine(lineId)}
+          />
+        </>
       ) : tab === 'change_orders' ? (
         <ChangeOrderTable
           changeOrders={orders}

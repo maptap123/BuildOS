@@ -34,7 +34,7 @@ export default async function JobBudgetPage({
   const [{ data: job }, { data: lines }, { data: actuals }, { data: changeOrders }] = await Promise.all([
     admin
       .from('jobs')
-      .select('id, contract_amount, estimated_cost, qb_sync_status, qb_last_synced_at, qb_customer_id')
+      .select('id, lead_id, contract_amount, estimated_cost, qb_sync_status, qb_last_synced_at, qb_customer_id')
       .eq('id', id)
       .single(),
     admin
@@ -61,6 +61,7 @@ export default async function JobBudgetPage({
     <BudgetClient
       jobId={id}
       job={job}
+      leadId={job.lead_id ?? undefined}
       initialLines={lines ?? []}
       initialActuals={actuals ?? []}
       initialChangeOrders={changeOrders ?? []}

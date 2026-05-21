@@ -20,13 +20,12 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes']
+  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes', 'client_visible', 'internal_note']
+  const numericFields = ['quantity', 'unit_cost', 'markup_pct', 'sort_order']
   const updates: Record<string, unknown> = {}
   for (const k of allowed) {
     if (k in body) {
-      updates[k] = ['quantity', 'unit_cost', 'markup_pct', 'sort_order'].includes(k)
-        ? Number(body[k])
-        : body[k]
+      updates[k] = numericFields.includes(k) ? Number(body[k]) : body[k]
     }
   }
 

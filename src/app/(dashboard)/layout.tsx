@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut, ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp, HardHat } from 'lucide-react'
+import { Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut, ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp, HardHat, BarChart3, ClipboardList } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
@@ -16,7 +16,9 @@ const TABS = [
   { key: 'schedule',   label: 'Schedule',   icon: Calendar    },
   { key: 'tasks',      label: 'Tasks',      icon: CheckSquare },
   { key: 'logs',            label: 'Logs',          icon: FileText    },
+  { key: 'estimates',        label: 'Estimates',     icon: ClipboardList },
   { key: 'profitability',   label: 'Profitability', icon: TrendingUp  },
+  { key: 'finance',         label: 'Finance',       icon: BarChart3   },
   { key: 'vendors',         label: 'Vendors',       icon: HardHat     },
   { key: 'contacts',        label: 'Contacts',      icon: Users       },
   { key: 'documents',  label: 'Documents',  icon: Folder      },
@@ -24,7 +26,7 @@ const TABS = [
   { key: 'admin',      label: 'Admin',      icon: ShieldCheck },
 ]
 
-const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'profitability'])
+const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'estimates', 'profitability'])
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -45,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   function tabHref(key: string): string | null {
     if (key === 'leads')      return '/leads'
     if (key === 'jobs')       return '/jobs'
+    if (key === 'finance')    return '/finance'
     if (key === 'admin')      return '/admin'
     if (key === 'time-clock') return '/time-clock'
     if (key === 'vendors')    return '/vendors'
@@ -58,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   function isActive(key: string): boolean {
     if (key === 'leads')      return pathname.startsWith('/leads')
     if (key === 'jobs')       return pathname === '/jobs' || (!!jobId && segments.length === 2)
+    if (key === 'finance')    return pathname.startsWith('/finance')
     if (key === 'admin')      return pathname.startsWith('/admin')
     if (key === 'time-clock') return pathname.startsWith('/time-clock')
     if (key === 'vendors')    return pathname.startsWith('/vendors')

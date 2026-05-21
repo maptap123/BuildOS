@@ -61,10 +61,14 @@ function groupLines(lines: EstimateLine[]): ProposalLineGroup[] {
 
 export default async function PrintProposalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; estimateId: string }>
+  searchParams: Promise<{ view?: string }>
 }) {
   const { id, estimateId } = await params
+  const { view } = await searchParams
+  const isInternalView = view === 'internal'
   const supabase = await createClient()
 
   const {
@@ -104,10 +108,20 @@ export default async function PrintProposalPage({
 
   const typedLead = lead as Lead
   const typedEstimate = estimate as Estimate
-  const typedLines = (lines ?? []) as EstimateLine[]
-  const groups = groupLines(typedLines)
-  const subtotal = typedLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
-  const markup = typedLines.reduce((sum, line) => sum + lineMarkup(line), 0)
+  const allLines = (lines ?? []) as EstimateLine[]
+
+  // In client view, only show lines where client_visible is true (default true for old rows)
+  const visibleLines = isInternalView
+    ? allLines
+    : allLines.filter(l => l.client_visible !== false)
+
+  // Respect show_line_details flag — only matters in client view
+  const showLineDetails = isInternalView || (typedEstimate.show_line_details !== false)
+  const showCostBreakdown = isInternalView || (typedEstimate.show_cost_breakdown === true)
+
+  const groups = groupLines(visibleLines)
+  const subtotal = visibleLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
+  const markup = visibleLines.reduce((sum, line) => sum + lineMarkup(line), 0)
   const total = subtotal + markup
   const proposalTitle = typedEstimate.title || typedEstimate.job_name || typedLead.title || `Estimate v${typedEstimate.version}`
   const statusLabel = typedEstimate.status === 'approved' ? 'Accepted' : typedEstimate.status
@@ -359,10 +373,27 @@ export default async function PrintProposalPage({
       <body>
         <div className="toolbar no-print">
           <div>
-            <strong>Proposal preview</strong>
-            <div className="muted">Use print to save this proposal as a PDF.</div>
+            <strong>{isInternalView ? 'Internal view' : 'Client view'}</strong>
+            <div className="muted">
+              {isInternalView
+                ? 'Showing all lines including internal-only items.'
+                : 'Use print to save this proposal as a PDF.'}
+            </div>
           </div>
           <div className="toolbar-actions">
+            <a
+              href={`?view=${isInternalView ? 'client' : 'internal'}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minHeight: '38px', borderRadius: '7px', padding: '0 14px',
+                fontSize: '13px', fontWeight: 700, textDecoration: 'none', cursor: 'pointer',
+                background: isInternalView ? '#d1fae5' : '#fef3c7',
+                color: isInternalView ? '#065f46' : '#92400e',
+                border: isInternalView ? '1px solid #6ee7b7' : '1px solid #fcd34d',
+              }}
+            >
+              {isInternalView ? 'Switch to Client View' : 'Switch to Internal View'}
+            </a>
             {publicProposalHref && (
               <a className="accept-link" href={publicProposalHref}>
                 {typedEstimate.status === 'approved' ? 'View accepted proposal' : 'Accept online'}
@@ -378,6 +409,26 @@ export default async function PrintProposalPage({
             }}
           />
         </div>
+
+        {isInternalView && (
+          <div style={{
+            background: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px',
+            padding: '10px 14px', marginBottom: '20px', fontSize: '12px', fontWeight: 700,
+            color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.8px',
+          }} className="no-print">
+            INTERNAL VIEW — All lines shown including hidden items. Not for client distribution.
+          </div>
+        )}
+
+        {typedEstimate.proposal_header_text && (
+          <div style={{
+            background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px',
+            padding: '14px 16px', marginBottom: '20px', fontSize: '13px', whiteSpace: 'pre-wrap',
+            color: '#0c4a6e',
+          }}>
+            {typedEstimate.proposal_header_text}
+          </div>
+        )}
 
         <header className="letterhead">
           <div>
@@ -435,7 +486,10 @@ export default async function PrintProposalPage({
               <br />
               Created {fmtDate(typedEstimate.created_at)}
               <br />
-              {typedLines.length} line item{typedLines.length === 1 ? '' : 's'}
+              {visibleLines.length} line item{visibleLines.length === 1 ? '' : 's'}
+              {isInternalView && allLines.length !== visibleLines.length && (
+                <> ({allLines.length} total incl. internal)</>
+              )}
             </div>
           </div>
         </section>
@@ -462,24 +516,25 @@ export default async function PrintProposalPage({
           </section>
         )}
 
+        {showLineDetails && (
         <section className="section">
           <h2 className="section-title">Proposal Detail</h2>
           <table>
             <thead>
               <tr>
                 <th>Description</th>
-                <th style={{ width: '76px' }}>Code</th>
-                <th className="num" style={{ width: '64px' }}>Qty</th>
-                <th style={{ width: '58px' }}>Unit</th>
-                <th className="num" style={{ width: '96px' }}>Unit Cost</th>
-                <th className="num" style={{ width: '74px' }}>Markup</th>
+                {showCostBreakdown && <th style={{ width: '76px' }}>Code</th>}
+                {showCostBreakdown && <th className="num" style={{ width: '64px' }}>Qty</th>}
+                {showCostBreakdown && <th style={{ width: '58px' }}>Unit</th>}
+                {showCostBreakdown && <th className="num" style={{ width: '96px' }}>Unit Cost</th>}
+                {showCostBreakdown && <th className="num" style={{ width: '74px' }}>Markup</th>}
                 <th className="num" style={{ width: '106px' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {groups.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="muted">
+                  <td colSpan={showCostBreakdown ? 7 : 2} className="muted">
                     No proposal line items have been added.
                   </td>
                 </tr>
@@ -487,23 +542,40 @@ export default async function PrintProposalPage({
                 groups.map(group => (
                   <Fragment key={group.phase}>
                     <tr className="phase-row">
-                      <td colSpan={6}>{group.phase}</td>
+                      <td colSpan={showCostBreakdown ? 6 : 1}>{group.phase}</td>
                       <td className="num">{fmtMoney(group.total)}</td>
                     </tr>
-                    {group.lines.map(line => (
-                      <tr key={line.id}>
-                        <td>
-                          {line.description}
-                          {line.notes && <span className="notes">{line.notes}</span>}
-                        </td>
-                        <td>{line.cost_code || '-'}</td>
-                        <td className="num">{fmtQty(Number(line.quantity))}</td>
-                        <td>{line.uom}</td>
-                        <td className="num">{fmtMoney(Number(line.unit_cost))}</td>
-                        <td className="num">{Number(line.markup_pct)}%</td>
-                        <td className="num">{fmtMoney(lineTotal(line))}</td>
-                      </tr>
-                    ))}
+                    {group.lines.map(line => {
+                      const isLineHidden = line.client_visible === false
+                      return (
+                        <tr key={line.id} style={isLineHidden ? { background: '#fef9c3' } : {}}>
+                          <td>
+                            <span>{line.description}</span>
+                            {isLineHidden && (
+                              <span style={{
+                                marginLeft: '8px', fontSize: '10px', fontWeight: 700,
+                                background: '#fde047', color: '#713f12',
+                                padding: '1px 6px', borderRadius: '4px',
+                              }}>
+                                INTERNAL
+                              </span>
+                            )}
+                            {line.notes && <span className="notes">{line.notes}</span>}
+                            {isInternalView && line.internal_note && (
+                              <span className="notes" style={{ color: '#d97706', fontStyle: 'italic' }}>
+                                Internal note: {line.internal_note}
+                              </span>
+                            )}
+                          </td>
+                          {showCostBreakdown && <td>{line.cost_code || '-'}</td>}
+                          {showCostBreakdown && <td className="num">{fmtQty(Number(line.quantity))}</td>}
+                          {showCostBreakdown && <td>{line.uom}</td>}
+                          {showCostBreakdown && <td className="num">{fmtMoney(Number(line.unit_cost))}</td>}
+                          {showCostBreakdown && <td className="num">{Number(line.markup_pct)}%</td>}
+                          <td className="num">{fmtMoney(lineTotal(line))}</td>
+                        </tr>
+                      )
+                    })}
                   </Fragment>
                 ))
               )}
@@ -525,6 +597,38 @@ export default async function PrintProposalPage({
             </div>
           </div>
         </section>
+        )}
+
+        {/* When line details are hidden, still show grand total */}
+        {!showLineDetails && (
+          <section className="section">
+            <div className="summary-bar">
+              <div className="summary-cell">
+                <div className="label">Subtotal</div>
+                <div className="summary-amount">{fmtMoney(subtotal)}</div>
+              </div>
+              <div className="summary-cell">
+                <div className="label">Markup</div>
+                <div className="summary-amount">{fmtMoney(markup)}</div>
+              </div>
+              <div className="summary-cell total">
+                <div className="label">Proposal Total</div>
+                <div className="summary-amount">{fmtMoney(total)}</div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {typedEstimate.proposal_footer_text && (
+          <section className="section">
+            <div style={{
+              background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px',
+              padding: '14px 16px', fontSize: '13px', whiteSpace: 'pre-wrap', color: '#374151',
+            }}>
+              {typedEstimate.proposal_footer_text}
+            </div>
+          </section>
+        )}
 
         <section className="section page-break">
           <h2 className="section-title">Terms and Acceptance</h2>

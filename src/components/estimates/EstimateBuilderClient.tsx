@@ -18,11 +18,14 @@ import {
   CheckCircle2,
   X,
   Layers,
+  Settings2,
+  Sparkles,
 } from 'lucide-react'
 import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
+import type { AISuggestedLine } from '@/lib/ai/claude'
 
 interface Permissions {
   can_create: boolean
@@ -154,9 +157,24 @@ export function EstimateBuilderClient({
   const [scopeText, setScopeText]             = useState<string>(initialEstimates[0]?.scope_text ?? '')
   const [scopeSaving, setScopeSaving]         = useState(false)
 
+  // Proposal settings state
+  const [showProposalSettings, setShowProposalSettings] = useState(false)
+  const [proposalSettingsSaving, setProposalSettingsSaving] = useState(false)
+
   // Assembly modal
   const [showAssemblies, setShowAssemblies]   = useState(false)
   const [addingAssembly, setAddingAssembly]   = useState<string | null>(null)
+
+  // AI Generate modal
+  const [showAIGenerate, setShowAIGenerate]         = useState(false)
+  const [aiScope, setAIScope]                       = useState('')
+  const [aiProjectType, setAIProjectType]           = useState('')
+  const [aiSqFt, setAISqFt]                         = useState('')
+  const [aiGenerating, setAIGenerating]             = useState(false)
+  const [aiSuggestedLines, setAISuggestedLines]     = useState<AISuggestedLine[]>([])
+  const [aiSelectedLines, setAISelectedLines]       = useState<Set<number>>(new Set())
+  const [aiError, setAIError]                       = useState<string | null>(null)
+  const [aiAdding, setAIAdding]                     = useState(false)
 
   // ── Create a new estimate ──────────────────────────────────────
   async function createEstimate() {
@@ -301,11 +319,14 @@ export function EstimateBuilderClient({
 
   // ── Local field change (queues dirty) ─────────────────────────
   const handleLineChange = useCallback(
-    (id: string, field: keyof EstimateLine, value: string | number) => {
+    (id: string, field: keyof EstimateLine, value: string | number | boolean) => {
       setLines(prev =>
         prev.map(l => l.id === id ? { ...l, [field]: value } : l)
       )
-      setDirtyLines(prev => new Set(prev).add(id))
+      // client_visible is persisted immediately in EstimateLineRow, no need to queue
+      if (field !== 'client_visible') {
+        setDirtyLines(prev => new Set(prev).add(id))
+      }
     },
     []
   )
@@ -333,19 +354,20 @@ export function EstimateBuilderClient({
       const toSave = lines.filter(l => dirtyLines.has(l.id))
       await Promise.all(
         toSave.map(l =>
-          fetch(`/api/estimate-lines?id=${l.id}`, {
+          fetch(`/api/estimate-lines/${l.id}`, {
             method:  'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-              description: l.description,
-              phase:       l.phase,
-              cost_code:   l.cost_code,
-              uom:         l.uom,
-              quantity:    l.quantity,
-              unit_cost:   l.unit_cost,
-              markup_pct:  l.markup_pct,
-              sort_order:  l.sort_order,
-              notes:       l.notes,
+              description:   l.description,
+              phase:         l.phase,
+              cost_code:     l.cost_code,
+              uom:           l.uom,
+              quantity:      l.quantity,
+              unit_cost:     l.unit_cost,
+              markup_pct:    l.markup_pct,
+              sort_order:    l.sort_order,
+              notes:         l.notes,
+              internal_note: l.internal_note,
             }),
           })
         )
@@ -405,6 +427,19 @@ export function EstimateBuilderClient({
     }
   }
 
+  // ── Save proposal settings field ──────────────────────────────
+  async function saveProposalSetting(field: keyof Estimate, value: boolean | string | null) {
+    if (!activeEstimate) return
+    setProposalSettingsSaving(true)
+    try {
+      await patchEstimate({ [field]: value } as Partial<Estimate>)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save proposal settings')
+    } finally {
+      setProposalSettingsSaving(false)
+    }
+  }
+
   async function markProposalSent() {
     if (!activeEstimate) return
     setSaving(true)
@@ -426,6 +461,97 @@ export function EstimateBuilderClient({
     setCollapsedPhases(prev => {
       const s = new Set(prev)
       if (s.has(phase)) s.delete(phase); else s.add(phase)
+      return s
+    })
+  }
+
+  // ── Open AI Generate modal ─────────────────────────────────────
+  function openAIGenerate() {
+    setAIScope(scopeText ?? '')
+    setAIProjectType('')
+    setAISqFt('')
+    setAISuggestedLines([])
+    setAISelectedLines(new Set())
+    setAIError(null)
+    setShowAIGenerate(true)
+  }
+
+  // ── Call Claude to generate lines ──────────────────────────────
+  async function runAIGenerate() {
+    if (!aiScope.trim()) { setAIError('Please enter a project scope.'); return }
+    setAIGenerating(true)
+    setAIError(null)
+    setAISuggestedLines([])
+    try {
+      const res = await fetch('/api/ai', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          action:        'generate_estimate_lines',
+          scope:         aiScope.trim(),
+          project_type:  aiProjectType || undefined,
+          square_footage: aiSqFt ? Number(aiSqFt) : undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'AI request failed')
+      const suggested: AISuggestedLine[] = json.result ?? []
+      setAISuggestedLines(suggested)
+      setAISelectedLines(new Set(suggested.map((_, i) => i)))
+    } catch (e) {
+      setAIError(e instanceof Error ? e.message : 'Failed to generate estimate')
+    } finally {
+      setAIGenerating(false)
+    }
+  }
+
+  // ── Add selected AI lines to estimate ─────────────────────────
+  async function addAILines() {
+    if (!activeEstimate) return
+    setAIAdding(true)
+    setAIError(null)
+    try {
+      const selected = aiSuggestedLines.filter((_, i) => aiSelectedLines.has(i))
+      const results = await Promise.allSettled(
+        selected.map((al, i) =>
+          fetch('/api/estimate-lines', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              estimate_id: activeEstimate.id,
+              lead_id:     lead.id,
+              description: al.description,
+              phase:       al.phase,
+              cost_code:   al.cost_code ?? null,
+              uom:         al.uom,
+              quantity:    al.quantity,
+              unit_cost:   al.unit_cost,
+              markup_pct:  al.markup_pct,
+              sort_order:  lines.length + i,
+            }),
+          }).then(async r => {
+            if (!r.ok) throw new Error(`POST failed: ${r.status}`)
+            return r.json() as Promise<EstimateLine>
+          })
+        )
+      )
+      const added = results
+        .filter((r): r is PromiseFulfilledResult<EstimateLine> => r.status === 'fulfilled')
+        .map(r => r.value)
+      setLines(prev => [...prev, ...added])
+      setShowAIGenerate(false)
+    } catch (e) {
+      setAIError(e instanceof Error ? e.message : 'Failed to add lines')
+    } finally {
+      setAIAdding(false)
+    }
+  }
+
+  // ── Toggle a single AI-suggested line checkbox ─────────────────
+  function toggleAILine(idx: number) {
+    setAISelectedLines(prev => {
+      const s = new Set(prev)
+      if (s.has(idx)) s.delete(idx); else s.add(idx)
       return s
     })
   }
@@ -612,6 +738,75 @@ export function EstimateBuilderClient({
         </div>
       )}
 
+      {/* Proposal Settings */}
+      {activeEstimate && permissions.can_edit && (
+        <div className="bg-white rounded-xl border border-border px-5 py-4">
+          <button
+            onClick={() => setShowProposalSettings(v => !v)}
+            className="flex items-center gap-2 w-full text-sm font-semibold text-navy-800 hover:text-navy-900 transition-colors"
+          >
+            {showProposalSettings ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <Settings2 size={14} className="text-gray-400" />
+            Proposal Settings
+            {proposalSettingsSaving && <Loader2 size={12} className="animate-spin ml-1 text-gray-400" />}
+          </button>
+
+          {showProposalSettings && (
+            <div className="mt-4 space-y-4">
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={activeEstimate.show_line_details ?? true}
+                    onChange={e => saveProposalSetting('show_line_details', e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-navy-700 focus:ring-navy-500"
+                  />
+                  <div>
+                    <p className="text-sm text-navy-800 font-medium">Show line item details to client</p>
+                    <p className="text-xs text-gray-400">Display the full line-by-line breakdown in the client proposal</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={activeEstimate.show_cost_breakdown ?? false}
+                    onChange={e => saveProposalSetting('show_cost_breakdown', e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-navy-700 focus:ring-navy-500"
+                  />
+                  <div>
+                    <p className="text-sm text-navy-800 font-medium">Show cost breakdown</p>
+                    <p className="text-xs text-gray-400">Show unit costs and markup percentages (otherwise shows totals only)</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Header text</label>
+                <textarea
+                  value={activeEstimate.proposal_header_text ?? ''}
+                  onChange={e => saveProposalSetting('proposal_header_text', e.target.value || null)}
+                  placeholder="Optional text shown at the top of the client proposal…"
+                  rows={2}
+                  className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gold-400 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Footer text</label>
+                <textarea
+                  value={activeEstimate.proposal_footer_text ?? ''}
+                  onChange={e => saveProposalSetting('proposal_footer_text', e.target.value || null)}
+                  placeholder="Optional text shown at the bottom of the client proposal…"
+                  rows={2}
+                  className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gold-400 resize-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* No estimate yet */}
       {estimates.length === 0 && (
         <div className="bg-white rounded-xl border border-border flex flex-col items-center justify-center py-16 gap-3">
@@ -645,6 +840,15 @@ export function EstimateBuilderClient({
                 Cost Catalog
               </button>
               <div className="flex items-center gap-2">
+                {permissions.can_create && (
+                  <button
+                    onClick={openAIGenerate}
+                    className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors"
+                  >
+                    <Sparkles size={12} />
+                    AI Generate
+                  </button>
+                )}
                 {permissions.can_create && (
                   <button
                     onClick={() => setShowAssemblies(true)}
@@ -720,6 +924,7 @@ export function EstimateBuilderClient({
                     <thead>
                       <tr className="border-b border-gray-100 text-[10px] text-gray-400 font-medium uppercase tracking-wide">
                         <th className="pl-3 pr-1 py-2.5 w-6" />
+                        <th className="px-1 py-2.5 w-6" title="Client visibility" />
                         <th className="px-2 py-2.5 text-left">Description</th>
                         <th className="px-2 py-2.5 text-left w-28 hidden md:table-cell">Phase</th>
                         <th className="px-2 py-2.5 text-center w-16 hidden md:table-cell">UOM</th>
@@ -746,7 +951,7 @@ export function EstimateBuilderClient({
                                   : <ChevronDown  size={12} className="text-gray-400" />
                                 }
                               </td>
-                              <td colSpan={6} className="px-2 py-2">
+                              <td colSpan={7} className="px-2 py-2">
                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                                   {phase}
                                 </span>
@@ -779,7 +984,7 @@ export function EstimateBuilderClient({
 
                     <tfoot>
                       <tr className="border-t-2 border-gray-200 bg-gray-50">
-                        <td colSpan={7} className="px-5 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
+                        <td colSpan={8} className="px-5 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
                           Grand Total
                         </td>
                         <td className="px-2 py-3 text-right">
@@ -878,6 +1083,216 @@ export function EstimateBuilderClient({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Generate modal */}
+      {showAIGenerate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-purple-500" />
+                <div>
+                  <h2 className="font-display font-bold text-navy-900 text-lg">AI Estimate Generator</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Describe the project scope and Claude will suggest line items</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAIGenerate(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-4">
+              {/* Scope textarea */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Project Scope
+                </label>
+                <textarea
+                  value={aiScope}
+                  onChange={e => setAIScope(e.target.value)}
+                  placeholder="Describe the work to be done in detail. E.g.: Full kitchen remodel including demo of existing cabinets, new custom cabinetry, quartz countertops, tile backsplash, appliance hookups, and painting…"
+                  rows={5}
+                  className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-purple-400 resize-none"
+                />
+              </div>
+
+              {/* Optional context fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Project Type (optional)
+                  </label>
+                  <select
+                    value={aiProjectType}
+                    onChange={e => setAIProjectType(e.target.value)}
+                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400"
+                  >
+                    <option value="">Select type…</option>
+                    <option value="Residential Remodel">Residential Remodel</option>
+                    <option value="New Construction">New Construction</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Addition">Addition</option>
+                    <option value="Repair/Maintenance">Repair / Maintenance</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Square Footage (optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={aiSqFt}
+                    onChange={e => setAISqFt(e.target.value)}
+                    placeholder="e.g. 1200"
+                    min={1}
+                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+              </div>
+
+              {/* Error */}
+              {aiError && (
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                  <AlertCircle size={15} className="shrink-0" />
+                  {aiError}
+                </div>
+              )}
+
+              {/* Loading state */}
+              {aiGenerating && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
+                  <Loader2 size={28} className="animate-spin text-purple-400" />
+                  <p className="text-sm font-medium">Claude is building your estimate…</p>
+                  <p className="text-xs text-gray-300">This may take 10–20 seconds</p>
+                </div>
+              )}
+
+              {/* Suggested lines list */}
+              {!aiGenerating && aiSuggestedLines.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {aiSuggestedLines.length} suggested lines
+                    </p>
+                    <div className="flex gap-3 text-xs text-gray-400">
+                      <button
+                        onClick={() => setAISelectedLines(new Set(aiSuggestedLines.map((_, i) => i)))}
+                        className="hover:text-navy-700 transition-colors"
+                      >
+                        Select all
+                      </button>
+                      <button
+                        onClick={() => setAISelectedLines(new Set())}
+                        className="hover:text-navy-700 transition-colors"
+                      >
+                        Deselect all
+                      </button>
+                    </div>
+                  </div>
+
+                  {aiSuggestedLines.map((al, idx) => {
+                    const total = al.quantity * al.unit_cost * (1 + al.markup_pct / 100)
+                    const isChecked = aiSelectedLines.has(idx)
+                    return (
+                      <label
+                        key={idx}
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                          isChecked
+                            ? 'border-purple-200 bg-purple-50/40'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleAILine(idx)}
+                          className="mt-0.5 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-navy-800">{al.description}</p>
+                            <span className="text-[10px] font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                              {al.phase}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                            <span>{al.quantity} {al.uom}</span>
+                            <span>@{fmt(al.unit_cost)}/{al.uom}</span>
+                            <span className="text-gray-400">{al.markup_pct}% markup</span>
+                            {al.cost_code && (
+                              <span className="text-gray-400">{al.cost_code}</span>
+                            )}
+                          </div>
+                          {al.rationale && (
+                            <p className="text-[11px] text-gray-400 mt-1 italic">{al.rationale}</p>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-navy-800 tabular-nums">{fmt(total)}</p>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+              <button
+                onClick={() => setShowAIGenerate(false)}
+                className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <div className="flex items-center gap-2">
+                {aiSuggestedLines.length === 0 ? (
+                  <button
+                    onClick={runAIGenerate}
+                    disabled={aiGenerating || !aiScope.trim()}
+                    className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {aiGenerating ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={14} />
+                    )}
+                    {aiGenerating ? 'Generating…' : 'Generate Estimate'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={runAIGenerate}
+                      disabled={aiGenerating}
+                      className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-100 text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Sparkles size={13} />
+                      Regenerate
+                    </button>
+                    <button
+                      onClick={addAILines}
+                      disabled={aiAdding || aiSelectedLines.size === 0}
+                      className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                    >
+                      {aiAdding ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Plus size={14} />
+                      )}
+                      {aiAdding ? 'Adding…' : `Add ${aiSelectedLines.size} Line${aiSelectedLines.size !== 1 ? 's' : ''}`}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

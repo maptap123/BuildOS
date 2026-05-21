@@ -1,15 +1,13 @@
 /**
- * Apify REST API Client — STUB
+ * Apify REST API Client
  *
  * Phase 5a integration. Wraps Apify actor runs for material price scraping.
- * Not wired up yet — implement once APIFY_API_TOKEN is provisioned.
  *
- * Apify actor catalogue (add retailers per Phase 5b / 5c):
- *   Phase 5a:  studio-amba/homedepot-scraper  — Home Depot price + availability by ZIP
- *   Phase 5b:  studio-amba/lowes-scraper      — Lowe's
- *   Phase 5c:  private actor (custom build)    — Sherwin-Williams
+ * Apify actor catalogue:
+ *   Phase 5a:  epctex/home-depot-scraper — Home Depot price + availability by ZIP
+ *   Phase 5b:  epctex/lowes-scraper      — Lowe's
  *
- * Required environment variables (add to Vercel + .env.local when ready):
+ * Required environment variables:
  *   APIFY_API_TOKEN        — from apify.com/account#/integrations
  *   PRICE_CACHE_TTL_HOURS  — default 24; how long before a cached result is stale
  *
@@ -35,6 +33,37 @@ export interface PriceSearchOptions {
   limit?: number
 }
 
+interface ApifyRunResponse {
+  data: {
+    id: string
+    status: string
+    defaultDatasetId: string
+  }
+}
+
+interface HomeDepotItem {
+  title?: string
+  price?: number
+  sku?: string
+  url?: string
+  storeId?: string
+}
+
+interface LowesItem {
+  title?: string
+  price?: number
+  sku?: string
+  url?: string
+}
+
+const APIFY_BASE = 'https://api.apify.com/v2'
+const RETAILERS = {
+  home_depot: 'epctex~home-depot-scraper',
+  lowes:      'epctex~lowes-scraper',
+} as const
+
+type RetailerKey = keyof typeof RETAILERS
+
 export class ApifyClient {
   private apiToken: string
 
@@ -42,43 +71,97 @@ export class ApifyClient {
     this.apiToken = apiToken
   }
 
-  /**
-   * Search for a material price across configured retailers.
-   * Returns a cache-ready list of PriceResult objects.
-   *
-   * The caller (/api/materials/price-search) is responsible for:
-   *   1. Checking price_cache for a fresh result first (TTL = PRICE_CACHE_TTL_HOURS)
-   *   2. If stale/missing: calling this method
-   *   3. Writing results into price_cache
-   *   4. Returning merged + sorted results
-   *
-   * TODO (Phase 5a): implement
-   *   1. POST https://api.apify.com/v2/acts/studio-amba~homedepot-scraper/runs
-   *      body: { "search": query, "zipCode": zip }
-   *   2. Poll run status until 'SUCCEEDED' (or use waitForFinish param)
-   *   3. GET /v2/datasets/{defaultDatasetId}/items
-   *   4. Map response rows → PriceResult[]
-   *   5. Phase 5b: wrap all configured retailers in Promise.all
-   *
-   * @param query  — free-text material search (e.g. '2x4x8 lumber')
-   * @param zip    — US ZIP code for local store prices
-   */
-  async searchPrice(query: string, zip?: string, _options?: PriceSearchOptions): Promise<PriceResult[]> {
-    // Log the call for future debugging — remove when implementing
-    console.log('[Apify stub] searchPrice()', { query, zip, apiTokenPresent: !!this.apiToken })
+  private async runActor(actorId: string, body: Record<string, unknown>): Promise<ApifyRunResponse['data'] | null> {
+    const url = `${APIFY_BASE}/acts/${actorId}/runs?waitForFinish=60&token=${this.apiToken}`
+    const res = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    })
+    if (!res.ok) {
+      console.error(`[Apify] Actor ${actorId} run failed: ${res.status}`)
+      return null
+    }
+    const json = (await res.json()) as ApifyRunResponse
+    if (json.data.status !== 'SUCCEEDED') {
+      console.error(`[Apify] Actor ${actorId} status: ${json.data.status}`)
+      return null
+    }
+    return json.data
+  }
 
-    // TODO (Phase 5a): implement Apify actor call
-    throw new Error('Apify integration not yet configured')
+  private async fetchDatasetItems(actorId: string): Promise<unknown[]> {
+    const url = `${APIFY_BASE}/acts/${actorId}/runs/last/dataset/items?token=${this.apiToken}&limit=10`
+    const res = await fetch(url)
+    if (!res.ok) return []
+    return (await res.json()) as unknown[]
+  }
+
+  private mapHomeDepot(items: unknown[], zip?: string): PriceResult[] {
+    return (items as HomeDepotItem[])
+      .filter(item => item.price != null && item.title)
+      .map(item => ({
+        retailer:     'home_depot',
+        product_name: item.title!,
+        sku:          item.sku,
+        price_cents:  Math.round((item.price ?? 0) * 100),
+        url:          item.url,
+        store_number: item.storeId,
+        zip_code:     zip,
+        scraped_at:   new Date().toISOString(),
+      }))
+  }
+
+  private mapLowes(items: unknown[], zip?: string): PriceResult[] {
+    return (items as LowesItem[])
+      .filter(item => item.price != null && item.title)
+      .map(item => ({
+        retailer:     'lowes',
+        product_name: item.title!,
+        sku:          item.sku,
+        price_cents:  Math.round((item.price ?? 0) * 100),
+        url:          item.url,
+        zip_code:     zip,
+        scraped_at:   new Date().toISOString(),
+      }))
+  }
+
+  async searchRetailer(retailer: RetailerKey, query: string, zip?: string, limit?: number): Promise<PriceResult[]> {
+    const actorId = RETAILERS[retailer]
+    const body    = { search: query, zipCode: zip, maxItems: limit ?? 5 }
+    const run     = await this.runActor(actorId, body)
+    if (!run) return []
+
+    const items = await this.fetchDatasetItems(actorId)
+    return retailer === 'home_depot'
+      ? this.mapHomeDepot(items, zip)
+      : this.mapLowes(items, zip)
+  }
+
+  async searchPriceAllRetailers(query: string, zip?: string, options?: PriceSearchOptions): Promise<PriceResult[]> {
+    const limit   = options?.limit
+    const results = await Promise.allSettled([
+      this.searchRetailer('home_depot', query, zip, limit),
+      this.searchRetailer('lowes',      query, zip, limit),
+    ])
+
+    const merged: PriceResult[] = []
+    for (const r of results) {
+      if (r.status === 'fulfilled') merged.push(...r.value)
+      else console.error('[Apify] Retailer search failed:', r.reason)
+    }
+
+    return merged.sort((a, b) => a.price_cents - b.price_cents)
+  }
+
+  /** @deprecated Use searchPriceAllRetailers instead */
+  async searchPrice(query: string, zip?: string, options?: PriceSearchOptions): Promise<PriceResult[]> {
+    return this.searchPriceAllRetailers(query, zip, options)
   }
 }
 
 /**
  * Lazy singleton — only constructed when APIFY_API_TOKEN is present.
- * Import this in route handlers; it will throw at runtime (not import time).
- *
- * Usage:
- *   import { getApifyClient } from '@/lib/apify/client'
- *   const client = getApifyClient()   // throws 501 if not configured
  */
 export function getApifyClient(): ApifyClient {
   const token = process.env.APIFY_API_TOKEN

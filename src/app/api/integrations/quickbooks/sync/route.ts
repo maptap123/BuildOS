@@ -1,30 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-// TODO (Phase 4): import { QuickBooksClient } from '@/lib/quickbooks/client'
-// TODO (Phase 4): import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  syncJobAsCustomer,
+  syncEstimateToQB,
+  syncActualAsBill,
+} from '@/lib/quickbooks/client'
 
 /**
  * POST /api/integrations/quickbooks/sync
  *
- * Manual sync trigger. Enqueues or immediately executes a QB sync for a
- * given entity type and ID.
+ * Manual sync trigger. Immediately executes a QB sync for a given entity.
  *
  * Request body:
- *   {
- *     entity: 'job' | 'bill' | 'invoice',
- *     id: string
- *   }
+ *   { entity: 'job' | 'estimate' | 'bill', id: string, jobId?: string }
  *
- * Phase 4 implementation plan:
- *   1. Check that QB is connected (quickbooks_tokens row exists + not expired)
- *   2. Load entity from DB
- *   3. Dispatch to QuickBooksClient.syncJob() / syncBill() / syncInvoice()
- *   4. Store returned qb_id on the entity row
- *   5. Update integration_settings.last_sync_at
- *   6. On failure: write error to integration_settings.sync_error
+ * For entity='estimate': jobId is required.
  *
- * Future: replace direct call with a background job / Vercel cron for
- *   high-volume syncs and automatic retry on 429/503 from Intuit.
+ * Required env vars:
+ *   QB_CLIENT_ID, QB_CLIENT_SECRET, QB_ENVIRONMENT, QB_REDIRECT_URI
  */
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -43,29 +37,70 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}))
-  const { entity, id } = body as { entity?: string; id?: string }
+  const { entity, id, jobId } = body as { entity?: string; id?: string; jobId?: string }
 
   if (!entity || !id) {
-    return NextResponse.json({ error: 'entity and id required' }, { status: 400 })
+    return NextResponse.json({ error: 'entity and id are required' }, { status: 400 })
   }
 
-  const validEntities = ['job', 'bill', 'invoice'] as const
-  if (!validEntities.includes(entity as typeof validEntities[number])) {
+  const validEntities = ['job', 'estimate', 'bill'] as const
+  type ValidEntity = typeof validEntities[number]
+  if (!validEntities.includes(entity as ValidEntity)) {
     return NextResponse.json(
       { error: `Invalid entity. Valid values: ${validEntities.join(', ')}` },
       { status: 400 }
     )
   }
 
-  // TODO (Phase 4): check quickbooks_tokens for valid/refreshable token
-  // TODO (Phase 4): call QuickBooksClient.syncJob/syncBill/syncInvoice
-  return NextResponse.json(
-    {
-      error: 'QuickBooks sync not yet configured',
-      note: 'Phase 4: Connect QuickBooks via Settings → Integrations, then this endpoint will sync the entity.',
-      entity,
-      id,
-    },
-    { status: 501 }
-  )
+  const admin = createAdminClient()
+
+  // Mark job as pending if applicable
+  const targetJobId = entity === 'job' ? id : (jobId ?? null)
+  if (targetJobId) {
+    await admin
+      .from('jobs')
+      .update({ qb_sync_status: 'pending' })
+      .eq('id', targetJobId)
+  }
+
+  try {
+    let qbId: string
+
+    if (entity === 'job') {
+      qbId = await syncJobAsCustomer(admin, id)
+    } else if (entity === 'estimate') {
+      if (!jobId) {
+        return NextResponse.json(
+          { error: 'jobId is required when entity is estimate' },
+          { status: 400 }
+        )
+      }
+      qbId = await syncEstimateToQB(admin, jobId, id)
+    } else {
+      // bill
+      qbId = await syncActualAsBill(admin, id)
+    }
+
+    return NextResponse.json({ ok: true, qb_id: qbId, entity, id })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+
+    // Record error on the job row when syncing a job
+    if (targetJobId) {
+      await admin
+        .from('jobs')
+        .update({ qb_sync_status: 'error', qb_sync_error: message })
+        .eq('id', targetJobId)
+    }
+
+    // Surface QB-not-connected errors with a distinct status
+    if (message.includes('not connected') || message.includes('No tokens')) {
+      return NextResponse.json(
+        { error: message, setup_required: true },
+        { status: 422 }
+      )
+    }
+
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
