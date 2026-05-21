@@ -55,3 +55,8 @@ tmp_althoff_logs_pages/
 # local reference screenshots
 Referance Images/
 referance-images/
+screenshots/
+
+# tool data
+ruvector.db
+.claude-flow/
