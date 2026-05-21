@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: budgetPerm } = await supabase
+  const { data: budgetPerm } = await createAdminClient()
     .from('user_permissions')
     .select('can_edit')
     .eq('user_id', user.id)

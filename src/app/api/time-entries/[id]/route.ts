@@ -21,7 +21,7 @@ export async function GET(
   if (error) return NextResponse.json({ error: error.message }, { status: 404 })
   if (data.user_id !== user.id) {
     // Non-admin can only view their own
-    const { data: perm } = await supabase
+    const { data: perm } = await createAdminClient()
       .from('user_permissions')
       .select('can_manage')
       .eq('user_id', user.id)
@@ -51,7 +51,7 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Only owner (if pending) or admin can update
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_manage')
     .eq('user_id', user.id)
@@ -91,7 +91,7 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_manage')
     .eq('user_id', user.id)

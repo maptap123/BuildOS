@@ -11,7 +11,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_edit')
     .eq('user_id', user.id)
@@ -48,7 +48,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_delete')
     .eq('user_id', user.id)

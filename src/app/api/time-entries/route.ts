@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const qbSynced = searchParams.get('qb_synced')
 
   // Admins see all; field crew see only their own
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_manage')
     .eq('user_id', user.id)

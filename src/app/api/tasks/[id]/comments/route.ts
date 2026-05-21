@@ -12,7 +12,7 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_view')
     .eq('user_id', user.id)
@@ -42,7 +42,7 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await supabase
+  const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_create')
     .eq('user_id', user.id)
@@ -107,7 +107,7 @@ export async function DELETE(
 
   if (!comment) return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
 
-  const { data: adminPerm } = await supabase
+  const { data: adminPerm } = await createAdminClient()
     .from('user_permissions')
     .select('can_manage')
     .eq('user_id', user.id)

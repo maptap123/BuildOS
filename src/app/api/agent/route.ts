@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Require AI module permission
-  const { data: aiPerm } = await supabase
+  const { data: aiPerm } = await createAdminClient()
     .from('user_permissions')
     .select('can_view')
     .eq('user_id', user.id)
