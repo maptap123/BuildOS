@@ -167,7 +167,10 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_id: jobId, log_date: logDate, work_performed: polished.trim() }),
       })
-      if (!res.ok) throw new Error('Save failed')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Save failed')
+      }
       const savedLog = await res.json() as DailyLog
 
       if (capturedPhotos.length > 0 && savedLog.id) {
