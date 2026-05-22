@@ -37,9 +37,12 @@ NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
 SUPABASE_SERVICE_ROLE_KEY=<service role key — server-side only, never expose to client>
 ANTHROPIC_API_KEY=sk-ant-...
+HERMES_JDC_API_KEY=<long random bearer token for the VPS Hermes agent>
+HERMES_JDC_USER_ID=<public.users id Hermes should act as>
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is used only in server-side API routes via the admin client. It bypasses Row Level Security so that permission enforcement can be done in application code.
+`HERMES_JDC_API_KEY` lets the external Hermes VPS call `POST /api/agent` without a browser session. `HERMES_JDC_USER_ID` must be an active JDC user with the module permissions Hermes is allowed to use.
 
 ### 3. Run the dev server
 
@@ -173,7 +176,7 @@ Panels respect module-level `can_view` permissions and show a friendly message f
 | `POST /api/ai` | Daily log summarisation and estimate assistance via Claude |
 | `POST /api/agent` | Conversational agent with tools to query jobs, tasks, schedule, budget, and logs |
 
-Both require the `ai` module `can_view` permission.
+Both require the `ai` module `can_view` permission. `/api/agent` also accepts `Authorization: Bearer <HERMES_JDC_API_KEY>` for the VPS Hermes bridge and applies permissions from `HERMES_JDC_USER_ID`.
 
 ---
 

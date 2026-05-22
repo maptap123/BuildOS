@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function LogClient({ jobId, initialLogs, permissions }: Props) {
-  const { logs, loading, error, refresh } = useLogs(jobId, initialLogs)
+  const { logs, loading, error, upsertLog, removeLog } = useLogs(jobId, initialLogs)
   const [showAdd, setShowAdd] = useState(false)
   const [editLog, setEditLog] = useState<DailyLog | null>(null)
   const [photos, setPhotos] = useState<LogPhoto[]>([])
@@ -44,7 +44,7 @@ export function LogClient({ jobId, initialLogs, permissions }: Props) {
     try {
       const res = await fetch(`/api/logs?id=${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete log')
-      refresh()
+      removeLog(id)
     } catch {
       // user can retry
     }
@@ -79,7 +79,7 @@ export function LogClient({ jobId, initialLogs, permissions }: Props) {
         <AddLogModal
           jobId={jobId}
           onClose={() => setShowAdd(false)}
-          onSaved={() => { setShowAdd(false); refresh(); refreshPhotos() }}
+          onSaved={log => { upsertLog(log); setShowAdd(false); refreshPhotos() }}
         />
       )}
 
@@ -88,7 +88,7 @@ export function LogClient({ jobId, initialLogs, permissions }: Props) {
           jobId={jobId}
           log={editLog}
           onClose={() => setEditLog(null)}
-          onSaved={() => { setEditLog(null); refresh(); refreshPhotos() }}
+          onSaved={log => { upsertLog(log); setEditLog(null); refreshPhotos() }}
         />
       )}
     </div>

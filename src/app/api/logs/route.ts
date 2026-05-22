@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getWeatherForJobLocation } from '@/lib/weather/open-meteo'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -67,6 +68,36 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .single()
 
+  let autoWeather: Awaited<ReturnType<typeof getWeatherForJobLocation>> = null
+  if (!weather_summary || temperature_high == null || temperature_low == null) {
+    const { data: job, error: jobError } = await admin
+      .from('jobs')
+      .select('site_address, city, state, postal_code')
+      .eq('id', job_id)
+      .single()
+
+    if (jobError || !job) {
+      return NextResponse.json({ error: 'Could not load job location for weather.' }, { status: 400 })
+    }
+
+    if (!job.postal_code && !job.city && !job.site_address) {
+      return NextResponse.json({ error: 'Add a job address, city, or ZIP before creating a daily log.' }, { status: 400 })
+    }
+
+    try {
+      autoWeather = await getWeatherForJobLocation(job, log_date)
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Weather lookup failed' },
+        { status: 502 }
+      )
+    }
+
+    if (!autoWeather) {
+      return NextResponse.json({ error: 'Could not find weather for this job location.' }, { status: 502 })
+    }
+  }
+
   const { data, error } = await admin
     .from('daily_logs')
     .insert({
@@ -75,9 +106,9 @@ export async function POST(request: Request) {
       logged_at: new Date().toISOString(),
       author_name: userRow?.full_name || null,
       work_performed: work_performed?.trim() || null,
-      weather_summary: weather_summary?.trim() || null,
-      temperature_high: temperature_high ?? null,
-      temperature_low: temperature_low ?? null,
+      weather_summary: weather_summary?.trim() || autoWeather?.weather_summary || null,
+      temperature_high: temperature_high ?? autoWeather?.temperature_high ?? null,
+      temperature_low: temperature_low ?? autoWeather?.temperature_low ?? null,
       manpower_count: manpower_count ?? null,
       delays: delays?.trim() || null,
       safety_notes: safety_notes?.trim() || null,
