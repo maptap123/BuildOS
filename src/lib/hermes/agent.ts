@@ -4,6 +4,8 @@ const WEBHOOK_URL = process.env.DISCORD_HERMES_WEBHOOK_URL ?? ''
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? ''
 const CHANNEL_ID = process.env.DISCORD_HERMES_CHANNEL_ID ?? ''
 
+const DISCORD_API = 'https://discord.com/api/v10'
+
 export type HermesChannel = 'app' | 'discord'
 
 export type HermesStreamEvent =
@@ -25,17 +27,64 @@ interface DiscordMessage {
   webhook_id?: string
 }
 
-// Cached at module level so we only fetch once per serverless instance
 let hermesBotId: string | null = null
 
 async function getHermesBotId(): Promise<string> {
   if (hermesBotId) return hermesBotId
-  const resp = await fetch('https://discord.com/api/v10/users/@me', {
+  const resp = await fetch(`${DISCORD_API}/users/@me`, {
     headers: { Authorization: `Bot ${BOT_TOKEN}` },
   })
   const data = await resp.json() as { id: string }
   hermesBotId = data.id
   return hermesBotId
+}
+
+async function getOrCreateThread(
+  userId: string,
+  userName: string,
+  admin: ReturnType<typeof createAdminClient>
+): Promise<string> {
+  const { data: userRow } = await admin
+    .from('users')
+    .select('discord_thread_id')
+    .eq('id', userId)
+    .single()
+
+  const existingThreadId = (userRow as { discord_thread_id?: string } | null)?.discord_thread_id
+  if (existingThreadId) return existingThreadId
+
+  // Post a starter message to anchor the thread
+  const starterResp = await fetch(`${WEBHOOK_URL}?wait=true`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: userName,
+      content: `— ${userName} started a conversation with Hermes —`,
+    }),
+  })
+  if (!starterResp.ok) throw new Error(`Webhook error: ${starterResp.status}`)
+  const starter = await starterResp.json() as { id: string }
+
+  // Create a thread from that message
+  const threadResp = await fetch(
+    `${DISCORD_API}/channels/${CHANNEL_ID}/messages/${starter.id}/threads`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bot ${BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        name: `${userName} — Hermes`,
+        auto_archive_duration: 10080,
+      }),
+    }
+  )
+  if (!threadResp.ok) throw new Error(`Thread creation error: ${threadResp.status}`)
+  const thread = await threadResp.json() as { id: string }
+
+  await admin.from('users').update({ discord_thread_id: thread.id }).eq('id', userId)
+  return thread.id
 }
 
 function sleep(ms: number) {
@@ -50,7 +99,11 @@ export async function* hermesStream(
 ): AsyncGenerator<HermesStreamEvent> {
   const admin = createAdminClient()
 
-  const { data: userRow } = await admin.from('users').select('full_name').eq('id', userId).single()
+  const { data: userRow } = await admin
+    .from('users')
+    .select('full_name')
+    .eq('id', userId)
+    .single()
   const userName = (userRow as { full_name?: string } | null)?.full_name ?? 'Team Member'
 
   // Load or create conversation for UI history
@@ -74,15 +127,20 @@ export async function* hermesStream(
     convId = conv?.id
   }
 
+  // Get or create this user's dedicated Discord thread
+  let threadId: string
+  try {
+    threadId = await getOrCreateThread(userId, userName, admin)
+  } catch (e) {
+    yield { type: 'error', message: `Could not reach Discord: ${(e as Error).message}` }
+    return
+  }
+
   const botId = await getHermesBotId()
+  const content = jobId ? `${userMessage} [job:${jobId}]` : userMessage
 
-  // Include job context subtly if the user is on a specific job page
-  const content = jobId
-    ? `${userMessage} [job:${jobId}]`
-    : userMessage
-
-  // Post to Discord as the real user (webhook = no bot flag, appears as their name)
-  const postResp = await fetch(`${WEBHOOK_URL}?wait=true`, {
+  // Post to the user's thread as their real name
+  const postResp = await fetch(`${WEBHOOK_URL}?wait=true&thread_id=${threadId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: userName, content }),
@@ -96,7 +154,7 @@ export async function* hermesStream(
   const posted = await postResp.json() as { id: string }
   const afterId = posted.id
 
-  // Poll the channel for Hermes's reply (bot message, not a webhook post)
+  // Poll the thread for the bot's reply
   let reply = ''
   const deadline = Date.now() + 45_000
 
@@ -104,18 +162,18 @@ export async function* hermesStream(
     await sleep(2000)
 
     const msgsResp = await fetch(
-      `https://discord.com/api/v10/channels/${CHANNEL_ID}/messages?after=${afterId}&limit=20`,
+      `${DISCORD_API}/channels/${threadId}/messages?after=${afterId}&limit=10`,
       { headers: { Authorization: `Bot ${BOT_TOKEN}` } }
     )
     if (!msgsResp.ok) continue
 
     const msgs = await msgsResp.json() as DiscordMessage[]
-    const hermesMsg = msgs
+    const botMsg = msgs
       .filter(m => m.author.id === botId && !m.webhook_id)
       .sort((a, b) => a.id.localeCompare(b.id))[0]
 
-    if (hermesMsg) {
-      reply = hermesMsg.content
+    if (botMsg) {
+      reply = botMsg.content
       break
     }
   }
@@ -127,7 +185,6 @@ export async function* hermesStream(
 
   yield { type: 'delta', text: reply }
 
-  // Persist for UI history
   const updatedHistory: StoredMessage[] = [
     ...history,
     { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
