@@ -6,6 +6,7 @@ import { AlertCircle } from 'lucide-react'
 import { useLogs } from '@/hooks/useLogs'
 import { LogFeed } from './LogFeed'
 import { AddLogModal } from './AddLogModal'
+import { AiLogModal } from './AiLogModal'
 import type { DailyLog, LogPhoto } from '@/types'
 
 interface Permissions {
@@ -23,7 +24,9 @@ interface Props {
 export function LogClient({ jobId, initialLogs, permissions }: Props) {
   const searchParams = useSearchParams()
   const { logs, loading, error, upsertLog, removeLog } = useLogs(jobId, initialLogs)
-  const [showAdd, setShowAdd] = useState(() => searchParams.get('newLog') === '1')
+  const isAiMode = searchParams.get('aiMode') === '1'
+  const [showAdd, setShowAdd] = useState(() => searchParams.get('newLog') === '1' && !isAiMode)
+  const [showAiLog, setShowAiLog] = useState(() => searchParams.get('newLog') === '1' && isAiMode)
   const [editLog, setEditLog] = useState<DailyLog | null>(null)
   const [photos, setPhotos] = useState<LogPhoto[]>([])
 
@@ -82,6 +85,14 @@ export function LogClient({ jobId, initialLogs, permissions }: Props) {
           jobId={jobId}
           onClose={() => setShowAdd(false)}
           onSaved={log => { upsertLog(log); setShowAdd(false); refreshPhotos() }}
+        />
+      )}
+
+      {showAiLog && (
+        <AiLogModal
+          jobId={jobId}
+          onClose={() => setShowAiLog(false)}
+          onSaved={log => { upsertLog(log); setShowAiLog(false); refreshPhotos() }}
         />
       )}
 
