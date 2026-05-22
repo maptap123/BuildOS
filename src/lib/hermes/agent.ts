@@ -27,17 +27,6 @@ interface DiscordMessage {
   webhook_id?: string
 }
 
-let hermesBotId: string | null = null
-
-async function getHermesBotId(): Promise<string> {
-  if (hermesBotId) return hermesBotId
-  const resp = await fetch(`${DISCORD_API}/users/@me`, {
-    headers: { Authorization: `Bot ${BOT_TOKEN}` },
-  })
-  const data = await resp.json() as { id: string }
-  hermesBotId = data.id
-  return hermesBotId
-}
 
 async function getOrCreateThread(
   userId: string,
@@ -136,7 +125,6 @@ export async function* hermesStream(
     return
   }
 
-  const botId = await getHermesBotId()
   const content = jobId ? `${userMessage} [job:${jobId}]` : userMessage
 
   // Post to the user's thread as their real name
@@ -168,8 +156,10 @@ export async function* hermesStream(
     if (!msgsResp.ok) continue
 
     const msgs = await msgsResp.json() as DiscordMessage[]
+    // Accept any bot application message (not webhook) — the VPS Hermes bot
+    // may have a different Discord ID than the management bot in DISCORD_BOT_TOKEN
     const botMsg = msgs
-      .filter(m => m.author.id === botId && !m.webhook_id)
+      .filter(m => m.author.bot === true && !m.webhook_id)
       .sort((a, b) => a.id.localeCompare(b.id))[0]
 
     if (botMsg) {
