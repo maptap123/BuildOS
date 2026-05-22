@@ -1,54 +1,65 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-// TODO (Phase 10a): import { hermes } from '@/lib/hermes/agent'
-// TODO (Phase 10a): Wire streaming — replace NextResponse.json with a ReadableStream response
+import { createAdminClient } from '@/lib/supabase/admin'
+import { hermesStream } from '@/lib/hermes/agent'
 
-/**
- * POST /api/hermes/chat
- *
- * Hermes in-app chat endpoint. Accepts a user message and returns an
- * AI response. Designed to be streaming-ready (Phase 10b).
- *
- * Request body:
- *   {
- *     message:          string,           // user's text message
- *     conversation_id?: string,           // existing thread UUID, or omit to start new
- *   }
- *
- * Response (once implemented):
- *   Streaming: text/event-stream with Server-Sent Events
- *   Each event: data: { delta: string }
- *   Final event: data: { done: true, conversation_id: string }
- *
- * Phase 10a implementation plan:
- *   1. Auth + permission check (all authenticated users)
- *   2. Load/create hermes_conversations row
- *   3. Call hermes.chat(user.id, message, 'app')
- *   4. Stream Claude response back via ReadableStream
- *   5. On stream end, persist full message to DB
- *
- * Phase 10b additions:
- *   - Context awareness: accept optional `job_id` to pre-set active job
- *   - Quick-action chips: accept `action` shortcut instead of `message`
- */
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await request.json().catch(() => ({}))
-  const { message } = body as { message?: string; conversation_id?: string }
-
-  if (!message || typeof message !== 'string' || !message.trim()) {
-    return NextResponse.json({ error: 'message is required' }, { status: 400 })
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 
-  // TODO (Phase 10a): call hermes.chat(user.id, message.trim(), 'app') and stream the response
-  return NextResponse.json(
-    {
-      error: 'Hermes not yet configured',
-      note: 'Phase 10: Implement HermesAgent.chat() and wire Claude streaming to this route.',
+  const { data: perm } = await createAdminClient()
+    .from('user_permissions')
+    .select('can_view')
+    .eq('user_id', user.id)
+    .eq('module', 'ai')
+    .single()
+
+  if (!perm?.can_view) {
+    return new Response(JSON.stringify({ error: 'AI module access not granted' }), { status: 403 })
+  }
+
+  const body = await request.json().catch(() => ({})) as {
+    message?: string
+    conversation_id?: string
+    job_id?: string
+  }
+
+  const message = body.message?.trim()
+  if (!message) {
+    return new Response(JSON.stringify({ error: 'message is required' }), { status: 400 })
+  }
+
+  const encoder = new TextEncoder()
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      function send(event: object) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+      }
+
+      try {
+        for await (const event of hermesStream(user.id, message, body.conversation_id, body.job_id)) {
+          send(event)
+          if (event.type === 'done' || event.type === 'error') break
+        }
+      } catch (err) {
+        send({ type: 'error', message: err instanceof Error ? err.message : 'Unknown error' })
+      } finally {
+        controller.close()
+      }
     },
-    { status: 501 }
-  )
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }

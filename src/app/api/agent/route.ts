@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 
 /**
  * POST /api/agent
@@ -17,7 +18,7 @@ import { NextResponse } from 'next/server'
  *   get_job                { job_id }
  *   update_job_status      { job_id, status }
  *   list_tasks             { job_id, status?, priority? }
- *   create_task            { job_id, title, description?, priority?, due_date?, estimated_hours? }
+ *   create_task            { job_id, title, description?, priority?, due_date? }
  *   update_task            { task_id, ...fields }
  *   list_schedule          { job_id, status? }
  *   update_schedule_item   { item_id, ...fields }
@@ -27,15 +28,17 @@ import { NextResponse } from 'next/server'
  *   list_actuals           { job_id, budget_line_id? }
  *   get_budget_summary     { job_id }
  *   list_daily_logs        { job_id, limit? }
+ *   create_daily_log       { job_id, log_date?, work_performed, weather_summary?, manpower_count?, delays?, safety_notes?, inspection_notes? }
  *   search_across_jobs     { query, modules? }
  */
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const admin = createAdminClient()
+  const authResult = await authenticateAgentRequest(request, admin)
+  if ('response' in authResult) return authResult.response
+  const { user } = authResult
 
   // Require AI module permission
-  const { data: aiPerm } = await createAdminClient()
+  const { data: aiPerm } = await admin
     .from('user_permissions')
     .select('can_view')
     .eq('user_id', user.id)
@@ -52,8 +55,6 @@ export async function POST(request: Request) {
   if (!tool || typeof tool !== 'string') {
     return NextResponse.json({ error: 'tool name required' }, { status: 400 })
   }
-
-  const admin = createAdminClient()
 
   // Helper: check module permission
   async function hasPerm(module: string, flag: 'can_view' | 'can_create' | 'can_edit' | 'can_delete') {
@@ -122,8 +123,6 @@ export async function POST(request: Request) {
           description: params.description ?? null,
           priority: params.priority ?? 'medium',
           due_date: params.due_date ?? null,
-          estimated_hours: params.estimated_hours ?? null,
-          tags: params.tags ?? [],
           status: 'todo',
           created_by: user.id,
         }).select().single()
@@ -134,7 +133,7 @@ export async function POST(request: Request) {
       case 'update_task': {
         if (!await hasPerm('tasks', 'can_edit')) return permError()
         if (!params.task_id) return NextResponse.json({ error: 'task_id required' }, { status: 400 })
-        const allowed = ['title','description','status','priority','due_date','assigned_to','estimated_hours','actual_hours','tags']
+        const allowed = ['title','description','status','priority','due_date','assigned_to']
         const updates: Record<string, unknown> = {}
         for (const k of allowed) { if (k in params) updates[k] = params[k] }
         if (updates.status === 'done') { updates.completed_at = new Date().toISOString(); updates.completed_by = user.id }
@@ -246,6 +245,42 @@ export async function POST(request: Request) {
         return ok({ logs: data, count: data?.length ?? 0 })
       }
 
+      case 'create_daily_log': {
+        if (!await hasPerm('logs', 'can_create')) return permError()
+        if (!params.job_id || !params.work_performed) {
+          return NextResponse.json({ error: 'job_id and work_performed required' }, { status: 400 })
+        }
+
+        const { data: userRow } = await admin
+          .from('users')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+
+        const { data, error } = await admin
+          .from('daily_logs')
+          .insert({
+            job_id: params.job_id,
+            log_date: params.log_date ?? new Date().toISOString().slice(0, 10),
+            logged_at: new Date().toISOString(),
+            author_name: userRow?.full_name || 'Hermes',
+            work_performed: String(params.work_performed).trim(),
+            weather_summary: trimOrNull(params.weather_summary),
+            temperature_high: params.temperature_high ?? null,
+            temperature_low: params.temperature_low ?? null,
+            manpower_count: params.manpower_count ?? null,
+            delays: trimOrNull(params.delays),
+            safety_notes: trimOrNull(params.safety_notes),
+            inspection_notes: trimOrNull(params.inspection_notes),
+            ai_summary: trimOrNull(params.ai_summary),
+            created_by: user.id,
+          })
+          .select()
+          .single()
+        if (error) throw error
+        return ok({ log: data, message: 'Daily log created' })
+      }
+
       // ─── CROSS-MODULE SEARCH ─────────────────────────────────────────────
       case 'search_across_jobs': {
         if (!await hasPerm('jobs', 'can_view')) return permError()
@@ -276,13 +311,13 @@ export async function POST(request: Request) {
             'list_tasks','create_task','update_task',
             'list_schedule','update_schedule_item',
             'list_budget','get_budget_summary','list_change_orders','create_change_order','list_actuals',
-            'list_daily_logs',
+            'list_daily_logs','create_daily_log',
             'search_across_jobs',
           ],
         }, { status: 400 })
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Unknown error'
+    const msg = getErrorMessage(e)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
@@ -297,4 +332,73 @@ function permError() {
 
 function notFoundError(resource: string) {
   return NextResponse.json({ error: `${resource} not found` }, { status: 404 })
+}
+
+async function authenticateAgentRequest(
+  request: Request,
+  admin: ReturnType<typeof createAdminClient>
+) {
+  const configuredKey = process.env.HERMES_JDC_API_KEY
+  const authHeader = request.headers.get('authorization')
+  const bearerToken = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]
+
+  if (configuredKey && bearerToken && safeTokenEqual(bearerToken, configuredKey)) {
+    const hermesUserId = process.env.HERMES_JDC_USER_ID
+    if (!hermesUserId) {
+      return {
+        response: NextResponse.json(
+          { error: 'Hermes service user is not configured' },
+          { status: 500 }
+        ),
+      }
+    }
+
+    const { data: user, error } = await admin
+      .from('users')
+      .select('id, email, full_name, is_active')
+      .eq('id', hermesUserId)
+      .single()
+
+    if (error || !user?.is_active) {
+      return {
+        response: NextResponse.json(
+          { error: 'Hermes service user is invalid or inactive' },
+          { status: 403 }
+        ),
+      }
+    }
+
+    return { user }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  return { user }
+}
+
+function safeTokenEqual(value: string, expected: string) {
+  const valueBuffer = Buffer.from(value)
+  const expectedBuffer = Buffer.from(expected)
+  return valueBuffer.length === expectedBuffer.length && timingSafeEqual(valueBuffer, expectedBuffer)
+}
+
+function trimOrNull(value: unknown) {
+  if (typeof value !== 'string') return value ?? null
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message: unknown }).message)
+  }
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return 'Unknown error'
+  }
 }

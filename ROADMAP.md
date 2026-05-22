@@ -322,15 +322,40 @@ Goal: become more than a Buildertrend clone by turning project data into action.
 
 ## Phase 10: Hermes — Agentic AI Platform
 
-Goal: give every employee a single AI they can text or chat with that knows who they are, respects what they're allowed to see, and can both read and update job data in natural language — no app required for field workers, full in-app chat for office users.
+Goal: deploy Hermes Agent (Nous Research OSS) on a VPS as the single AI brain for the entire JDC business. Hermes has full read and write access to every part of the operation — the JDC app, QuickBooks, email, and SMS context from Android phones. Every employee talks to the same agent, either through the JDC app or Discord. All conversations are visible to ownership in Discord regardless of which channel was used.
 
-### The Core Idea
+### The Full Picture
 
-Hermes is one Claude-powered agent accessible two ways:
-- **SMS** — employees text a Twilio number from their phone. No app install. No login screen.
-- **In-app chat** — same agent, same memory, same capabilities, embedded in the web platform.
+```
+                    ┌─────────────────────────────────┐
+                    │       HERMES AGENT (VPS)         │
+                    │    Nous Research OSS              │
+                    │    Always-on, always aware        │
+                    │    Model: OpenRouter (flexible)   │
+                    └───────────────┬─────────────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         │                          │                           │
+         ▼                          ▼                           ▼
+  JDC Platform              QuickBooks API            Email (Gmail / Outlook)
+  Read + Write              Financial data            Read + Draft replies
+  Jobs, schedule,           P&L, invoices,            Lisa's client emails
+  budget, tasks,            payments, vendors         Incoming inquiries
+  change orders,
+  daily logs, docs
+         │
+         ▼
+  SMS Context (Tasker)
+  Jason, Lisa, August,
+  Cane — sub + vendor
+  threads synced on
+  app open
+```
 
-The agent's responses are filtered by the user's role. A field worker asking "what's the markup on this job?" gets a polite refusal. A CEO asking the same thing gets the number, the margin, and a comparison to last quarter.
+**Interfaces:**
+- **JDC app** — in-app chat panel, available on every page
+- **Discord** — direct message or channel; Hermes Agent has native Discord support
+- **Visibility** — every conversation (app or Discord) is mirrored to a per-user Discord channel so ownership sees everything in one place
 
 ---
 
@@ -341,89 +366,155 @@ The agent's responses are filtered by the user's role. A field worker asking "wh
 | My tasks for today | ✅ | ✅ | ✅ |
 | Job schedule / milestones | ✅ | ✅ | ✅ |
 | Daily log — read | ✅ (own) | ✅ (all) | ✅ (all) |
-| Daily log — create via text | ✅ | ✅ | ✅ |
-| Photo upload via MMS | ✅ | ✅ | ✅ |
+| Daily log — create | ✅ | ✅ | ✅ |
 | Mark task complete | ✅ | ✅ | ✅ |
 | Punch list status | ✅ | ✅ | ✅ |
 | Job address / site info | ✅ | ✅ | ✅ |
+| Draft SMS reply to sub | ✅ | ✅ | ✅ |
 | Budget summary | ❌ | ✅ | ✅ |
 | Actual costs / bills | ❌ | ✅ | ✅ |
 | Purchase orders | ❌ | ✅ | ✅ |
 | Contract value | ❌ | ✅ | ✅ |
+| QuickBooks data | ❌ | ✅ | ✅ |
+| Draft client email | ❌ | ✅ | ✅ |
+| Change order financials | ❌ | ✅ | ✅ |
+| Lead pipeline | ❌ | ✅ | ✅ |
 | Markup / margin | ❌ | ❌ | ✅ |
 | Profitability report | ❌ | ❌ | ✅ |
 | Portfolio / all jobs summary | ❌ | ❌ | ✅ |
-| Change order financials | ❌ | ✅ | ✅ |
-| Lead pipeline | ❌ | ✅ | ✅ |
 | Employee info / rates | ❌ | ❌ | ✅ |
 
 ---
 
-### Phase 10a — Agent Foundation
+### Phase 10a — VPS + Hermes Agent Deployment
 
-- [ ] Add `hermes_conversations` Supabase table — stores message history per user (user_id, role, channel: sms/app, messages JSONB, updated_at)
-- [ ] Add `hermes_user_context` table — long-term memory per user (preferred job names, last asked topics, known preferences, last active job)
-- [ ] Build role-aware Claude agent with tool definitions gated by role tier (field / pm / owner)
-- [ ] Read tools: get_my_tasks, get_job_schedule, get_job_status, get_daily_logs, get_punch_list, get_budget_summary (pm+), get_profitability (owner only), get_all_jobs_health (owner only)
-- [ ] Write tools: create_daily_log, mark_task_complete, add_task_note, upload_photo_from_url
-- [ ] Add system prompt that injects: user's name, role, active jobs, today's date, and recent conversation summary
-- [ ] Agent refuses out-of-tier requests gracefully ("that info is restricted to management — want me to flag it for your PM?")
+Goal: get Hermes Agent running on a VPS and connected to the JDC tool dispatcher.
 
-### Phase 10b — In-App Chat Interface
+**Progress note (2026-05-21):** Hermes Agent is running on a Hostinger KVM VPS via Hostinger Docker Manager. Current access during setup is the raw VPS IP/port, and the working model provider is OpenAI Codex OAuth with `gpt-5.5`. Detailed handoff notes live in `HERMES_PROGRESS.md`.
+
+Completed so far:
+- [x] Provisioned Hostinger KVM VPS
+- [x] Deployed Hermes Agent via Hostinger Docker Manager
+- [x] Completed Hermes setup with OpenAI Codex OAuth
+- [x] Verified chat works with `gpt-5.5`
+- [x] Switched terminal backend to Local after Docker backend could not run `docker version`
+- [x] Verified tool execution by creating `hello.txt`
+
+Immediate next steps:
+- [ ] Take Hostinger VPS snapshot/backup while install is clean
+- [ ] Configure HTTPS/domain or a no-cost hostname path; currently using raw IP + port
+- [ ] Wire Hermes to the existing JDC `/api/agent` endpoint
+
+- [ ] Provision a VPS — Railway, Render, or DigitalOcean droplet ($6–12/mo)
+- [ ] Clone and deploy Nous Research Hermes Agent on the VPS
+- [ ] Set up OpenRouter account + API key — gives access to all major models without locking to one provider
+- [ ] Configure Hermes Agent with OpenRouter as the model provider
+- [ ] Wire Hermes to the existing JDC `/api/agent` endpoint as its primary tool source — Hermes calls JDC tools to read and write app data
+- [ ] Add `HERMES_JDC_API_KEY` env var on VPS — authenticates Hermes's calls to the JDC tool dispatcher
+- [ ] Verify Hermes can: list jobs, get schedule, update a task, create a daily log — all via natural language
+- [ ] Configure role-aware system prompt — inject user name, role, active jobs, today's date on each conversation start
+- [ ] Agent refuses out-of-tier requests gracefully ("that info is restricted to management")
+
+### Phase 10b — Discord Server + Visibility Architecture
+
+Goal: set up the Discord server that serves as both a user interface and the owner's full visibility layer.
+
+- [ ] Create JDC Discord server: "JDC Hermes"
+- [ ] Create per-user channels: `#hermes-jason`, `#hermes-lisa`, `#hermes-august`, `#hermes-cane`
+- [ ] Create `#hermes-alerts` channel — proactive briefings, overrun alerts, schedule risks post here
+- [ ] Connect Hermes Agent Discord bot to the server
+- [ ] Configure Hermes so each Discord channel maps to the correct user identity and role tier
+- [ ] Owner (August) has read access to all channels — full visibility across all 4 users
+- [ ] Individual users can only see their own channel
+- [ ] Test end-to-end: Jason asks a question in `#hermes-jason`, Hermes responds with real JDC data
+
+### Phase 10c — In-App Chat + Discord Mirror
+
+Goal: employees can use the JDC app to talk to Hermes, and those conversations appear in Discord automatically.
 
 - [ ] Add `src/components/hermes/HermesChatPanel.tsx` — slide-in chat panel available on every page
-- [ ] Wire chat panel to `/api/hermes/chat` route (streams Claude responses)
-- [ ] Show conversation history from `hermes_conversations` on open
-- [ ] Add context-awareness: if user is on the Oak Street job page, Hermes auto-knows the active job
-- [ ] Add quick-action chips: "My tasks today", "Log my hours", "What's overdue?"
-- [ ] Add chat trigger button to main nav (persistent across all pages)
+- [ ] Wire chat panel to `/api/hermes/chat` route — forwards message to VPS Hermes Agent, streams response back
+- [ ] Auto-inject active job context — if user is on the Oak Street job page, Hermes knows the job without being told
+- [ ] Mirror every in-app conversation to the corresponding Discord channel in real time
+- [ ] Add quick-action chips: "My tasks today", "What's overdue?", "Summarize this job"
+- [ ] Add persistent chat trigger button in main nav
 
-### Phase 10c — SMS Interface (Twilio)
+### Phase 10d — Email Integration
 
-- [ ] Add Twilio account + provision a dedicated phone number for Hermes
-- [ ] Add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` env vars
-- [ ] Add `/api/hermes/sms` webhook route — receives inbound Twilio SMS, resolves user by phone number, calls agent, replies via Twilio
-- [ ] Add phone number field to employee profiles + verification flow (send code, confirm)
-- [ ] Handle MMS photo messages — download attached image, upload to Supabase storage, attach to daily log
-- [ ] Handle unrecognized numbers gracefully ("This number isn't linked to a JDC account. Contact your admin.")
-- [ ] Add SMS rate limiting per user (prevent runaway usage)
+Goal: Hermes can read emails and draft replies on behalf of Lisa and other team members.
 
-### Phase 10d — Persistent Memory
+- [ ] Complete Microsoft 365 / Gmail OAuth flow — store encrypted tokens per user
+- [ ] Add `read_emails` tool to Hermes — pulls recent inbox threads, filterable by sender, job name, or date range
+- [ ] Add `draft_email_reply` tool — Hermes composes a reply based on email thread + relevant JDC job data; user reviews and sends manually
+- [ ] Add `search_emails` tool — find all emails mentioning a specific job, client, or sub
+- [ ] Wire email context into system prompt for Lisa's role — on conversation start, inject summary of unread emails ("You have 2 unread client emails from this week")
+- [ ] Email data is scoped per user — Lisa's emails are not visible to Jason's Hermes session
 
-- [ ] Agent summarizes each conversation end and stores key facts in `hermes_user_context` (last job discussed, open items mentioned, preferences)
-- [ ] On new conversation, inject prior context into system prompt ("Last time we spoke you were working on Oak Street — still on that job?")
-- [ ] Agent learns job nicknames ("the church job" → maps to Calvary Baptist Renovation)
-- [ ] Agent tracks recurring questions per role and surfaces them as suggestions
-- [ ] Add admin UI to view/clear a user's Hermes memory
+### Phase 10e — QuickBooks Integration
 
-### Phase 10f — Admin Conversation Monitoring
+Goal: Hermes can answer financial questions and cross-reference JDC job data with QuickBooks actuals.
 
-Goal: give the system admin full visibility into every Hermes conversation across all employees — what was asked, what was returned, and when.
+- [ ] Complete QuickBooks OAuth connection flow — store encrypted tokens
+- [ ] Add `get_qb_job_costs` tool — pulls actual costs for a job from QuickBooks by customer/project
+- [ ] Add `get_qb_vendor_balance` tool — outstanding balance owed to a specific vendor
+- [ ] Add `get_qb_cash_position` tool — overall company cash, AR aging, AP aging
+- [ ] Add `get_qb_profit_loss` tool — P&L summary for a date range
+- [ ] Cross-reference tool — compare JDC budget vs QuickBooks actuals for a job and surface variance
+- [ ] QuickBooks data is owner/PM tier only — field workers cannot access it
 
-- [ ] Add admin-only `/admin/hermes` page — lists all employees with their last active channel (SMS/app), last message timestamp, and total message count
-- [ ] Add conversation detail view — admin can click any employee and read the full message thread (both sides: what they asked and what Hermes replied)
-- [ ] Add filters: by employee, by date range, by channel (SMS vs in-app), by job mentioned
-- [ ] Add search across all conversations — find any message containing a keyword (e.g. "markup", "cost", "fired")
-- [ ] Flag attempted permission violations — highlight any message where an employee asked for data outside their role tier and was refused (so you can see if someone is probing for info they shouldn't have)
-- [ ] Show which tools Hermes called per message (e.g. get_budget_summary, create_daily_log) — gives a clear audit trail of what data was actually read or written
-- [ ] Add export to CSV — full conversation history for any employee or date range
-- [ ] Conversations are retained for 90 days by default; add configurable retention setting in admin
-- [ ] Add activity summary widget on main admin dashboard: messages sent today, most active employee, jobs most discussed
+### Phase 10f — SMS Context Bridge (Tasker)
 
-### Phase 10e — Proactive Intelligence
+Goal: Jason, Lisa, August, and Cane can ask Hermes to reference or draft replies to their real Android SMS conversations with subs and vendors — without changing how anyone texts.
 
-- [ ] Morning SMS to field workers: "Good morning [Name] — you're on Oak Street today. 3 open tasks. Reply to log your start time."
-- [ ] PM daily brief via SMS or in-app: budget at-risk jobs, overdue tasks, unsigned change orders
-- [ ] Owner Monday morning portfolio summary: active jobs, total committed vs budget, open change orders value
-- [ ] Alert when a field worker hasn't logged for a job day ("No log filed for Oak Street yesterday — want me to create one?")
-- [ ] Budget overrun alert to PM+: "Lumber costs on Oak Street are 12% over budget line"
+**How it works:**
+- Tasker ($3.99) runs on each user's Android phone: trigger = JDC app opened
+- Tasker reads recent SMS threads, filters to contacts in the JDC contacts table, POSTs to `/api/hermes/sms-sync`
+- Hermes stores threads per-user; on conversation start, injects a summary of recent sub/vendor activity
+- User asks "draft a reply to Mike the plumber" — Hermes reads the thread, checks the job schedule, writes the reply; user copies and sends from their phone
+
+**Key decisions:**
+- 4 users: Jason, Lisa, August, Cane — each gets a unique API token in their Tasker config
+- Data is fully isolated per user — no cross-visibility even in admin
+- Only contacts in the JDC contacts table are synced — not the full inbox
+- Hermes drafts replies, never sends — user always has final control
+- 30-day rolling retention; older threads pruned automatically
+
+**Tasks:**
+- [ ] Add `hermes_sms_context` Supabase table — (user_id, contact_phone, contact_name, messages JSONB, thread_date, synced_at) with row-level security
+- [ ] Add `/api/hermes/sms-sync` POST endpoint — authenticates via per-user Bearer token, upserts thread rows
+- [ ] Add token generation for Jason, Lisa, August, Cane in Settings → Hermes → SMS Context — generate once, revocable
+- [ ] Add contact phone matching — threads matched to contacts table by phone number
+- [ ] Add `read_sms_thread` tool to Hermes — pull full thread with a specific contact
+- [ ] Add `draft_sms_reply` tool — compose reply based on thread + job data
+- [ ] Wire SMS summary into Hermes system prompt — "Jason has 3 recent sub threads: Mike (plumber, 2h ago), Dave (electrician, yesterday), Carlos (framing, 3 days ago)"
+- [ ] Add Tasker setup guide page in app — step-by-step for each of the 4 users
+- [ ] Add 30-day auto-pruning via Supabase cron
+
+**Tasker profile:**
+- Trigger: App launched — `build-os-eight.vercel.app`
+- Action 1: Query SMS inbox — last 30 days, known contacts only
+- Action 2: HTTP POST to `/api/hermes/sms-sync` with Bearer token + thread JSON
+- Action 3: Flash "Hermes synced" toast (optional)
+
+### Phase 10g — Proactive Intelligence
+
+Goal: Hermes initiates contact — employees don't have to ask, it tells them what they need to know.
+
+- [ ] Morning briefing at 7am — posted to each user's Discord channel: their jobs for the day, open tasks, schedule milestones, any budget flags
+- [ ] Owner Monday morning portfolio post to `#hermes-august`: all active jobs, total committed vs budget, unsigned change orders, cash position from QuickBooks
+- [ ] Budget overrun alert — when any job's forecast exceeds budget by >10%, post alert to `#hermes-alerts` and the relevant PM's channel
+- [ ] Schedule risk alert — when a schedule item is overdue with incomplete predecessors, flag to PM
+- [ ] Missing daily log reminder — if no log filed for an active job by 4pm, post reminder to field worker's channel
+- [ ] Unsigned change order reminder — daily nudge if a CO has been pending client signature for more than 3 days
 
 ---
 
 **Infrastructure cost estimate:**
-- Twilio: ~$1/mo per number + ~$0.0079/SMS sent — negligible at launch
-- Claude API: depends on message volume; budget ~$50–200/mo at active team size
-- Memory storage: minimal Supabase rows
+- VPS: ~$6–12/mo (Railway or DigitalOcean)
+- OpenRouter API: ~$30–100/mo depending on model choice and message volume
+- Supabase: within existing plan
+- Discord: free
+- Tasker: $3.99 one-time per phone (4 phones = ~$16 total)
 
 ---
 
@@ -485,8 +576,11 @@ Start here unless we intentionally reprioritize.
 - [ ] Add mobile-friendly daily log creation flow
 - [ ] Add job activity feed
 - [ ] Phase 7: AI daily brief + budget overrun risk detection (Sprint D)
-- [ ] **[Hermes]** Add `hermes_conversations` + `hermes_user_context` tables, role-aware agent, in-app chat panel (Phase 10a + 10b — start here before SMS)
-- [ ] **[Hermes]** Add Twilio SMS interface + phone number verification on employee profiles (Phase 10c)
+- [ ] **[Hermes]** Provision VPS, deploy Nous Research Hermes Agent, connect to OpenRouter, wire to `/api/agent` JDC tool dispatcher (Phase 10a)
+- [ ] **[Hermes]** Set up Discord server with per-user channels, connect Hermes bot, verify end-to-end with real JDC data (Phase 10b)
+- [ ] **[Hermes]** Build in-app chat panel + Discord mirror so app conversations appear in Discord (Phase 10c)
+- [ ] **[Hermes]** Complete QuickBooks + email OAuth, add Hermes read/draft tools (Phase 10d + 10e)
+- [ ] **[Hermes]** Add `hermes_sms_context` table + `/api/hermes/sms-sync` endpoint + Tasker setup for Jason, Lisa, August, Cane (Phase 10f)
 
 ---
 
