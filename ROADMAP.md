@@ -570,26 +570,41 @@ JDC Platform runs as a single Next.js app but renders a fundamentally different 
 
 ---
 
-### Mobile Sprint 1 — Foundation (current focus)
-- [ ] Create `useMobileLayout` hook — returns true when viewport < 768px
-- [ ] Refactor `(dashboard)/layout.tsx` to render `<MobileShell>` vs `<DesktopShell>` based on hook
-- [ ] Build `<MobileShell>` — navy top bar (job context), content area, 5-tab bottom nav
-- [ ] Build mobile "Today" dashboard screen — my jobs, today's tasks, schedule milestones
-- [ ] Build mobile Jobs list — card-based, tap to open job with address, phone, quick actions
-- [ ] Build mobile Log creation — full-screen flow: photos first, then notes, then submit
+### Mobile Sprint 1 — Foundation ✅ DONE (2026-05-22)
 
-### Mobile Sprint 2 — Field Tools
+**Architecture note:** The split is done with Tailwind CSS breakpoints (`md:hidden` / `hidden md:block`), not hooks or shell components. No `useMobileLayout` hook needed — Tailwind handles it cleanly. Desktop code is untouched.
+
+**Files built/changed:**
+- `src/components/mobile/MobileHome.tsx` — navy/gold launchpad: Hermes hero button, 4-tile action grid, Today's Tasks, This Week schedule
+- `src/components/mobile/LogModePicker.tsx` — bottom sheet: Traditional vs AI Log mode (AI = BETA stub, Phase 2)
+- `src/app/(dashboard)/more/page.tsx` — full mobile nav: Management, Job Tools, Settings sections + sign out
+- `src/hooks/useCurrentUser.ts` + `src/app/api/me/profile/route.ts` — personalized greeting
+- `src/app/(dashboard)/layout.tsx` — 5-tab mobile bottom nav (Home, Jobs, Tasks, Time Clock, More); tabs with no job open `JobPickerSheet` with destination intent routing
+- `src/app/(dashboard)/jobs/page.tsx` — dual render: mobile gets `<MobileHome>`, desktop gets existing dashboard
+- `src/components/jobs/JobPickerSheet.tsx` — added `onSelect` callback prop for destination intent
+- `src/components/logs/LogClient.tsx` — auto-opens Add Log modal when `?newLog=1` is in URL
+
+**Verified working (Playwright, 390×844):**
+- ✅ Hermes button → inline chat panel
+- ✅ Daily Log → LogModePicker → Traditional → job picker → `/jobs/{id}/logs?newLog=1` → Add Log modal auto-opens
+- ✅ Schedule (no job) → job picker → `/jobs/{id}/schedule`
+- ✅ Time Clock → `/time-clock`
+- ✅ Documents → `/documents`
+- ✅ Jobs nav tab → job picker sheet
+- ✅ Tasks nav tab (no job) → job picker with `tasks` intent → `/jobs/{id}/tasks`
+- ✅ More tab → `/more` page
+
+### Mobile Sprint 2 — Field Tools (next)
 - [ ] Build mobile Tasks screen — my tasks list, tap to complete, pull to refresh
 - [ ] Add camera capture to photo upload (not just file picker)
-- [ ] Add weather auto-fetch on log creation
+- [ ] Add weather auto-fetch on log creation (already in desktop log form, needs mobile hook)
 - [ ] Add offline draft storage for logs (localStorage → sync on reconnect)
-- [ ] Build mobile "More" screen — links to Documents, Time Clock, Hermes, Settings
+- [ ] AI Log mode (Phase 2) — camera + voice → Hermes writes the log (Klutch AI pattern)
 
 ### Mobile Sprint 3 — Hermes on Mobile
-- [ ] Persistent Hermes FAB (floating action button) on all mobile screens
-- [ ] Full-screen Hermes chat on mobile
-- [ ] Quick chips: "What are my tasks today?", "Start a daily log for [job]", "What's on my schedule?"
 - [ ] Voice-to-text input for Hermes (native mobile keyboard mic)
+- [ ] Hermes AI Log — open camera, talk + snap photos, Hermes writes the log entry on submit
+- [ ] Quick chips persistent across sessions: "My tasks today", "What's overdue?", "Start a log"
 
 ---
 
@@ -629,11 +644,11 @@ Goal: once the job and budget modules are more fully built out, allow admins to 
 
 Start here unless we intentionally reprioritize.
 
-- [ ] **[Mobile Sprint 1]** Build `useMobileLayout` hook + split `(dashboard)/layout.tsx` into `<MobileShell>` and `<DesktopShell>` — desktop untouched
-- [ ] **[Mobile Sprint 1]** Build mobile "Today" dashboard — my jobs today, tasks due, milestones
-- [ ] **[Mobile Sprint 1]** Build mobile Jobs list (card-based) + job detail quick view (address, phone, quick actions)
-- [ ] **[Mobile Sprint 1]** Build mobile Log creation — camera-first full-screen flow
-- [ ] **[Mobile Sprint 2]** Camera capture, weather auto-fetch, offline log drafts
+- [x] **[Mobile Sprint 1]** ✅ Done — MobileHome launchpad, LogModePicker, More page, 5-tab nav, Hermes chat, all routing verified in Playwright
+- [ ] **[Mobile Sprint 2]** Camera capture on photo upload (mobile file picker currently opens gallery, need `capture="environment"`)
+- [ ] **[Mobile Sprint 2]** Weather auto-fetch on mobile log creation
+- [ ] **[Mobile Sprint 2]** Offline draft storage for logs
+- [ ] **[Mobile Sprint 2]** AI Log mode — camera + voice → Hermes writes the log (Klutch AI pattern, currently BETA stub)
 - [ ] **[Price Intelligence]** Decide which retailers to include, then start Phase 5a (Apify client + price_cache schema + HD scraper)
 - [ ] Add job activity feed
 - [ ] Phase 7: AI daily brief + budget overrun risk detection (Sprint D)
