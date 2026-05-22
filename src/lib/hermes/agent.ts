@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const HERMES_BASE_URL = (process.env.HERMES_API_URL ?? '').replace(/\/$/, '')
-const HERMES_API_KEY = process.env.HERMES_API_KEY ?? ''
+const WEBHOOK_URL = process.env.DISCORD_HERMES_WEBHOOK_URL ?? ''
+const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? ''
+const CHANNEL_ID = process.env.DISCORD_HERMES_CHANNEL_ID ?? ''
 
 export type HermesChannel = 'app' | 'discord'
 
@@ -17,29 +18,28 @@ interface StoredMessage {
   timestamp: string
 }
 
-async function postToDiscord(text: string, userName: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN
-  const channelId = process.env.DISCORD_HERMES_CHANNEL_ID
-  if (!token || !channelId) return
-  await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: `**${userName}:** ${text}` }),
-  }).catch(() => {})
+interface DiscordMessage {
+  id: string
+  content: string
+  author: { id: string; bot?: boolean }
+  webhook_id?: string
 }
 
-async function postHermesReplyToDiscord(text: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN
-  const channelId = process.env.DISCORD_HERMES_CHANNEL_ID
-  if (!token || !channelId) return
-  const MAX = 2000
-  for (let i = 0; i < text.length; i += MAX) {
-    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: `**Hermes:** ${text.slice(i, i + MAX)}` }),
-    }).catch(() => {})
-  }
+// Cached at module level so we only fetch once per serverless instance
+let hermesBotId: string | null = null
+
+async function getHermesBotId(): Promise<string> {
+  if (hermesBotId) return hermesBotId
+  const resp = await fetch('https://discord.com/api/v10/users/@me', {
+    headers: { Authorization: `Bot ${BOT_TOKEN}` },
+  })
+  const data = await resp.json() as { id: string }
+  hermesBotId = data.id
+  return hermesBotId
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 export async function* hermesStream(
@@ -52,8 +52,8 @@ export async function* hermesStream(
 
   const { data: userRow } = await admin.from('users').select('full_name').eq('id', userId).single()
   const userName = (userRow as { full_name?: string } | null)?.full_name ?? 'Team Member'
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
+  // Load or create conversation for UI history
   let convId = conversationId
   let history: StoredMessage[] = []
 
@@ -74,91 +74,68 @@ export async function* hermesStream(
     convId = conv?.id
   }
 
-  // Mirror user message to Discord
-  postToDiscord(userMessage, userName)
+  const botId = await getHermesBotId()
 
-  const systemContext = [
-    `You are Hermes, the AI assistant for JDC Construction LLC — a residential and commercial remodeling company in Louisville, Kentucky.`,
-    `Today is ${today}. The user's name is ${userName} (user ID: ${userId}).`,
-    jobId ? `They are currently viewing job ID: ${jobId}. Use this as the default job context.` : '',
-    `Be concise and direct. Field crew are busy. Format dollar amounts as $X,XXX and dates as "Mon DD".`,
-  ].filter(Boolean).join(' ')
+  // Include job context subtly if the user is on a specific job page
+  const content = jobId
+    ? `${userMessage} [job:${jobId}]`
+    : userMessage
 
-  const messages = [
-    { role: 'system' as const, content: systemContext },
-    ...history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-    { role: 'user' as const, content: userMessage },
-  ]
+  // Post to Discord as the real user (webhook = no bot flag, appears as their name)
+  const postResp = await fetch(`${WEBHOOK_URL}?wait=true`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: userName, content }),
+  })
 
-  try {
-    const response = await fetch(`${HERMES_BASE_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${HERMES_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'hermes-agent',
-        messages,
-        stream: true,
-      }),
-    })
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '')
-      yield { type: 'error', message: `Hermes API error ${response.status}: ${errText}` }
-      return
-    }
-
-    const reader = response.body?.getReader()
-    if (!reader) {
-      yield { type: 'error', message: 'No response body from Hermes' }
-      return
-    }
-
-    const decoder = new TextDecoder()
-    let fullReply = ''
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') continue
-        try {
-          const chunk = JSON.parse(data)
-          const text = chunk.choices?.[0]?.delta?.content
-          if (text) {
-            fullReply += text
-            yield { type: 'delta', text }
-          }
-        } catch {
-          // ignore malformed SSE chunks
-        }
-      }
-    }
-
-    const updatedHistory: StoredMessage[] = [
-      ...history,
-      { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
-      { role: 'assistant', content: fullReply, timestamp: new Date().toISOString() },
-    ]
-
-    if (convId) {
-      await admin.from('hermes_conversations').update({ messages: updatedHistory }).eq('id', convId)
-    }
-
-    if (fullReply) await postHermesReplyToDiscord(fullReply)
-
-    yield { type: 'done', conversationId: convId! }
-
-  } catch (err) {
-    yield { type: 'error', message: err instanceof Error ? err.message : 'Hermes encountered an error' }
+  if (!postResp.ok) {
+    yield { type: 'error', message: `Failed to reach Discord: ${postResp.status}` }
+    return
   }
+
+  const posted = await postResp.json() as { id: string }
+  const afterId = posted.id
+
+  // Poll the channel for Hermes's reply (bot message, not a webhook post)
+  let reply = ''
+  const deadline = Date.now() + 45_000
+
+  while (Date.now() < deadline) {
+    await sleep(2000)
+
+    const msgsResp = await fetch(
+      `https://discord.com/api/v10/channels/${CHANNEL_ID}/messages?after=${afterId}&limit=20`,
+      { headers: { Authorization: `Bot ${BOT_TOKEN}` } }
+    )
+    if (!msgsResp.ok) continue
+
+    const msgs = await msgsResp.json() as DiscordMessage[]
+    const hermesMsg = msgs
+      .filter(m => m.author.id === botId && !m.webhook_id)
+      .sort((a, b) => a.id.localeCompare(b.id))[0]
+
+    if (hermesMsg) {
+      reply = hermesMsg.content
+      break
+    }
+  }
+
+  if (!reply) {
+    yield { type: 'error', message: 'Hermes did not respond in time. Try again.' }
+    return
+  }
+
+  yield { type: 'delta', text: reply }
+
+  // Persist for UI history
+  const updatedHistory: StoredMessage[] = [
+    ...history,
+    { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
+    { role: 'assistant', content: reply, timestamp: new Date().toISOString() },
+  ]
+  if (convId) {
+    await admin.from('hermes_conversations').update({ messages: updatedHistory }).eq('id', convId)
+  }
+
+  yield { type: 'done', conversationId: convId! }
 }
