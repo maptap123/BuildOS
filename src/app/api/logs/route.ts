@@ -86,15 +86,8 @@ export async function POST(request: Request) {
 
     try {
       autoWeather = await getWeatherForJobLocation(job, log_date)
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Weather lookup failed' },
-        { status: 502 }
-      )
-    }
-
-    if (!autoWeather) {
-      return NextResponse.json({ error: 'Could not find weather for this job location.' }, { status: 502 })
+    } catch {
+      // weather is non-blocking — save the log without it
     }
   }
 
