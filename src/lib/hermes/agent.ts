@@ -140,30 +140,37 @@ export async function* hermesStream(
   }
 
   const posted = await postResp.json() as { id: string }
-  const afterId = posted.id
 
-  // Poll the thread for the bot's reply
+  // Poll the thread for the bot's FINAL reply.
+  // Hermes posts intermediate tool-call status messages before its answer,
+  // so we advance scanFrom each time we find new bot messages and only stop
+  // when a full poll cycle returns nothing new (bot has gone quiet).
   let reply = ''
+  let lastBotMsg: DiscordMessage | null = null
+  let scanFrom = posted.id
   const deadline = Date.now() + 45_000
 
   while (Date.now() < deadline) {
     await sleep(2000)
 
     const msgsResp = await fetch(
-      `${DISCORD_API}/channels/${threadId}/messages?after=${afterId}&limit=10`,
+      `${DISCORD_API}/channels/${threadId}/messages?after=${scanFrom}&limit=10`,
       { headers: { Authorization: `Bot ${BOT_TOKEN}` } }
     )
     if (!msgsResp.ok) continue
 
     const msgs = await msgsResp.json() as DiscordMessage[]
-    // Accept any bot application message (not webhook) — the VPS Hermes bot
-    // may have a different Discord ID than the management bot in DISCORD_BOT_TOKEN
-    const botMsg = msgs
-      .filter(m => m.author.bot === true && !m.webhook_id)
-      .sort((a, b) => a.id.localeCompare(b.id))[0]
+    if (!Array.isArray(msgs)) continue
 
-    if (botMsg) {
-      reply = botMsg.content
+    const botMsgs = msgs
+      .filter(m => m.author.bot === true && !m.webhook_id)
+      .sort((a, b) => a.id.localeCompare(b.id))
+
+    if (botMsgs.length > 0) {
+      lastBotMsg = botMsgs[botMsgs.length - 1]
+      scanFrom = lastBotMsg.id
+    } else if (lastBotMsg) {
+      reply = lastBotMsg.content
       break
     }
   }
@@ -173,7 +180,29 @@ export async function* hermesStream(
     return
   }
 
+  // Check for navigation queued by the navigate_to tool during this request
+  const { data: userCtx } = await admin
+    .from('hermes_user_context')
+    .select('preferences')
+    .eq('user_id', userId)
+    .single()
+
+  const ctxPrefs = (userCtx?.preferences as Record<string, unknown>) ?? {}
+  const pendingNav = ctxPrefs.pending_nav as { url: string; label?: string } | undefined
+
+  if (pendingNav?.url) {
+    const { pending_nav: _removed, ...clearedPrefs } = ctxPrefs
+    await admin.from('hermes_user_context').upsert({
+      user_id: userId,
+      preferences: clearedPrefs,
+      updated_at: new Date().toISOString(),
+    })
+  }
+
   yield { type: 'delta', text: reply }
+  if (pendingNav?.url) {
+    yield { type: 'navigate', url: pendingNav.url, label: pendingNav.label }
+  }
 
   const updatedHistory: StoredMessage[] = [
     ...history,

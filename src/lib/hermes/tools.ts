@@ -451,6 +451,24 @@ export async function executeTool(
       return { results, query: q }
     }
 
+    case 'navigate_to': {
+      const url = String(params.url ?? '').trim()
+      const label = String(params.label ?? '').trim() || undefined
+      if (!url) return { error: 'url required' }
+      const { data: ctx } = await admin
+        .from('hermes_user_context')
+        .select('preferences')
+        .eq('user_id', userId)
+        .single()
+      const existing = (ctx?.preferences as Record<string, unknown>) ?? {}
+      await admin.from('hermes_user_context').upsert({
+        user_id: userId,
+        preferences: { ...existing, pending_nav: { url, label } },
+        updated_at: new Date().toISOString(),
+      })
+      return { navigating: true, url, label }
+    }
+
     default:
       return { error: `Unknown tool: ${toolName}` }
   }
