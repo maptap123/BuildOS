@@ -8,7 +8,7 @@ import { useTagOptions } from '@/hooks/useTagOptions'
 import { useUsers } from '@/hooks/useUsers'
 import { useJobFilterPrefs } from '@/hooks/useJobFilterPrefs'
 import { JobStatusBadge } from './JobStatusBadge'
-import type { JobStatus } from '@/types'
+import type { Job, JobStatus } from '@/types'
 
 const STATUS_CHIPS: { value: JobStatus; label: string }[] = [
   { value: 'active',   label: 'Active'   },
@@ -20,9 +20,10 @@ const STATUS_CHIPS: { value: JobStatus; label: string }[] = [
 interface Props {
   onClose: () => void
   currentJobId?: string | null
+  onSelect?: (job: Job) => void
 }
 
-export function JobPickerSheet({ onClose, currentJobId }: Props) {
+export function JobPickerSheet({ onClose, currentJobId, onSelect }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState<JobStatus[]>([])
@@ -291,7 +292,7 @@ export function JobPickerSheet({ onClose, currentJobId }: Props) {
             filtered.map(job => (
               <button
                 key={job.id}
-                onClick={() => select(`/jobs/${job.id}`)}
+                onClick={() => onSelect ? (onSelect(job), onClose()) : select(`/jobs/${job.id}`)}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                   job.id === currentJobId ? 'bg-gold-50' : ''
                 }`}

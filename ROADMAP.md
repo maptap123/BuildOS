@@ -532,6 +532,67 @@ Goal: help owners and PMs see the business clearly.
 - [ ] Add export to CSV/PDF
 - [ ] Add saved report views
 
+## Mobile Experience Strategy
+
+**One codebase. Two completely different experiences.**
+
+JDC Platform runs as a single Next.js app but renders a fundamentally different UI depending on the device. This is not responsive tweaking — it's two distinct products sharing the same data layer and API routes.
+
+### Philosophy
+- **Mobile = field tool.** Built for a phone in one hand on a job site. The primary users are Jason, Cane, and August in the field. Every screen is optimized for speed, large touch targets, camera access, and offline-tolerant patterns. Feature set is deliberately narrow: the things field workers actually need every hour.
+- **Desktop = management tool.** Built for an owner or PM at a desk. Full data density, all modules visible, sidebar navigation, tables, charts, and the full feature set.
+- **How the split works:** The `(dashboard)/layout.tsx` detects viewport width and renders either the `<MobileLayout>` or `<DesktopLayout>` wrapper. Pages and components can further branch with `useMobileLayout()` hook. Mobile-specific pages live in `src/components/mobile/`. Desktop-specific pages are untouched.
+
+### Mobile Nav (5 items max)
+| Tab | What it is |
+|-----|-----------|
+| Today | My jobs for today, tasks due, schedule milestones — the field worker's morning dashboard |
+| Jobs | Job list, tap into a job for site address, contacts, and quick actions |
+| Log | Create daily log with photos, weather, and notes — camera-first flow |
+| Tasks | My open tasks across all jobs — tap to complete |
+| More | Access to Documents, Time Clock, Hermes chat, Settings |
+
+### Mobile-Only Features
+- Camera-first photo upload directly in log creation
+- Large tap targets throughout (min 44px)
+- Swipe gestures on task/log cards
+- Offline-tolerant log drafts (saves locally, syncs on reconnect)
+- Quick action floating button for the most common task: "Start a Log"
+
+### Desktop-Only Features
+- Full sidebar job panel
+- All 13+ navigation tabs
+- Budget/financial views with tables and charts
+- Admin panel
+- Profitability reports
+- Vendor and contact management tables
+- Lead pipeline kanban
+
+---
+
+### Mobile Sprint 1 — Foundation (current focus)
+- [ ] Create `useMobileLayout` hook — returns true when viewport < 768px
+- [ ] Refactor `(dashboard)/layout.tsx` to render `<MobileShell>` vs `<DesktopShell>` based on hook
+- [ ] Build `<MobileShell>` — navy top bar (job context), content area, 5-tab bottom nav
+- [ ] Build mobile "Today" dashboard screen — my jobs, today's tasks, schedule milestones
+- [ ] Build mobile Jobs list — card-based, tap to open job with address, phone, quick actions
+- [ ] Build mobile Log creation — full-screen flow: photos first, then notes, then submit
+
+### Mobile Sprint 2 — Field Tools
+- [ ] Build mobile Tasks screen — my tasks list, tap to complete, pull to refresh
+- [ ] Add camera capture to photo upload (not just file picker)
+- [ ] Add weather auto-fetch on log creation
+- [ ] Add offline draft storage for logs (localStorage → sync on reconnect)
+- [ ] Build mobile "More" screen — links to Documents, Time Clock, Hermes, Settings
+
+### Mobile Sprint 3 — Hermes on Mobile
+- [ ] Persistent Hermes FAB (floating action button) on all mobile screens
+- [ ] Full-screen Hermes chat on mobile
+- [ ] Quick chips: "What are my tasks today?", "Start a daily log for [job]", "What's on my schedule?"
+- [ ] Voice-to-text input for Hermes (native mobile keyboard mic)
+
+---
+
 ## Phase 9: Product Hardening
 
 Goal: make the app dependable enough for real customers.
@@ -568,12 +629,12 @@ Goal: once the job and budget modules are more fully built out, allow admins to 
 
 Start here unless we intentionally reprioritize.
 
-- [x] Show contacts on job detail panel (quick win — contacts table exists, job_id is linked)
-- [x] Add convert lead to job/project flow (Lead status = Won → auto-create job; accepted proposal → job + budget + schedule)
-- [x] Add estimate builder UI (pulls from 4,600-row cost book already in DB)
+- [ ] **[Mobile Sprint 1]** Build `useMobileLayout` hook + split `(dashboard)/layout.tsx` into `<MobileShell>` and `<DesktopShell>` — desktop untouched
+- [ ] **[Mobile Sprint 1]** Build mobile "Today" dashboard — my jobs today, tasks due, milestones
+- [ ] **[Mobile Sprint 1]** Build mobile Jobs list (card-based) + job detail quick view (address, phone, quick actions)
+- [ ] **[Mobile Sprint 1]** Build mobile Log creation — camera-first full-screen flow
+- [ ] **[Mobile Sprint 2]** Camera capture, weather auto-fetch, offline log drafts
 - [ ] **[Price Intelligence]** Decide which retailers to include, then start Phase 5a (Apify client + price_cache schema + HD scraper)
-- [x] Add proposal PDF generation + client accept flow
-- [ ] Add mobile-friendly daily log creation flow
 - [ ] Add job activity feed
 - [ ] Phase 7: AI daily brief + budget overrun risk detection (Sprint D)
 - [ ] **[Hermes]** Provision VPS, deploy Nous Research Hermes Agent, connect to OpenRouter, wire to `/api/agent` JDC tool dispatcher (Phase 10a)

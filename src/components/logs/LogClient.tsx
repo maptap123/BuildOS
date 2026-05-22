@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
 import { useLogs } from '@/hooks/useLogs'
 import { LogFeed } from './LogFeed'
@@ -20,8 +21,9 @@ interface Props {
 }
 
 export function LogClient({ jobId, initialLogs, permissions }: Props) {
+  const searchParams = useSearchParams()
   const { logs, loading, error, upsertLog, removeLog } = useLogs(jobId, initialLogs)
-  const [showAdd, setShowAdd] = useState(false)
+  const [showAdd, setShowAdd] = useState(() => searchParams.get('newLog') === '1')
   const [editLog, setEditLog] = useState<DailyLog | null>(null)
   const [photos, setPhotos] = useState<LogPhoto[]>([])
 

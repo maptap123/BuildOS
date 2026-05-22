@@ -8,6 +8,7 @@ import { useAgenda } from '@/hooks/useAgenda'
 import { useJobs } from '@/hooks/useJobs'
 import { usePermissions } from '@/hooks/usePermissions'
 import { AddJobModal } from '@/components/jobs'
+import { MobileHome } from '@/components/mobile/MobileHome'
 import type { Job, AgendaTask, AgendaScheduleItem, AgendaLogEntry } from '@/types'
 
 function StatCard({ label, value, loading }: { label: string; value: number; loading: boolean }) {
@@ -321,8 +322,18 @@ function JobsDashboardContent() {
 
 export default function JobsDashboardPage() {
   return (
-    <Suspense fallback={null}>
-      <JobsDashboardContent />
-    </Suspense>
+    <>
+      {/* Mobile: full action launchpad */}
+      <div className="md:hidden -mx-4 -mt-6">
+        <MobileHome jobId={null} jobName={null} />
+      </div>
+
+      {/* Desktop: existing dashboard */}
+      <div className="hidden md:block">
+        <Suspense fallback={null}>
+          <JobsDashboardContent />
+        </Suspense>
+      </div>
+    </>
   )
 }
