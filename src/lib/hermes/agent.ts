@@ -39,54 +39,6 @@ async function getHermesBotId(): Promise<string> {
   return hermesBotId
 }
 
-async function getOrCreateThread(
-  userId: string,
-  userName: string,
-  admin: ReturnType<typeof createAdminClient>
-): Promise<string> {
-  const { data: userRow } = await admin
-    .from('users')
-    .select('discord_thread_id')
-    .eq('id', userId)
-    .single()
-
-  const existingThreadId = (userRow as { discord_thread_id?: string } | null)?.discord_thread_id
-  if (existingThreadId) return existingThreadId
-
-  // Post a starter message to anchor the thread
-  const starterResp = await fetch(`${WEBHOOK_URL}?wait=true`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username: userName,
-      content: `— ${userName} started a conversation with Hermes —`,
-    }),
-  })
-  if (!starterResp.ok) throw new Error(`Webhook error: ${starterResp.status}`)
-  const starter = await starterResp.json() as { id: string }
-
-  // Create a thread from that message
-  const threadResp = await fetch(
-    `${DISCORD_API}/channels/${CHANNEL_ID}/messages/${starter.id}/threads`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bot ${BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        name: `${userName} — Hermes`,
-        auto_archive_duration: 10080,
-      }),
-    }
-  )
-  if (!threadResp.ok) throw new Error(`Thread creation error: ${threadResp.status}`)
-  const thread = await threadResp.json() as { id: string }
-
-  await admin.from('users').update({ discord_thread_id: thread.id }).eq('id', userId)
-  return thread.id
-}
-
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -127,20 +79,11 @@ export async function* hermesStream(
     convId = conv?.id
   }
 
-  // Get or create this user's dedicated Discord thread
-  let threadId: string
-  try {
-    threadId = await getOrCreateThread(userId, userName, admin)
-  } catch (e) {
-    yield { type: 'error', message: `Could not reach Discord: ${(e as Error).message}` }
-    return
-  }
-
   const botId = await getHermesBotId()
   const content = jobId ? `${userMessage} [job:${jobId}]` : userMessage
 
-  // Post to the user's thread as their real name
-  const postResp = await fetch(`${WEBHOOK_URL}?wait=true&thread_id=${threadId}`, {
+  // Post to main channel as the real user
+  const postResp = await fetch(`${WEBHOOK_URL}?wait=true`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: userName, content }),
@@ -154,7 +97,7 @@ export async function* hermesStream(
   const posted = await postResp.json() as { id: string }
   const afterId = posted.id
 
-  // Poll the thread for the bot's reply
+  // Poll the channel for Hermes's reply
   let reply = ''
   const deadline = Date.now() + 45_000
 
@@ -162,7 +105,7 @@ export async function* hermesStream(
     await sleep(2000)
 
     const msgsResp = await fetch(
-      `${DISCORD_API}/channels/${threadId}/messages?after=${afterId}&limit=10`,
+      `${DISCORD_API}/channels/${CHANNEL_ID}/messages?after=${afterId}&limit=10`,
       { headers: { Authorization: `Bot ${BOT_TOKEN}` } }
     )
     if (!msgsResp.ok) continue
