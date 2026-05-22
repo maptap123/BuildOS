@@ -215,6 +215,18 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
       required: ['query'],
     },
   },
+  {
+    name: 'navigate_to',
+    description: 'Navigate the user to a specific page in the JDC app. Use this when the user says "show me", "take me to", "go to", or "open" a section. First look up the job ID if needed, then call this. Valid routes: /jobs, /jobs/{job_id}, /jobs/{job_id}/budget, /jobs/{job_id}/schedule, /jobs/{job_id}/tasks, /jobs/{job_id}/logs, /jobs/{job_id}/estimates, /finance, /leads, /time-clock',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        url:    { type: 'string', description: 'The app route to navigate to.' },
+        label:  { type: 'string', description: 'Short description of the destination shown to the user, e.g. "daily logs for Ryan Porch"' },
+      },
+      required: ['url'],
+    },
+  },
 ]
 
 // ─── Permission helper ────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ export type HermesChannel = 'app' | 'discord'
 
 export type HermesStreamEvent =
   | { type: 'delta'; text: string }
+  | { type: 'navigate'; url: string; label?: string }
   | { type: 'done'; conversationId: string }
   | { type: 'error'; message: string }
 
@@ -32,7 +33,8 @@ Rules:
 - Dollar amounts: always format as $X,XXX. Dates: format as "Mon DD" (e.g. "Jun 3").
 - If you don't have permission to access something, say so simply.
 - Never make up data. If unsure, look it up with a tool.
-- Confirm before taking destructive actions (like changing a job status).`
+- Confirm before taking destructive actions (like changing a job status).
+- When the user says "show me", "take me to", "open", or "go to" a section, use the navigate_to tool (look up the job ID first if needed) and give a one-line confirmation. Don't dump a data table — just navigate.`
 }
 
 async function postToDiscord(text: string, userName: string): Promise<void> {
@@ -146,9 +148,20 @@ export async function* hermesStream(
 
         claudeMessages.push({ role: 'assistant', content: finalMsg.content })
 
+        // Emit navigate events before executing other tools
+        for (const block of toolBlocks) {
+          if (block.name === 'navigate_to') {
+            const input = block.input as { url: string; label?: string }
+            yield { type: 'navigate', url: input.url, label: input.label }
+          }
+        }
+
         const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
           toolBlocks.map(async (block) => {
             toolsCalled.push(block.name)
+            if (block.name === 'navigate_to') {
+              return { type: 'tool_result' as const, tool_use_id: block.id, content: '{"success":true}' }
+            }
             const result = await executeTool(
               block.name,
               block.input as Record<string, unknown>,
@@ -182,8 +195,8 @@ export async function* hermesStream(
       await admin.from('hermes_conversations').update({ messages: updatedHistory }).eq('id', convId)
     }
 
-    // Post Hermes reply to Discord (fire-and-forget)
-    if (fullReply) postHermesReplyToDiscord(fullReply)
+    // Post Hermes reply to Discord (awaited so Vercel doesn't kill it before it sends)
+    if (fullReply) await postHermesReplyToDiscord(fullReply)
 
     yield { type: 'done', conversationId: convId! }
 

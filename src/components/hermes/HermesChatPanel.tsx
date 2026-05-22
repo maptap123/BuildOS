@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, Loader2, Bot } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -25,6 +25,7 @@ const QUICK_PROMPTS = [
 
 export function HermesChatPanel() {
   const pathname = usePathname()
+  const router = useRouter()
   const jobId = extractJobId(pathname)
 
   const [open, setOpen] = useState(false)
@@ -104,6 +105,11 @@ export function HermesChatPanel() {
                 }
                 return next
               })
+            }
+
+            if (event.type === 'navigate') {
+              router.push(event.url)
+              setTimeout(() => setOpen(false), 400)
             }
 
             if (event.type === 'done') {
