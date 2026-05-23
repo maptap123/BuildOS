@@ -142,11 +142,13 @@ export async function* hermesStream(
   const posted = await postResp.json() as { id: string }
 
   // Poll the thread for the bot's FINAL reply.
-  // Hermes posts intermediate tool-call status messages before its answer,
-  // so we advance scanFrom each time we find new bot messages and only stop
-  // when a full poll cycle returns nothing new (bot has gone quiet).
+  // Hermes posts tool-call status messages (skill_view: "...", terminal: "...") before
+  // its real answer. We advance scanFrom past ALL bot messages but only treat prose
+  // responses as candidates — silence after a real message means the bot is done.
+  const isToolStatus = (content: string) => /^[\w_]+:\s*["'`]/.test(content.trim())
+
   let reply = ''
-  let lastBotMsg: DiscordMessage | null = null
+  let lastRealMsg: DiscordMessage | null = null
   let scanFrom = posted.id
   const deadline = Date.now() + 45_000
 
@@ -162,15 +164,19 @@ export async function* hermesStream(
     const msgs = await msgsResp.json() as DiscordMessage[]
     if (!Array.isArray(msgs)) continue
 
-    const botMsgs = msgs
-      .filter(m => m.author.bot === true && !m.webhook_id)
+    const allBotMsgs = msgs
+      .filter(m => m.author.bot === true && !m.webhook_id && m.content.trim())
       .sort((a, b) => a.id.localeCompare(b.id))
 
-    if (botMsgs.length > 0) {
-      lastBotMsg = botMsgs[botMsgs.length - 1]
-      scanFrom = lastBotMsg.id
-    } else if (lastBotMsg) {
-      reply = lastBotMsg.content
+    if (allBotMsgs.length > 0) {
+      // Advance scanFrom past everything (including tool-call status messages)
+      scanFrom = allBotMsgs[allBotMsgs.length - 1].id
+      // Only update the reply candidate for real prose responses
+      const realMsgs = allBotMsgs.filter(m => !isToolStatus(m.content))
+      if (realMsgs.length > 0) lastRealMsg = realMsgs[realMsgs.length - 1]
+    } else if (lastRealMsg) {
+      // Silent cycle after a real response — bot is done
+      reply = lastRealMsg.content
       break
     }
   }
