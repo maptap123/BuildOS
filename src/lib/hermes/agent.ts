@@ -188,7 +188,7 @@ export async function* hermesStream(
     .single()
 
   const ctxPrefs = (userCtx?.preferences as Record<string, unknown>) ?? {}
-  const pendingNav = ctxPrefs.pending_nav as { url: string; label?: string } | undefined
+  let pendingNav = ctxPrefs.pending_nav as { url: string; label?: string } | undefined
 
   if (pendingNav?.url) {
     const { pending_nav: _removed, ...clearedPrefs } = ctxPrefs
@@ -197,6 +197,16 @@ export async function* hermesStream(
       preferences: clearedPrefs,
       updated_at: new Date().toISOString(),
     })
+  }
+
+  // Fallback: if navigate_to wasn't called but reply contains a JDC platform URL,
+  // extract the path and navigate there anyway
+  if (!pendingNav?.url) {
+    const urlMatch = reply.match(/https?:\/\/[^\s)]+\/(jobs\/[a-z0-9-/]+|finance|leads|time-clock[^\s)]*)/i)
+    if (urlMatch) {
+      const path = ('/' + urlMatch[1]).replace(/[)\].,;'"]+$/, '')
+      pendingNav = { url: path }
+    }
   }
 
   yield { type: 'delta', text: reply }
