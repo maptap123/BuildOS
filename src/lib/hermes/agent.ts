@@ -142,10 +142,18 @@ export async function* hermesStream(
   const posted = await postResp.json() as { id: string }
 
   // Poll the thread for the bot's FINAL reply.
-  // Hermes posts tool-call status messages (skill_view: "...", terminal: "...") before
-  // its real answer. We advance scanFrom past ALL bot messages but only treat prose
-  // responses as candidates — silence after a real message means the bot is done.
-  const isToolStatus = (content: string) => /^[\w_]+:\s*["'`]/.test(content.trim())
+  // Hermes posts tool-call status messages (💻 terminal: "...", 🖥️ skill_view: "...")
+  // before its real answer. We advance scanFrom past ALL bot messages but only treat
+  // messages that look like prose answers as candidates.
+  // A real answer: the first word (after stripping leading emoji/symbols) contains a
+  // space before any colon — e.g. "Here you go:" not "terminal:".
+  const looksLikeAnswer = (content: string) => {
+    const text = content.trim()
+    if (text.length < 15) return false
+    const stripped = text.replace(/^[^A-Za-z]+/, '')       // skip leading emoji/symbols
+    const beforeColon = stripped.split(':')[0]
+    return /\s/.test(beforeColon) || !/:/.test(stripped)    // multi-word prefix or no colon
+  }
 
   let reply = ''
   let lastRealMsg: DiscordMessage | null = null
@@ -169,13 +177,11 @@ export async function* hermesStream(
       .sort((a, b) => a.id.localeCompare(b.id))
 
     if (allBotMsgs.length > 0) {
-      // Advance scanFrom past everything (including tool-call status messages)
+      // Advance scanFrom past everything including tool-call messages
       scanFrom = allBotMsgs[allBotMsgs.length - 1].id
-      // Only update the reply candidate for real prose responses
-      const realMsgs = allBotMsgs.filter(m => !isToolStatus(m.content))
+      const realMsgs = allBotMsgs.filter(m => looksLikeAnswer(m.content))
       if (realMsgs.length > 0) lastRealMsg = realMsgs[realMsgs.length - 1]
     } else if (lastRealMsg) {
-      // Silent cycle after a real response — bot is done
       reply = lastRealMsg.content
       break
     }
