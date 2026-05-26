@@ -15,8 +15,10 @@ export async function GET(request: Request) {
   const dateTo = searchParams.get('date_to')
   const qbSynced = searchParams.get('qb_synced')
 
+  const admin = createAdminClient()
+
   // Admins see all; field crew see only their own
-  const { data: perm } = await createAdminClient()
+  const { data: perm } = await admin
     .from('user_permissions')
     .select('can_manage')
     .eq('user_id', user.id)
@@ -24,7 +26,6 @@ export async function GET(request: Request) {
     .single()
   const isAdmin = !!perm?.can_manage
 
-  const admin = createAdminClient()
   let query = admin
     .from('time_entries')
     .select('*, user:users(id, full_name, avatar_url, hourly_rate), job:jobs(id, name)')
@@ -50,10 +51,21 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const {
-    job_id, clock_in, clock_out, regular_hours, overtime_hours,
-    break_minutes, cost_code, notes, tags,
+    job_id,
+    clock_in,
+    clock_out,
+    break_minutes,
+    cost_code,
+    notes,
+    tags,
     // admin can record for another user
     user_id: targetUserId,
+    // GPS / location fields
+    clock_in_latitude,
+    clock_in_longitude,
+    clock_in_accuracy_meters,
+    location_status,
+    device_info,
   } = body
 
   if (!job_id || !clock_in) {
@@ -62,15 +74,57 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Resolve which user this entry is for
-  const entryUserId = targetUserId ?? user.id
+  // Determine admin status
+  const { data: perm } = await admin
+    .from('user_permissions')
+    .select('can_manage')
+    .eq('user_id', user.id)
+    .eq('module', 'admin')
+    .single()
+  const isAdmin = !!perm?.can_manage
 
-  // Snapshot the user's hourly rates at time of entry
+  // Resolve target user — non-admins can only clock in for themselves
+  const entryUserId = targetUserId ?? user.id
+  if (!isAdmin && targetUserId && targetUserId !== user.id) {
+    return NextResponse.json(
+      { error: 'Cannot create time entries for other users' },
+      { status: 403 },
+    )
+  }
+
+  // Guard: prevent a second open shift for the same user
+  const { data: openShift } = await admin
+    .from('time_entries')
+    .select('id')
+    .eq('user_id', entryUserId)
+    .is('clock_out', null)
+    .maybeSingle()
+
+  if (openShift) {
+    return NextResponse.json(
+      { error: 'You already have an open shift. Clock out before starting a new one.' },
+      { status: 409 },
+    )
+  }
+
+  // Snapshot hourly rates at time of entry
   const { data: userData } = await admin
     .from('users')
     .select('hourly_rate, overtime_rate')
     .eq('id', entryUserId)
     .single()
+
+  // Compute hours if clock_out is provided up-front (admin backfill scenario)
+  let regularHours = 0
+  let overtimeHours = 0
+  if (clock_out) {
+    const brkMins = break_minutes ?? 0
+    const totalMs = new Date(clock_out).getTime() - new Date(clock_in).getTime()
+    const netMs = Math.max(0, totalMs - brkMins * 60_000)
+    const netHrs = netMs / 3_600_000
+    regularHours = parseFloat(Math.min(netHrs, 8).toFixed(2))
+    overtimeHours = parseFloat(Math.max(0, netHrs - 8).toFixed(2))
+  }
 
   const { data, error } = await admin
     .from('time_entries')
@@ -79,14 +133,20 @@ export async function POST(request: Request) {
       user_id: entryUserId,
       clock_in,
       clock_out: clock_out ?? null,
-      regular_hours: regular_hours ?? 0,
-      overtime_hours: overtime_hours ?? 0,
+      regular_hours: regularHours,
+      overtime_hours: overtimeHours,
       break_minutes: break_minutes ?? 0,
       cost_code: cost_code ?? null,
       hourly_rate: userData?.hourly_rate ?? null,
       overtime_rate: userData?.overtime_rate ?? null,
       notes: notes ?? null,
       tags: tags ?? [],
+      // GPS
+      clock_in_latitude: clock_in_latitude ?? null,
+      clock_in_longitude: clock_in_longitude ?? null,
+      clock_in_accuracy_meters: clock_in_accuracy_meters ?? null,
+      location_status: location_status ?? null,
+      device_info: device_info ?? null,
       created_by: user.id,
     })
     .select('*, user:users(id, full_name, avatar_url), job:jobs(id, name)')

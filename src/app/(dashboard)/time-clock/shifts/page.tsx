@@ -10,7 +10,7 @@ export default async function ShiftsPage() {
 
   const admin = createAdminClient()
 
-  // Only admins can access the shifts management page
+  // Only admins/managers can access shift management
   const { data: perm } = await admin
     .from('user_permissions')
     .select('can_manage')
@@ -20,8 +20,10 @@ export default async function ShiftsPage() {
 
   if (!perm?.can_manage) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-        You don&apos;t have permission to manage shifts.
+      <div className="max-w-lg mx-auto mt-12">
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-5 py-4">
+          You don&apos;t have permission to manage shifts.
+        </div>
       </div>
     )
   }
@@ -33,14 +35,18 @@ export default async function ShiftsPage() {
   const [{ data: entries }, { data: users }, { data: jobs }] = await Promise.all([
     admin
       .from('time_entries')
-      .select('*, user:users(id, full_name, avatar_url, hourly_rate), job:jobs(id, name, job_number)')
+      .select(
+        '*, user:users(id, full_name, avatar_url, hourly_rate), job:jobs(id, name, job_number)',
+      )
       .gte('clock_in', cutoff.toISOString())
       .order('clock_in', { ascending: false }),
+
     admin
       .from('users')
       .select('id, full_name, email')
       .eq('is_active', true)
       .order('full_name', { ascending: true }),
+
     admin
       .from('jobs')
       .select('id, name, job_number')

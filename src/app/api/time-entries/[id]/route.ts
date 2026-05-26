@@ -42,15 +42,17 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
+
+  // Fetch the existing entry — include clock_in and break_minutes for server-side hour computation
   const { data: existing } = await admin
     .from('time_entries')
-    .select('user_id, approval_status')
+    .select('user_id, approval_status, clock_in, break_minutes')
     .eq('id', id)
     .single()
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Only owner (if pending) or admin can update
+  // Check admin status
   const { data: perm } = await createAdminClient()
     .from('user_permissions')
     .select('can_manage')
@@ -59,16 +61,44 @@ export async function PATCH(
     .single()
   const isAdmin = !!perm?.can_manage
 
+  // Only owner (if pending) or admin can update
   if (!isAdmin && (existing.user_id !== user.id || existing.approval_status !== 'pending')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await request.json()
-  const allowed = ['clock_in', 'clock_out', 'regular_hours', 'overtime_hours',
-                   'break_minutes', 'cost_code', 'notes', 'tags']
+
+  // Field allow-lists — admins get more fields; crew gets clock-out fields only
+  const adminAllowed = [
+    'clock_in', 'clock_out', 'regular_hours', 'overtime_hours',
+    'break_minutes', 'cost_code', 'notes', 'tags',
+    'clock_out_latitude', 'clock_out_longitude', 'clock_out_accuracy_meters',
+  ]
+  const crewAllowed = [
+    'clock_out', 'break_minutes', 'cost_code', 'notes',
+    'clock_out_latitude', 'clock_out_longitude', 'clock_out_accuracy_meters',
+  ]
+  const allowedFields = isAdmin ? adminAllowed : crewAllowed
+
   const updates: Record<string, unknown> = {}
-  for (const key of allowed) {
+  for (const key of allowedFields) {
     if (key in body) updates[key] = body[key]
+  }
+
+  // Server-side hours computation when clock_out is provided.
+  // Overrides any client-sent regular_hours / overtime_hours to prevent time fraud.
+  if (updates.clock_out) {
+    const brkMins =
+      typeof updates.break_minutes === 'number'
+        ? updates.break_minutes
+        : (existing.break_minutes ?? 0)
+    const totalMs =
+      new Date(updates.clock_out as string).getTime() -
+      new Date(existing.clock_in).getTime()
+    const netMs = Math.max(0, totalMs - brkMins * 60_000)
+    const netHrs = netMs / 3_600_000
+    updates.regular_hours = parseFloat(Math.min(netHrs, 8).toFixed(2))
+    updates.overtime_hours = parseFloat(Math.max(0, netHrs - 8).toFixed(2))
   }
 
   const { data, error } = await admin

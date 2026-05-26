@@ -117,6 +117,15 @@ export interface TimeEntry {
   approved_at: string | null;
   qb_time_activity_id: string | null;
   qb_synced: boolean;
+  // GPS / location (added in migration 027)
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  clock_in_accuracy_meters: number | null;
+  clock_out_latitude: number | null;
+  clock_out_longitude: number | null;
+  clock_out_accuracy_meters: number | null;
+  location_status: 'captured' | 'denied' | 'unavailable' | 'skipped' | null;
+  device_info: Record<string, unknown> | null;
   created_by: string;
   created_at: string;
   updated_at: string;
