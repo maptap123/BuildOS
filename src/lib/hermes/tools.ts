@@ -12,6 +12,9 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
       properties: {
         status: { type: 'string', enum: ['lead','estimating','scheduled','active','on_hold','completed','closed'], description: 'Filter by job status' },
         search: { type: 'string', description: 'Search by job name, client name, or job number' },
+        limit: { type: 'number', description: 'Maximum jobs to return, default 50, max 500' },
+        offset: { type: 'number', description: 'Number of jobs to skip for pagination' },
+        page: { type: 'number', description: '1-based page number; ignored when offset is provided' },
       },
     },
   },
@@ -264,12 +267,31 @@ export async function executeTool(
 
     case 'list_jobs': {
       if (!await hasPerm(admin, userId, 'jobs', 'can_view')) return { error: 'Permission denied' }
-      let q = admin.from('jobs').select('id, job_number, name, status, client_name, site_address, start_date, target_completion_date, contract_amount').order('created_at', { ascending: false })
+      const rawLimit = Number(params.limit ?? 50)
+      const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 500) : 50
+      const rawOffset = params.offset !== undefined
+        ? Number(params.offset)
+        : params.page !== undefined
+          ? (Number(params.page) - 1) * limit
+          : 0
+      const offset = Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0
+
+      let q = admin
+        .from('jobs')
+        .select('id, job_number, name, status, client_name, site_address, start_date, target_completion_date, contract_amount', { count: 'exact' })
+        .order('created_at', { ascending: false })
       if (params.status) q = q.eq('status', params.status)
       if (params.search) q = q.or(`name.ilike.%${params.search}%,client_name.ilike.%${params.search}%,job_number.ilike.%${params.search}%`)
-      const { data, error } = await q.limit(50)
+      const { data, error, count } = await q.range(offset, offset + limit - 1)
       if (error) throw error
-      return { jobs: data, count: data?.length ?? 0 }
+      return {
+        jobs: data,
+        count: data?.length ?? 0,
+        total_count: count ?? data?.length ?? 0,
+        limit,
+        offset,
+        has_more: count === null ? false : offset + (data?.length ?? 0) < count,
+      }
     }
 
     case 'get_job': {

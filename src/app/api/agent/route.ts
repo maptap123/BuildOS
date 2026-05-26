@@ -14,7 +14,7 @@ import { timingSafeEqual } from 'crypto'
  *   { tool: string, params: Record<string, unknown> }
  *
  * Available tools (Hermes tool schema):
- *   list_jobs              { status?, search? }
+ *   list_jobs              { status?, search?, limit?, offset?, page? }
  *   get_job                { job_id }
  *   update_job_status      { job_id, status }
  *   list_tasks             { job_id, status?, priority? }
@@ -73,12 +73,31 @@ export async function POST(request: Request) {
       // ─── JOBS ───────────────────────────────────────────────────────────
       case 'list_jobs': {
         if (!await hasPerm('jobs', 'can_view')) return permError()
-        let query = admin.from('jobs').select('id, job_number, name, status, client_name, site_address, start_date, target_completion_date, contract_amount').order('created_at', { ascending: false })
+        const rawLimit = Number(params.limit ?? 50)
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 500) : 50
+        const rawOffset = params.offset !== undefined
+          ? Number(params.offset)
+          : params.page !== undefined
+            ? (Number(params.page) - 1) * limit
+            : 0
+        const offset = Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0
+
+        let query = admin
+          .from('jobs')
+          .select('id, job_number, name, status, client_name, site_address, start_date, target_completion_date, contract_amount', { count: 'exact' })
+          .order('created_at', { ascending: false })
         if (params.status) query = query.eq('status', params.status)
         if (params.search) query = query.or(`name.ilike.%${params.search}%,client_name.ilike.%${params.search}%,job_number.ilike.%${params.search}%`)
-        const { data, error } = await query.limit(50)
+        const { data, error, count } = await query.range(offset, offset + limit - 1)
         if (error) throw error
-        return ok({ jobs: data, count: data?.length ?? 0 })
+        return ok({
+          jobs: data,
+          count: data?.length ?? 0,
+          total_count: count ?? data?.length ?? 0,
+          limit,
+          offset,
+          has_more: count === null ? false : offset + (data?.length ?? 0) < count,
+        })
       }
 
       case 'get_job': {
