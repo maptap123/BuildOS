@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
+import { usePermissions } from '@/hooks/usePermissions'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
 import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
 
@@ -30,7 +31,9 @@ const TABS = [
   { key: 'documents',     label: 'Documents',     icon: Folder       },
   { key: 'time-clock',    label: 'Time Clock',    icon: Clock        },
   { key: 'admin',         label: 'Admin',         icon: ShieldCheck  },
-]
+] as const
+
+type NavKey = typeof TABS[number]['key'] | 'home' | 'more'
 
 const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'estimates', 'profitability'])
 
@@ -53,6 +56,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const jobId = segments[0] === 'jobs' && segments[1] ? segments[1] : null
 
   const { job } = useJob(jobId)
+  const { can, isAdmin } = usePermissions()
+
+  const canManageOffice = isAdmin() || can('jobs', 'create') || can('jobs', 'edit')
+  const canViewBudget = isAdmin() || can('budget', 'view')
+
+  function canUseNav(key: NavKey): boolean {
+    if (key === 'home' || key === 'more') return true
+    if (key === 'time-clock') return isAdmin() || can('time_clock', 'view') || can('jobs', 'view')
+    if (key === 'jobs') return isAdmin() || can('jobs', 'view')
+    if (key === 'schedule') return isAdmin() || can('schedule', 'view')
+    if (key === 'tasks') return isAdmin() || can('tasks', 'view')
+    if (key === 'logs') return isAdmin() || can('logs', 'view')
+    if (key === 'documents') return isAdmin() || can('documents', 'view')
+    if (key === 'budget') return canViewBudget
+    if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
+    if (key === 'profitability') return isAdmin() || can('profitability', 'view') || canViewBudget
+    if (key === 'estimates') return isAdmin() || can('estimates', 'view') || canViewBudget
+    if (key === 'leads') return isAdmin() || can('leads', 'view') || canManageOffice
+    if (key === 'vendors') return isAdmin() || can('vendors', 'view') || canManageOffice
+    if (key === 'contacts') return isAdmin() || can('contacts', 'view') || canManageOffice
+    if (key === 'admin') return isAdmin()
+    return false
+  }
 
   async function signOut() {
     const supabase = createClient()
@@ -118,7 +144,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Desktop top tab bar */}
         <nav className="hidden md:flex items-center gap-1 bg-white border-b border-border px-4 shrink-0 overflow-x-auto scrollbar-none">
-          {TABS.map(({ key, label, icon: Icon }) => {
+          {TABS.filter(({ key }) => canUseNav(key)).map(({ key, label, icon: Icon }) => {
             const href = tabHref(key)
             const active = isActiveDesktop(key)
             return (
@@ -189,7 +215,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             paddingBottom: 'env(safe-area-inset-bottom)',
           }}
         >
-          {MOBILE_NAV.map(({ key, label, icon: Icon }) => {
+          {MOBILE_NAV.filter(({ key }) => canUseNav(key as NavKey)).map(({ key, label, icon: Icon }) => {
             const href = mobileTabHref(key)
             const active = isActiveMobile(key)
 

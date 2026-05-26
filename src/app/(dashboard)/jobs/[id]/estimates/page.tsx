@@ -34,13 +34,13 @@ export default async function JobEstimatesPage({
 
   const admin = createAdminClient()
 
-  const [{ data: perm }, { data: budgetPerm }, { data: job }] = await Promise.all([
+  const [{ data: estimatePerm }, { data: budgetPerm }, { data: job }] = await Promise.all([
+    admin.from('user_permissions').select('can_view, can_create').eq('user_id', user.id).eq('module', 'estimates').single(),
     admin.from('user_permissions').select('can_view, can_create').eq('user_id', user.id).eq('module', 'budget').single(),
-    admin.from('user_permissions').select('can_create').eq('user_id', user.id).eq('module', 'budget').single(),
     admin.from('jobs').select('id, lead_id, name').eq('id', id).single(),
   ])
 
-  if (!perm?.can_view) {
+  if (!estimatePerm?.can_view && !budgetPerm?.can_view) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
         You don&apos;t have permission to view estimates.

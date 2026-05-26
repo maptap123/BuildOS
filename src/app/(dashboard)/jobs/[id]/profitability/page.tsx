@@ -16,14 +16,12 @@ export default async function JobProfitabilityPage({
 
   const admin = createAdminClient()
 
-  const { data: perm } = await admin
-    .from('user_permissions')
-    .select('can_view')
-    .eq('user_id', user.id)
-    .eq('module', 'budget')
-    .single()
+  const [{ data: profitPerm }, { data: budgetPerm }] = await Promise.all([
+    admin.from('user_permissions').select('can_view').eq('user_id', user.id).eq('module', 'profitability').single(),
+    admin.from('user_permissions').select('can_view').eq('user_id', user.id).eq('module', 'budget').single(),
+  ])
 
-  if (!perm?.can_view) {
+  if (!profitPerm?.can_view && !budgetPerm?.can_view) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
         You don&apos;t have permission to view profitability data.

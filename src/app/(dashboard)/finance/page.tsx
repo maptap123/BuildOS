@@ -13,6 +13,19 @@ export default async function FinancePage() {
 
   const admin = createAdminClient()
 
+  const [{ data: financePerm }, { data: budgetPerm }] = await Promise.all([
+    admin.from('user_permissions').select('can_view').eq('user_id', user.id).eq('module', 'finance').single(),
+    admin.from('user_permissions').select('can_view').eq('user_id', user.id).eq('module', 'budget').single(),
+  ])
+
+  if (!financePerm?.can_view && !budgetPerm?.can_view) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+        You don&apos;t have permission to view finance data.
+      </div>
+    )
+  }
+
   const [
     { data: jobs },
     { data: budgetLines },

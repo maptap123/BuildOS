@@ -14,14 +14,22 @@ interface Props {
 }
 
 const MODULES: { key: PermissionModule; label: string; helper: string }[] = [
-  { key: 'jobs', label: 'Jobs', helper: 'Job list, job details, contacts' },
-  { key: 'budget', label: 'Budget', helper: 'Budget, actuals, change orders' },
-  { key: 'schedule', label: 'Schedule', helper: 'Job schedules and calendar sync' },
-  { key: 'tasks', label: 'Tasks', helper: 'Task lists and comments' },
-  { key: 'logs', label: 'Logs', helper: 'Daily logs and jobsite notes' },
-  { key: 'documents', label: 'Documents', helper: 'Files and uploads' },
-  { key: 'ai', label: 'AI', helper: 'AI summaries and agent tools' },
-  { key: 'admin', label: 'Admin', helper: 'Users, permissions, settings' },
+  { key: 'jobs', label: 'Jobs', helper: 'Job list, job details, status, and edit access' },
+  { key: 'leads', label: 'Leads', helper: 'CRM pipeline and lead detail screens' },
+  { key: 'contacts', label: 'Contacts', helper: 'Homeowner, subcontractor, and job contact directory' },
+  { key: 'vendors', label: 'Vendors', helper: 'Vendor/supplier directory and records' },
+  { key: 'budget', label: 'Budget', helper: 'Job budget lines, actuals, purchase orders, and change orders' },
+  { key: 'finance', label: 'Finance', helper: 'Cross-job finance dashboard and reports' },
+  { key: 'profitability', label: 'Profitability', helper: 'Job margin, forecast, variance, and closeout reports' },
+  { key: 'estimates', label: 'Estimates', helper: 'Estimate builder, proposals, and homeowner acceptance flow' },
+  { key: 'schedule', label: 'Schedule', helper: 'Job schedules, Gantt/calendar views, and calendar sync' },
+  { key: 'tasks', label: 'Tasks', helper: 'Task lists, punch items, assignments, and comments' },
+  { key: 'logs', label: 'Daily Logs', helper: 'Daily logs and jobsite notes' },
+  { key: 'photos', label: 'Photos', helper: 'Job photos, log photos, and photo feed visibility' },
+  { key: 'documents', label: 'Documents', helper: 'Files, uploads, and document center' },
+  { key: 'time_clock', label: 'Time Clock', helper: 'Clock in/out and personal time entries' },
+  { key: 'ai', label: 'Fixer / AI', helper: 'AI summaries, chat, and agent tools' },
+  { key: 'admin', label: 'Admin', helper: 'Users, permissions, tags, and system settings' },
 ]
 
 const FLAGS: { key: PermissionFlag; label: string }[] = [

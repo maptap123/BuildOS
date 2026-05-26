@@ -2,11 +2,19 @@
 
 export type PermissionModule =
   | "jobs"
+  | "leads"
+  | "contacts"
+  | "vendors"
   | "budget"
+  | "finance"
+  | "profitability"
+  | "estimates"
   | "schedule"
   | "tasks"
   | "logs"
+  | "photos"
   | "documents"
+  | "time_clock"
   | "admin"
   | "ai";
 

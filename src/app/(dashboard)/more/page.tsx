@@ -8,6 +8,7 @@ import {
   Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { usePermissions } from '@/hooks/usePermissions'
 
 const SECTIONS = [
   {
@@ -16,7 +17,7 @@ const SECTIONS = [
       { key: 'leads',         label: 'Leads',          icon: Target,       href: '/leads',        description: 'CRM pipeline' },
       { key: 'finance',       label: 'Finance',        icon: BarChart3,    href: '/finance',      description: 'Overview & reports' },
       { key: 'vendors',       label: 'Vendors',        icon: HardHat,      href: '/vendors',      description: 'Vendor directory' },
-      { key: 'contacts',      label: 'Contacts',       icon: Users,        href: '/contacts',     description: 'Client & sub directory' },
+      { key: 'contacts',      label: 'Contacts',       icon: Users,        href: '/contacts',     description: 'Homeowner & sub directory' },
     ],
   },
   {
@@ -42,6 +43,31 @@ const SECTIONS = [
 
 export default function MorePage() {
   const router = useRouter()
+  const { can, isAdmin } = usePermissions()
+
+  const canManageOffice = isAdmin() || can('jobs', 'create') || can('jobs', 'edit')
+  const canViewBudget = isAdmin() || can('budget', 'view')
+
+  function canUseItem(key: string): boolean {
+    if (key === 'time-clock') return isAdmin() || can('time_clock', 'view') || can('jobs', 'view')
+    if (key === 'logs') return isAdmin() || can('logs', 'view')
+    if (key === 'schedule') return isAdmin() || can('schedule', 'view')
+    if (key === 'tasks') return isAdmin() || can('tasks', 'view')
+    if (key === 'documents') return isAdmin() || can('documents', 'view')
+    if (key === 'budget') return canViewBudget
+    if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
+    if (key === 'profitability') return isAdmin() || can('profitability', 'view') || canViewBudget
+    if (key === 'estimates') return isAdmin() || can('estimates', 'view') || canViewBudget
+    if (key === 'leads') return isAdmin() || can('leads', 'view') || canManageOffice
+    if (key === 'vendors') return isAdmin() || can('vendors', 'view') || canManageOffice
+    if (key === 'contacts') return isAdmin() || can('contacts', 'view') || canManageOffice
+    if (key === 'admin') return isAdmin()
+    return false
+  }
+
+  const visibleSections = SECTIONS
+    .map(section => ({ ...section, items: section.items.filter(item => canUseItem(item.key)) }))
+    .filter(section => section.items.length > 0)
 
   async function signOut() {
     const supabase = createClient()
@@ -54,7 +80,7 @@ export default function MorePage() {
       <h1 className="font-display text-2xl font-bold text-[#1b2b4a] mb-6 px-1">More</h1>
 
       <div className="space-y-6">
-        {SECTIONS.map(section => (
+        {visibleSections.map(section => (
           <div key={section.title}>
             <p className="text-[10px] font-bold tracking-[0.15em] text-[#4d6a9a] uppercase px-1 mb-2">
               {section.title}

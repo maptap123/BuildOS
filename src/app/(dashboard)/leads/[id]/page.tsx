@@ -19,14 +19,14 @@ export default async function LeadDetailPage({
 
   const admin = createAdminClient()
 
-  const { data: perm } = await admin
-    .from('user_permissions')
-    .select('can_view, can_create, can_edit, can_delete')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
+  const [{ data: leadPerm }, { data: jobPerm }] = await Promise.all([
+    admin.from('user_permissions').select('can_view, can_create, can_edit, can_delete').eq('user_id', user.id).eq('module', 'leads').single(),
+    admin.from('user_permissions').select('can_create, can_edit, can_delete').eq('user_id', user.id).eq('module', 'jobs').single(),
+  ])
 
-  if (!perm?.can_view) {
+  const perm = leadPerm ?? jobPerm
+
+  if (!leadPerm?.can_view && !jobPerm?.can_create && !jobPerm?.can_edit) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
         You don&apos;t have permission to view leads.
@@ -50,9 +50,9 @@ export default async function LeadDetailPage({
       lead={lead as Lead}
       initialActivities={(activities ?? []) as LeadActivity[]}
       permissions={{
-        can_create: perm.can_create,
-        can_edit:   perm.can_edit,
-        can_delete: perm.can_delete,
+        can_create: perm?.can_create ?? false,
+        can_edit:   perm?.can_edit ?? false,
+        can_delete: perm?.can_delete ?? false,
       }}
     />
   )

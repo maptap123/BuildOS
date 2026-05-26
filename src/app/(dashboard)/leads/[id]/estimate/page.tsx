@@ -19,7 +19,13 @@ export default async function LeadEstimatePage({
 
   const admin = createAdminClient()
 
-  const [{ data: perm }, { data: lead, error: leadErr }] = await Promise.all([
+  const [{ data: estimatePerm }, { data: budgetPerm }, { data: lead, error: leadErr }] = await Promise.all([
+    admin
+      .from('user_permissions')
+      .select('can_view, can_create, can_edit, can_delete')
+      .eq('user_id', user.id)
+      .eq('module', 'estimates')
+      .single(),
     admin
       .from('user_permissions')
       .select('can_view, can_create, can_edit, can_delete')
@@ -29,7 +35,9 @@ export default async function LeadEstimatePage({
     admin.from('leads').select('*').eq('id', id).single(),
   ])
 
-  if (!perm?.can_view) {
+  const perm = estimatePerm?.can_view ? estimatePerm : budgetPerm
+
+  if (!estimatePerm?.can_view && !budgetPerm?.can_view) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
         You don&apos;t have permission to view estimates.
@@ -63,9 +71,9 @@ export default async function LeadEstimatePage({
       initialEstimates={(estimates ?? []) as Estimate[]}
       initialLines={(lines ?? []) as EstimateLine[]}
       permissions={{
-        can_create: perm.can_create,
-        can_edit:   perm.can_edit,
-        can_delete: perm.can_delete,
+        can_create: perm?.can_create ?? false,
+        can_edit:   perm?.can_edit ?? false,
+        can_delete: perm?.can_delete ?? false,
       }}
     />
   )
