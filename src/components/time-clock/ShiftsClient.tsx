@@ -407,4 +407,3 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
     </div>
   )
 }
-
