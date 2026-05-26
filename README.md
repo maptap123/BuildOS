@@ -1,6 +1,50 @@
-# JDC Platform
+# BuildOS
 
-Internal construction management platform — a focused replacement for BuilderTrend built on Next.js 16, Supabase, and Claude AI.
+BuildOS is JDC Construction's internal operating system for running remodeling jobs from lead through closeout. It is being built to fully replace Buildertrend for JDC first, with the option to become a contractor-facing product later. BuildOS also borrows the best ideas from tools like CompanyCam where they improve the field workflow.
+
+
+## Product Language and Launch Direction
+
+- **Official product name:** BuildOS.
+- **Positioning:** internal-first for JDC; possible contractor product later.
+- **Replacement goal:** fully replace Buildertrend for JDC over time, not just fill gaps around it.
+- **Primary launch priority:** make mobile extremely usable for Crew. August and Lisa are expected to use the full desktop web version most heavily.
+- **AI assistant branding:** user-facing app copy should say **Fixer** (for example, "Talk to Fixer"). Existing technical route/file names may still use `hermes` until a separate code-naming decision is made.
+- **Homeowner portal:** deep-future item after internal launch; public links for estimates/contracts/change orders are enough for near-term homeowner-facing workflows.
+
+### Core Terms
+
+| Use this term | Meaning |
+|---|---|
+| Homeowner | The person/company paying for the work. Avoid client/customer in user-facing copy unless there is a specific reason. |
+| Job | Active work record. |
+| Lead | Early sales/opportunity stage before it becomes a job. |
+| Estimate | Homeowner-facing pre-sale price/scope. |
+| Proposal | Polished homeowner-facing estimate package. |
+| Contract | Signed after the homeowner agrees to the estimate. |
+| Budget | Internal/PM spend plan for managing the job. |
+| Change Order | Added or changed work after contract signing. |
+| Daily Log | Daily field update, including work notes and photos. |
+| Crew | JDC field workers. |
+| Subcontractor | Official term for companies/people hired to perform part of the work; "sub" is acceptable casually. |
+| Vendor/Supplier | Companies JDC buys materials or services from. |
+
+### Permissions Direction
+
+All jobs are generally visible internally, but features and sensitive money information must be controlled by role/person/module. Regular Crew may see different tools than Project Managers or Owner/Admin users.
+
+Main internal roles:
+
+- Owner/Admin
+- Office/Admin
+- Project Manager
+- Crew
+
+### Daily Log Photo Direction
+
+Crew should generally upload photos through Daily Logs. Internal users such as August, Lisa, and Jason may also upload standalone job-folder/job-feed photos. Long term, photo handling should support simple Daily Log upload, a CompanyCam-style job photo feed, date/location organization, and before/after groupings.
+
+---
 
 ## Tech Stack
 
@@ -196,6 +240,6 @@ For a staging environment create a separate Supabase project and use its keys.
 
 ---
 
-## BuilderTrend Data
+## Buildertrend Data
 
-Historical BuilderTrend export data lives in `bt-export/`. It was imported into Supabase during initial setup. Re-import scripts are in `scripts/` if needed.
+Historical Buildertrend export data lives in `bt-export/`. It was imported into Supabase during initial setup. Re-import scripts are in `scripts/` if needed.

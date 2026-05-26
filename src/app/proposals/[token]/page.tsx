@@ -270,7 +270,7 @@ export default async function PublicProposalPage({
       </main>
 
       <footer className="py-6 text-center">
-        <p className="text-xs text-gray-400">Powered by JDC Platform</p>
+        <p className="text-xs text-gray-400">Powered by BuildOS</p>
       </footer>
     </div>
   )

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { EstimateBuilderClient } from '@/components/estimates'
 import type { Lead, Estimate, EstimateLine } from '@/types'
 
-export const metadata = { title: 'Estimate Builder — JDC Platform' }
+export const metadata = { title: 'Estimate Builder — BuildOS' }
 
 export default async function LeadEstimatePage({
   params,

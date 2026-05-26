@@ -109,7 +109,7 @@ export function LogModePicker({ jobId, onClose }: Props) {
                   </span>
                 </div>
                 <p className="text-[#4d6a9a] text-sm leading-snug">
-                  Open the camera, talk and snap photos. Hermes writes the log for you when you&apos;re done.
+                  Open the camera, talk and snap photos. Fixer writes the log for you when you&apos;re done.
                 </p>
               </div>
             </button>

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { LeadsClient } from '@/components/leads'
 import type { Lead } from '@/types'
 
-export const metadata = { title: 'Leads — JDC Platform' }
+export const metadata = { title: 'Leads — BuildOS' }
 
 export default async function LeadsPage() {
   const supabase = await createClient()

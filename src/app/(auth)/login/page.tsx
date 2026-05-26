@@ -33,8 +33,8 @@ export default function LoginPage() {
       {/* Header */}
       <div className="flex justify-center pt-16 pb-10">
         <div className="text-center">
-          <h1 className="font-display text-4xl font-bold text-white tracking-wide">JDC</h1>
-          <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mt-1">Platform</p>
+          <h1 className="font-display text-4xl font-bold text-white tracking-wide">BuildOS</h1>
+          <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mt-1">JDC Construction</p>
         </div>
       </div>
 

@@ -183,7 +183,7 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
             <span className="text-xs font-semibold uppercase tracking-wide">Admin</span>
           </div>
           <h1 className="font-display text-2xl font-bold text-navy-900">Users & Permissions</h1>
-          <p className="text-sm text-gray-500 mt-1">Control who can access each part of JDC Platform.</p>
+          <p className="text-sm text-gray-500 mt-1">Control who can access each part of BuildOS.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-400 flex items-center gap-1.5">

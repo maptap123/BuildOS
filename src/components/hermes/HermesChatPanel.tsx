@@ -70,7 +70,7 @@ export function HermesChatPanel() {
       })
 
       if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: 'Failed to reach Hermes' }))
+        const err = await res.json().catch(() => ({ error: 'Failed to reach Fixer' }))
         setMessages(prev => {
           const next = [...prev]
           next[next.length - 1] = { role: 'assistant', content: err.error ?? 'Something went wrong.' }
@@ -127,7 +127,7 @@ export function HermesChatPanel() {
             if (event.type === 'error') {
               setMessages(prev => {
                 const next = [...prev]
-                next[next.length - 1] = { role: 'assistant', content: event.message ?? 'Hermes encountered an error.' }
+                next[next.length - 1] = { role: 'assistant', content: event.message ?? 'Fixer encountered an error.' }
                 return next
               })
             }
@@ -148,7 +148,7 @@ export function HermesChatPanel() {
       abortRef.current = null
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [loading, conversationId, jobId])
+  }, [loading, conversationId, jobId, router])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -166,7 +166,7 @@ export function HermesChatPanel() {
     <>
       {/* ── Floating button ── */}
       <button
-        aria-label="Open Hermes AI"
+        aria-label="Open Fixer AI"
         onClick={() => setOpen(true)}
         className={`
           fixed bottom-24 right-4 md:bottom-6 md:right-6 z-40
@@ -202,7 +202,7 @@ export function HermesChatPanel() {
           ${open ? 'translate-y-0 opacity-100' : 'translate-y-full md:translate-y-4 opacity-0 pointer-events-none'}
         `}
         role="dialog"
-        aria-label="Hermes AI Chat"
+        aria-label="Fixer AI Chat"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 shrink-0">
@@ -230,7 +230,7 @@ export function HermesChatPanel() {
                 <Bot size={24} className="text-navy-900" />
               </div>
               <div>
-                <p className="font-display font-semibold text-navy-900 text-sm">Hi, I&apos;m Hermes</p>
+                <p className="font-display font-semibold text-navy-900 text-sm">Hi, I&apos;m Fixer</p>
                 <p className="text-xs text-gray-400 mt-1">Ask me anything about your jobs, tasks, or schedule.</p>
               </div>
               <div className="flex flex-col gap-2 w-full mt-2">
@@ -287,7 +287,7 @@ export function HermesChatPanel() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Hermes…"
+              placeholder="Ask Fixer…"
               rows={1}
               disabled={loading}
               className="flex-1 bg-transparent text-sm text-navy-900 placeholder-gray-400 resize-none outline-none max-h-32 leading-5 py-0.5 disabled:opacity-50"
@@ -310,7 +310,7 @@ export function HermesChatPanel() {
               }
             </button>
           </div>
-          <p className="text-[10px] text-gray-300 text-center mt-1.5">Hermes can make mistakes — verify important info</p>
+          <p className="text-[10px] text-gray-300 text-center mt-1.5">Fixer can make mistakes — verify important info</p>
         </div>
       </div>
     </>

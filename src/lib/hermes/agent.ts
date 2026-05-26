@@ -203,7 +203,8 @@ export async function* hermesStream(
   let pendingNav = ctxPrefs.pending_nav as { url: string; label?: string } | undefined
 
   if (pendingNav?.url) {
-    const { pending_nav: _removed, ...clearedPrefs } = ctxPrefs
+    const clearedPrefs = { ...ctxPrefs }
+    delete clearedPrefs.pending_nav
     await admin.from('hermes_user_context').upsert({
       user_id: userId,
       preferences: clearedPrefs,

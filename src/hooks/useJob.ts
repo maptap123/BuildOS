@@ -10,7 +10,6 @@ export function useJob(id: string | null) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!id) { setJob(null); return }
     setLoading(true)
     fetch(`/api/jobs/${id}`)

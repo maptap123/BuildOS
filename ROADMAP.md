@@ -1,6 +1,50 @@
-# JDC Platform — Product Roadmap
+# BuildOS — Product Roadmap
 
-Living document for building JDC Platform into a serious Buildertrend / JobTread / Klutch AI competitor.
+Living document for building BuildOS into JDC Construction's internal operating system. The near-term goal is full internal replacement of Buildertrend for JDC, while leaving room for BuildOS to become a contractor product later.
+
+---
+
+
+## Current Product Decisions
+
+These decisions reflect August's current direction and should guide roadmap cleanup and feature work.
+
+### Naming and positioning
+
+- Official name: **BuildOS**.
+- BuildOS is **internal-first for JDC**, with a possible contractor product path later.
+- BuildOS should **fully replace Buildertrend** for JDC over time and also borrow stronger ideas from other tools, especially CompanyCam-style photo workflows.
+- User-facing AI assistant branding should be **Fixer**, not Hermes. Keep existing `hermes` technical route/file names until a separate code-naming decision is made.
+
+### Terminology
+
+- Paying party: **Homeowner**.
+- Work record: **Job**.
+- Pre-job sales/opportunity stage: **Lead**.
+- Homeowner-facing pre-sale price/scope: **Estimate**.
+- Polished homeowner-facing estimate package: **Proposal**.
+- Signed agreement after estimate acceptance: **Contract**.
+- Internal/PM spend plan: **Budget**.
+- Added/changed work after contract: **Change Order**.
+- Daily field update: **Daily Log**.
+- JDC field workers: **Crew**.
+- Official hired trade term: **Subcontractor**; casual **sub** is okay.
+- Material/service companies: **Vendor/Supplier**.
+
+### Launch focus
+
+- First real launch should prioritize an extremely usable **Crew mobile** experience.
+- August and Lisa will primarily use the full desktop web app.
+- Other users should be mobile-first unless their role requires office/admin tools.
+- All jobs are generally visible internally, but feature access and sensitive money visibility must be controlled by role/person/module.
+- Initial internal roles: **Owner/Admin**, **Office/Admin**, **Project Manager**, **Crew**.
+- Homeowner portal is a deep-future item; do not prioritize it before full internal launch.
+
+### Daily Log/photo direction
+
+- Crew normally uploads photos through **Daily Logs**.
+- Internal users such as August, Lisa, and Jason may upload standalone photos to the job folder/feed.
+- Long-term photo workflow should support simple Daily Log uploads, CompanyCam-style job feed, date/location organization, and before/after sets.
 
 ---
 
@@ -12,7 +56,7 @@ LEAD INTAKE          ESTIMATING          JOB EXECUTION           CLOSEOUT & REPO
 Lead captured    →   Estimate built  →   Budget set up      →   Punch list complete
 Lead qualified   →   Markup applied  →   Schedule active    →   Final invoice sent
 Site visit notes →   Proposal PDF    →   Daily logs / photos→   QB reconciliation
-Follow-up log    →   Client signs    →   Tasks / subs       →   Job profitability
+Follow-up log    →   Homeowner signs    →   Tasks / subs       →   Job profitability
 CRM pipeline     →   Convert → Job   →   Change orders      →   Portfolio report
                                      →   Bills / actuals    →
                                      →   Progress billing   →
@@ -29,17 +73,17 @@ CRM pipeline     →   Convert → Job   →   Change orders      →   Portfoli
 | **Proposal** | PDF + e-signature + link | ✅ Built | Email delivery / reminders remain |
 | **Convert → Job** | Estimate becomes budget + schedule | ✅ Built | Starter schedule is phase-based and should be refined |
 | **Budget setup** | Phases, cost codes, budget lines | ✅ Built | Phase grouping, cost code catalog |
-| **Schedule** | Gantt + milestones + subs | ✅ Built | Client-visible milestones |
+| **Schedule** | Gantt + milestones + subs | ✅ Built | Homeowner-visible milestones |
 | **Daily logs** | Photos, weather, manpower | ✅ Built | Mobile flow, weather helper |
 | **Tasks / punch list** | My tasks / all tasks / punch list tab | ✅ Built | — |
-| **Change orders** | Draft → client approve → PDF | ✅ Built | — |
+| **Change orders** | Draft → homeowner approval → PDF | ✅ Built | — |
 | **Purchase orders** | PO to vendor, linked to budget line | ✅ Built | — |
 | **Bills / actuals** | Bill entry, approval, QB sync | ✅ Built | QB sync (Phase 4) |
-| **Progress billing** | Draw schedule, invoice to client | Not built | Not in roadmap yet |
+| **Progress billing** | Draw schedule, invoice to homeowner | Not built | Not in roadmap yet |
 | **Job closeout** | Final invoice, warranty status | ✅ Built | Final invoice generation |
 | **Job profitability** | Contract vs budget vs actual vs forecast | ✅ Built | — |
 | **Documents** | File center, upload, job-linked | ✅ Built | Connect to tasks/logs/COs |
-| **Contacts** | Client/sub directory | ✅ Built | Show on job detail panel |
+| **Contacts** | Homeowner/sub directory | ✅ Built | Show on job detail panel |
 | **QB sync** | Bills, invoices, payments bidirectional | Stub only | Phase 4 |
 | **Portfolio report** | Multi-job budget health | Not built | Phase 8 |
 
@@ -48,10 +92,10 @@ CRM pipeline     →   Convert → Job   →   Change orders      →   Portfoli
 ## The Three Biggest Gaps
 
 **1. Lead Intake → Estimate → Job (core loop built)**
-BT's killer feature is this funnel. JDC now has the estimate builder UI, printable proposal, public client accept/decline link, and accepted proposal → job + budget + starter schedule conversion. The next lift is polish: assemblies, email delivery, better schedule templates, and AI-assisted scope matching.
+BT's killer feature is this funnel. JDC now has the estimate builder UI, printable proposal, public homeowner accept/decline link, and accepted proposal → job + budget + starter schedule conversion. The next lift is polish: assemblies, email delivery, better schedule templates, and AI-assisted scope matching.
 
 **2. Bills / Purchase Orders / Progress Billing (the money middle)**
-Budget lines and actuals exist but there's no way to track *commitments* (POs to subs/vendors) or *billing to the client* (draw schedule). This is the core of job cost control. BT users live here daily.
+Budget lines and actuals exist but there's no way to track *commitments* (POs to subs/vendors) or *billing to the homeowner* (draw schedule). This is the core of job cost control. BT users live here daily.
 
 **3. Job Profitability Report (the finish line)**
 The whole workflow is pointless without the closing report: contract value → revised contract (after COs) → budget → committed (POs) → actual (bills paid) → forecast → variance → margin %. This is what the owner reads at job end.
@@ -76,13 +120,13 @@ The **4,600-row cost book** is already in the DB. BT users build estimates from 
 ### Sprint B — Strengthen Job Cost Control (Phase 3) — DONE
 6. ✅ Purchase orders: create PO → link to budget line → mark committed
 7. ✅ Bills: enter bill → link to PO or budget line → approval status (pending/approved/paid)
-8. ⬜ Progress billing / draw schedule: client-facing invoice milestones
+8. ⬜ Progress billing / draw schedule: homeowner-facing invoice milestones
 9. ✅ Improved budget summary: Contract / Revised / Budget / Committed / Actual / Forecast / Variance
 
 ### Sprint C — Close the Loop on Completion — DONE
 10. ✅ Punch list: task type = "punch" with its own tab/filter
 11. ✅ Job closeout status: move from Active → Warranty → Closed with completion checklist
-12. ✅ Change order PDF + client approval link
+12. ✅ Change order PDF + homeowner approval link
 13. ✅ Job profitability report: the final financial summary per job
 
 ### Sprint D — Better Than BT — NOT STARTED
@@ -93,18 +137,18 @@ The **4,600-row cost book** is already in the DB. BT users build estimates from 
 
 ### Sprint E — Complete the Revenue Loop (remaining Sprint A items) — DONE
 18. ✅ Estimate builder UI (pulls from 4,600-row cost book already in DB)
-19. ✅ Proposal PDF generation + client accept flow
+19. ✅ Proposal PDF generation + homeowner acceptance flow
 20. ✅ Convert accepted proposal → job + budget lines + starter schedule
 21. ✅ Show contacts on job detail panel (quick win)
 
 | Sprint | Maps to Phase | Status |
 |--------|---------------|--------|
-| Sprint A | Phase 5 (Sales, Estimating, Proposals) | Done — CRM, estimates, proposals, client accept, and conversion built |
+| Sprint A | Phase 5 (Sales, Estimating, Proposals) | Done — CRM, estimates, proposals, homeowner acceptance, and conversion built |
 | Sprint B | Phase 3 (Money and Commitments) | Done |
 | Sprint C | Phase 3 + Phase 2 (Field OS) | Done |
 | Sprint D | Phase 7 (AI Advantage) | Not started |
 | Sprint E | Phase 5 remainder | Done |
-| Sprint F | Phase 10 (Hermes Agent Platform) | Not started |
+| Sprint F | Phase 10 (Fixer / Hermes Agent Platform) | Not started |
 
 ---
 
@@ -165,7 +209,7 @@ Goal: make the app useful to the field every day.
 - [x] Add file upload to Supabase storage
 - [x] Add file preview/download links
 - [ ] Connect documents to jobs, logs, tasks, budget lines, and change orders
-- [x] Build contacts/client directory UI
+- [x] Build contacts/homeowner directory UI
 - [x] Show contacts on job detail
 - [x] Add contact create/edit/delete flows
 - [x] Add log photo upload
@@ -196,8 +240,8 @@ Goal: make budgets, change orders, costs, and commitments reliable enough for re
 - [x] Link actual costs to purchase orders and bills
 - [x] Add change order approval workflow
 - [x] Add change order PDF generation
-- [x] Add change order client signature status
-- [x] Add client-facing change order approval link
+- [x] Add change order homeowner signature status
+- [x] Add homeowner-facing change order approval link
 - [x] Add job profitability report
 - [ ] Add cash flow / billing schedule view
 
@@ -280,15 +324,15 @@ Goal: let contractors look up live material prices from major retailers while bu
 
 ## Phase 6: Portals And Communication
 
-Goal: give clients and subs a reason to live in the platform.
+Goal: give homeowners and subs a reason to live in the platform.
 
 - [ ] Add customer portal role
 - [ ] Add customer portal login/access flow
-- [ ] Show approved schedule milestones to client
-- [ ] Show client-visible photos/documents
-- [ ] Show client-visible change orders
-- [ ] Add client messaging
-- [ ] Add client approvals
+- [ ] Show approved schedule milestones to homeowner
+- [ ] Show homeowner-visible photos/documents
+- [ ] Show homeowner-visible change orders
+- [ ] Add homeowner messaging
+- [ ] Add homeowner approvals
 - [ ] Add sub/vendor portal role
 - [ ] Add sub/vendor portal access flow
 - [ ] Show assigned tasks/work orders to subs
@@ -320,7 +364,7 @@ Goal: become more than a Buildertrend clone by turning project data into action.
 - [ ] Add bid leveling assistant
 - [ ] Add warranty/support AI assistant
 
-## Phase 10: Hermes — Agentic AI Platform
+## Phase 10: Fixer / Hermes — Agentic AI Platform
 
 Goal: deploy Hermes Agent (Nous Research OSS) on a VPS as the single AI brain for the entire JDC business. Hermes has full read and write access to every part of the operation — the JDC app, QuickBooks, email, and SMS context from Android phones. Every employee talks to the same agent, either through the JDC app or Discord. All conversations are visible to ownership in Discord regardless of which channel was used.
 
@@ -337,9 +381,9 @@ Goal: deploy Hermes Agent (Nous Research OSS) on a VPS as the single AI brain fo
          ┌──────────────────────────┼──────────────────────────┐
          │                          │                           │
          ▼                          ▼                           ▼
-  JDC Platform              QuickBooks API            Email (Gmail / Outlook)
+  BuildOS                   QuickBooks API            Email (Gmail / Outlook)
   Read + Write              Financial data            Read + Draft replies
-  Jobs, schedule,           P&L, invoices,            Lisa's client emails
+  Jobs, schedule,           P&L, invoices,            Lisa's homeowner emails
   budget, tasks,            payments, vendors         Incoming inquiries
   change orders,
   daily logs, docs
@@ -376,7 +420,7 @@ Goal: deploy Hermes Agent (Nous Research OSS) on a VPS as the single AI brain fo
 | Purchase orders | ❌ | ✅ | ✅ |
 | Contract value | ❌ | ✅ | ✅ |
 | QuickBooks data | ❌ | ✅ | ✅ |
-| Draft client email | ❌ | ✅ | ✅ |
+| Draft homeowner email | ❌ | ✅ | ✅ |
 | Change order financials | ❌ | ✅ | ✅ |
 | Lead pipeline | ❌ | ✅ | ✅ |
 | Markup / margin | ❌ | ❌ | ✅ |
@@ -430,7 +474,7 @@ Goal: set up the Discord server that serves as both a user interface and the own
 
 ### Phase 10c — In-App Chat + Discord Mirror
 
-Goal: employees can use the JDC app to talk to Hermes, and those conversations appear in Discord automatically.
+Goal: employees can use the JDC app to talk to Fixer, and those conversations appear in Discord automatically.
 
 - [ ] Add `src/components/hermes/HermesChatPanel.tsx` — slide-in chat panel available on every page
 - [ ] Wire chat panel to `/api/hermes/chat` route — forwards message to VPS Hermes Agent, streams response back
@@ -446,8 +490,8 @@ Goal: Hermes can read emails and draft replies on behalf of Lisa and other team 
 - [ ] Complete Microsoft 365 / Gmail OAuth flow — store encrypted tokens per user
 - [ ] Add `read_emails` tool to Hermes — pulls recent inbox threads, filterable by sender, job name, or date range
 - [ ] Add `draft_email_reply` tool — Hermes composes a reply based on email thread + relevant JDC job data; user reviews and sends manually
-- [ ] Add `search_emails` tool — find all emails mentioning a specific job, client, or sub
-- [ ] Wire email context into system prompt for Lisa's role — on conversation start, inject summary of unread emails ("You have 2 unread client emails from this week")
+- [ ] Add `search_emails` tool — find all emails mentioning a specific job, homeowner, or sub
+- [ ] Wire email context into system prompt for Lisa's role — on conversation start, inject summary of unread emails ("You have 2 unread homeowner emails from this week")
 - [ ] Email data is scoped per user — Lisa's emails are not visible to Jason's Hermes session
 
 ### Phase 10e — QuickBooks Integration
@@ -505,7 +549,7 @@ Goal: Hermes initiates contact — employees don't have to ask, it tells them wh
 - [ ] Budget overrun alert — when any job's forecast exceeds budget by >10%, post alert to `#hermes-alerts` and the relevant PM's channel
 - [ ] Schedule risk alert — when a schedule item is overdue with incomplete predecessors, flag to PM
 - [ ] Missing daily log reminder — if no log filed for an active job by 4pm, post reminder to field worker's channel
-- [ ] Unsigned change order reminder — daily nudge if a CO has been pending client signature for more than 3 days
+- [ ] Unsigned change order reminder — daily nudge if a CO has been pending homeowner signature for more than 3 days
 
 ---
 
@@ -536,7 +580,7 @@ Goal: help owners and PMs see the business clearly.
 
 **One codebase. Two completely different experiences.**
 
-JDC Platform runs as a single Next.js app but renders a fundamentally different UI depending on the device. This is not responsive tweaking — it's two distinct products sharing the same data layer and API routes.
+BuildOS runs as a single Next.js app but renders a fundamentally different UI depending on the device. This is not responsive tweaking — it's two distinct products sharing the same data layer and API routes.
 
 ### Philosophy
 - **Mobile = field tool.** Built for a phone in one hand on a job site. The primary users are Jason, Cane, and August in the field. Every screen is optimized for speed, large touch targets, camera access, and offline-tolerant patterns. Feature set is deliberately narrow: the things field workers actually need every hour.
@@ -550,7 +594,7 @@ JDC Platform runs as a single Next.js app but renders a fundamentally different 
 | Jobs | Job list, tap into a job for site address, contacts, and quick actions |
 | Log | Create daily log with photos, weather, and notes — camera-first flow |
 | Tasks | My open tasks across all jobs — tap to complete |
-| More | Access to Documents, Time Clock, Hermes chat, Settings |
+| More | Access to Documents, Time Clock, Fixer chat, Settings |
 
 ### Mobile-Only Features
 - Camera-first photo upload directly in log creation
@@ -575,7 +619,7 @@ JDC Platform runs as a single Next.js app but renders a fundamentally different 
 **Architecture note:** The split is done with Tailwind CSS breakpoints (`md:hidden` / `hidden md:block`), not hooks or shell components. No `useMobileLayout` hook needed — Tailwind handles it cleanly. Desktop code is untouched.
 
 **Files built/changed:**
-- `src/components/mobile/MobileHome.tsx` — navy/gold launchpad: Hermes hero button, 4-tile action grid, Today's Tasks, This Week schedule
+- `src/components/mobile/MobileHome.tsx` — navy/gold launchpad: Fixer hero button, 4-tile action grid, Today's Tasks, This Week schedule
 - `src/components/mobile/LogModePicker.tsx` — bottom sheet: Traditional vs AI Log mode (AI = BETA stub, Phase 2)
 - `src/app/(dashboard)/more/page.tsx` — full mobile nav: Management, Job Tools, Settings sections + sign out
 - `src/hooks/useCurrentUser.ts` + `src/app/api/me/profile/route.ts` — personalized greeting
@@ -585,7 +629,7 @@ JDC Platform runs as a single Next.js app but renders a fundamentally different 
 - `src/components/logs/LogClient.tsx` — auto-opens Add Log modal when `?newLog=1` is in URL
 
 **Verified working (Playwright, 390×844):**
-- ✅ Hermes button → inline chat panel
+- ✅ Fixer button → inline chat panel
 - ✅ Daily Log → LogModePicker → Traditional → job picker → `/jobs/{id}/logs?newLog=1` → Add Log modal auto-opens
 - ✅ Schedule (no job) → job picker → `/jobs/{id}/schedule`
 - ✅ Time Clock → `/time-clock`
@@ -599,11 +643,11 @@ JDC Platform runs as a single Next.js app but renders a fundamentally different 
 - [ ] Add camera capture to photo upload (not just file picker)
 - [ ] Add weather auto-fetch on log creation (already in desktop log form, needs mobile hook)
 - [ ] Add offline draft storage for logs (localStorage → sync on reconnect)
-- [ ] AI Log mode (Phase 2) — camera + voice → Hermes writes the log (Klutch AI pattern)
+- [ ] AI Log mode (Phase 2) — camera + voice → Fixer writes the log (Klutch AI pattern)
 
 ### Mobile Sprint 3 — Hermes on Mobile
 - [ ] Voice-to-text input for Hermes (native mobile keyboard mic)
-- [ ] Hermes AI Log — open camera, talk + snap photos, Hermes writes the log entry on submit
+- [ ] Fixer AI Log — open camera, talk + snap photos, Fixer writes the log entry on submit
 - [ ] Quick chips persistent across sessions: "My tasks today", "What's overdue?", "Start a log"
 
 ---
@@ -631,7 +675,7 @@ Goal: make the app dependable enough for real customers.
 
 Goal: once the job and budget modules are more fully built out, allow admins to control exactly which parts employees can see or change.
 
-- [ ] Define job visibility sections such as client info, address, contract value, internal notes, contacts, schedule snapshot, logs, documents, and activity
+- [ ] Define job visibility sections such as homeowner info, address, contract value, internal notes, contacts, schedule snapshot, logs, documents, and activity
 - [ ] Define budget visibility sections such as contract amount, cost codes, estimates, committed costs, actual costs, vendor names, invoices/bills, change orders, profit/margin, and reports
 - [ ] Add section-level permission fields or a role policy JSON model
 - [ ] Update admin UI to manage section-level permissions without becoming cluttered
@@ -644,11 +688,11 @@ Goal: once the job and budget modules are more fully built out, allow admins to 
 
 Start here unless we intentionally reprioritize.
 
-- [x] **[Mobile Sprint 1]** ✅ Done — MobileHome launchpad, LogModePicker, More page, 5-tab nav, Hermes chat, all routing verified in Playwright
+- [x] **[Mobile Sprint 1]** ✅ Done — MobileHome launchpad, LogModePicker, More page, 5-tab nav, Fixer chat, all routing verified in Playwright
 - [ ] **[Mobile Sprint 2]** Camera capture on photo upload (mobile file picker currently opens gallery, need `capture="environment"`)
 - [ ] **[Mobile Sprint 2]** Weather auto-fetch on mobile log creation
 - [ ] **[Mobile Sprint 2]** Offline draft storage for logs
-- [ ] **[Mobile Sprint 2]** AI Log mode — camera + voice → Hermes writes the log (Klutch AI pattern, currently BETA stub)
+- [ ] **[Mobile Sprint 2]** AI Log mode — camera + voice → Fixer writes the log (Klutch AI pattern, currently BETA stub)
 - [ ] **[Price Intelligence]** Decide which retailers to include, then start Phase 5a (Apify client + price_cache schema + HD scraper)
 - [ ] Add job activity feed
 - [ ] Phase 7: AI daily brief + budget overrun risk detection (Sprint D)
@@ -664,4 +708,4 @@ Start here unless we intentionally reprioritize.
 
 Do not try to clone every competitor screen. Build the daily contractor operating loop:
 
-Lead/job → estimate/budget → schedule/tasks → daily log/photos → change order/actuals → client/sub communication → AI summary/risk dashboard.
+Lead/job → estimate/budget → schedule/tasks → daily log/photos → change order/actuals → homeowner/sub communication → AI summary/risk dashboard.

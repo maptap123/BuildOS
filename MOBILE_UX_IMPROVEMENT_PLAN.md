@@ -1,4 +1,4 @@
-# JDC Platform Roadmap
+# BuildOS Mobile UX Improvement Plan
 ## Web Platform + Future Mobile App — Updated May 2026
 
 ---
@@ -21,7 +21,7 @@ The job switcher is a modal — not a real page. PMs need a proper jobs list.
 
 **Solution:**
 - Add `/jobs/list` as a first-class page (accessible from the current nav)
-- **Table/card layout** with: job name, client, status badge, PM, last activity, contract value
+- **Table/card layout** with: job name, homeowner, status badge, PM, last activity, contract value
 - **Saved views** — save filter presets by name
 - **"+ New Job"** button prominent in header
 - Keep the modal switcher for quick-switching *within* a job context
@@ -88,27 +88,27 @@ No back nav, no financial summary, no color, no related lead link.
 
 ---
 
-### Priority 6 — New Features: Client Portal & Lead Intelligence (MEDIUM–LOW, ongoing)
+### Priority 6 — Future Features: Homeowner Portal & Lead Intelligence (MEDIUM–LOW, ongoing)
 
 Differentiators that BT does poorly:
 
-**Client-facing (from Houzz Pro):**
-- **Client Selection Portal** — homeowner logs in, makes finish selections (tile, cabinet, fixture) from presented options. Replaces email chains. `/portal/[token]/selections`
-- **Photo Albums** — organize job photos into albums by phase. Client can view + add inspiration images.
-- **Progress Photos** — before/after slider for client-facing job updates.
+**Homeowner-facing (from Houzz Pro):**
+- **Homeowner Selection Portal** — homeowner logs in, makes finish selections (tile, cabinet, fixture) from presented options. Replaces email chains. `/portal/[token]/selections`
+- **Photo Albums** — organize job photos into albums by phase. Homeowner can view + add inspiration images.
+- **Progress Photos** — before/after slider for homeowner-facing job updates.
 - **Review Collection** — after job close, auto-send review request via SMS/email. Collect Google/Houzz link + internal rating.
 
 **Lead intelligence (from Clutch.ai):**
 - **Lead Source Tracking** — tag each lead with source (Referral, Google, Houzz, etc.). Dashboard shows revenue by source.
-- **AI Lead Scoring** — Hermes scores lead quality based on project type, budget, timeline, location.
-- **Automated Follow-up** — Hermes sends SMS follow-up after X days of no response.
-- **Proposal Analytics** — track when client opened proposal, time spent, sections read.
+- **AI Lead Scoring** — Fixer scores lead quality based on project type, budget, timeline, location.
+- **Automated Follow-up** — Fixer sends SMS follow-up after X days of no response.
+- **Proposal Analytics** — track when homeowner opened proposal, time spent, sections read.
 
 **Feature parity with BT:**
 - **Warranty Tracking** — `/jobs/[id]/warranties` — log warranties with expiration dates and vendor contacts
-- **Client Updates** — weekly progress posts visible to homeowner in their portal
-- **Submittals** — track product submittals sent to client for approval
-- **Selections** — structured selection tracking (Option A vs B vs C, client picks one)
+- **Homeowner Updates** — weekly progress posts visible to homeowner in their portal
+- **Submittals** — track product submittals sent to homeowner for approval
+- **Selections** — structured selection tracking (Option A vs B vs C, homeowner picks one)
 
 ---
 

@@ -6,7 +6,6 @@ import { Bot, FileText, Calendar, Clock, Folder, ChevronRight, CheckSquare, Aler
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useAgenda } from '@/hooks/useAgenda'
 import { LogModePicker } from './LogModePicker'
-import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
 import { JobPickerSheet } from '@/components/jobs/JobPickerSheet'
 import type { Job } from '@/types'
 
@@ -105,7 +104,7 @@ export function MobileHome({ jobId, jobName }: Props) {
               <Bot size={22} className="text-[#0b1623]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-base leading-tight">Talk to Hermes</p>
+              <p className="text-white font-bold text-base leading-tight">Talk to Fixer</p>
               <p className="text-[#4d6a9a] text-xs mt-0.5 truncate">
                 &ldquo;Did we order the parts for the Ryan job?&rdquo;
               </p>
@@ -395,7 +394,7 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ message: msg, conversation_id: conversationId }),
       })
       if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: 'Failed to reach Hermes' }))
+        const err = await res.json().catch(() => ({ error: 'Failed to reach Fixer' }))
         setMessages(prev => { const n=[...prev]; n[n.length-1]={role:'assistant',content:err.error??'Something went wrong.'}; return n })
         return
       }
@@ -452,7 +451,7 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
               <Bot size={28} className="text-[#0b1623]" />
             </div>
             <div>
-              <p className="font-display font-bold text-[#1b2b4a] text-base">Hi, I&apos;m Hermes</p>
+              <p className="font-display font-bold text-[#1b2b4a] text-base">Hi, I&apos;m Fixer</p>
               <p className="text-sm text-gray-500 mt-1">Ask me anything about your jobs, tasks, or schedule.</p>
             </div>
             <div className="flex flex-col gap-2 w-full">
@@ -483,7 +482,7 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') send(input) }}
-            placeholder="Ask Hermes…"
+            placeholder="Ask Fixer…"
             disabled={loading}
             className="flex-1 bg-transparent text-sm text-[#1b2b4a] placeholder-gray-400 outline-none"
           />

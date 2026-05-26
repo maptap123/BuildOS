@@ -6,7 +6,7 @@ import { createHash } from 'crypto'
 /**
  * POST /api/hermes/ingest-sms
  *
- * Called by Tasker on Android when the JDC Platform app is opened.
+ * Called by Tasker on Android when the BuildOS app is opened.
  * Receives the user's recent SMS messages and upserts them into
  * user_sms_messages for Hermes to reference.
  *

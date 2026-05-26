@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { LeadDetailClient } from '@/components/leads'
 import type { Lead, LeadActivity } from '@/types'
 
-export const metadata = { title: 'Lead Detail — JDC Platform' }
+export const metadata = { title: 'Lead Detail — BuildOS' }
 
 export default async function LeadDetailPage({
   params,

@@ -1,13 +1,13 @@
-'use client'
+﻿'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   Plus, Calendar, List, BarChart2, CalendarDays, CalendarRange,
   Search, X, ChevronLeft, ChevronRight, SlidersHorizontal,
 } from 'lucide-react'
 import type { ScheduleItem, ScheduleItemStatus, PredecessorType } from '@/types'
 
-// ─── Predecessor types (local, trimmed from SchedulePredecessor for Gantt) ────
+// â”€â”€â”€ Predecessor types (local, trimmed from SchedulePredecessor for Gantt) â”€â”€â”€â”€
 
 interface GanttPredecessor {
   id: string
@@ -17,7 +17,7 @@ interface GanttPredecessor {
   lag_days: number
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ScheduleView = 'list' | 'gantt' | 'week' | 'month' | 'year'
 
@@ -27,7 +27,7 @@ interface Filters {
   trades: string[]
 }
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Tailwind classes for status badges / filter chips (not bars)
 const STATUS_CFG: Record<ScheduleItemStatus, {
@@ -61,7 +61,7 @@ const VIEWS: { id: ScheduleView; label: string; short: string; icon: React.Eleme
   { id: 'year',  label: 'Yearly',  short: 'Year',  icon: CalendarRange },
 ]
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parseDay(s: string) {
   return new Date(s + 'T00:00:00')
@@ -75,7 +75,7 @@ function fmtRange(start: string, end: string) {
   const s = parseDay(start)
   const e = parseDay(end)
   const days = Math.ceil((e.getTime() - s.getTime()) / 86_400_000) + 1
-  return `${fmtShort(s)} – ${fmtShort(e)} · ${days}d`
+  return `${fmtShort(s)} â€“ ${fmtShort(e)} Â· ${days}d`
 }
 
 function daysBetween(a: Date, b: Date): number {
@@ -106,7 +106,7 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
   )
 }
 
-// ─── MILESTONE DIAMOND ────────────────────────────────────────────────────────
+// â”€â”€â”€ MILESTONE DIAMOND â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function MilestoneDiamond({ size = 14 }: { size?: number }) {
   return (
@@ -115,12 +115,12 @@ function MilestoneDiamond({ size = 14 }: { size?: number }) {
       style={{ fontSize: size, lineHeight: 1 }}
       aria-label="Milestone"
     >
-      ◆
+      â—†
     </span>
   )
 }
 
-// ─── INLINE DATE INPUT ────────────────────────────────────────────────────────
+// â”€â”€â”€ INLINE DATE INPUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface InlineDateInputProps {
   itemId: string
@@ -163,7 +163,7 @@ function InlineDateInput({ itemId, field, value, onSaved }: InlineDateInputProps
   )
 }
 
-// ─── LIST VIEW ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ LIST VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void; onRefresh: () => void }) {
   return (
@@ -211,17 +211,17 @@ function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit:
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{item.trade ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{item.trade ?? 'â€”'}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <InlineDateInput itemId={item.id} field="start_date" value={item.start_date} onSaved={onRefresh} />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {isMilestone
-                      ? <span className="text-gray-400 text-sm px-1">—</span>
+                      ? <span className="text-gray-400 text-sm px-1">â€”</span>
                       : <InlineDateInput itemId={item.id} field="end_date" value={item.end_date} onSaved={onRefresh} />
                     }
                   </td>
-                  <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{isMilestone ? '—' : `${dur}d`}</td>
+                  <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{isMilestone ? 'â€”' : `${dur}d`}</td>
                   <td className="px-4 py-3">
                     {isMilestone
                       ? <MilestoneDiamond size={16} />
@@ -280,12 +280,12 @@ function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit:
   )
 }
 
-// ─── GANTT VIEW ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ GANTT VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const PX_PER_DAY = 16  // fixed pixel width per day — bars always legible regardless of total span
-const ROW_H      = 44  // px — must match h-11 (44px) used on bar rows
+const PX_PER_DAY = 16  // fixed pixel width per day â€” bars always legible regardless of total span
+const ROW_H      = 44  // px â€” must match h-11 (44px) used on bar rows
 const BAR_MID_Y  = ROW_H / 2  // vertical center of a bar row
-const RULER_H    = 32  // px — height of the month ruler (h-8)
+const RULER_H    = 32  // px â€” height of the month ruler (h-8)
 
 interface GanttViewProps {
   items: ScheduleItem[]
@@ -331,7 +331,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
   const todayLeft = totalDays > 0 ? daysBetween(minDate, today) * PX_PER_DAY : null
   const showToday = todayLeft !== null && todayLeft >= 0 && todayLeft <= totalDays * PX_PER_DAY
 
-  // ── Fetch all predecessors for this job ──────────────────────────────────
+  // â”€â”€ Fetch all predecessors for this job â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!jobId) return
     fetch(`/api/schedule?job_id=${jobId}&include_predecessors=true`)
@@ -339,10 +339,10 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
       .then((res: { items: ScheduleItem[]; predecessors: GanttPredecessor[] } | null) => {
         if (res?.predecessors) setPredecessors(res.predecessors)
       })
-      .catch(() => { /* non-fatal — arrows just won't render */ })
+      .catch(() => { /* non-fatal â€” arrows just won't render */ })
   }, [jobId])
 
-  // ── Auto-scroll to today on mount ────────────────────────────────────────
+  // â”€â”€ Auto-scroll to today on mount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const container = scrollRef.current
     if (!container || todayLeft === null) return
@@ -353,18 +353,18 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length > 0])
 
-  function barLeft(item: ScheduleItem): number {
+  const barLeft = useCallback((item: ScheduleItem): number => {
     const s = parseDay(item.start_date)
     return Math.max(0, daysBetween(minDate, s)) * PX_PER_DAY
-  }
+  }, [minDate])
 
-  function barRight(item: ScheduleItem): number {
+  const barRight = useCallback((item: ScheduleItem): number => {
     const s = parseDay(item.start_date)
     const e = parseDay(item.end_date)
     const left = Math.max(0, daysBetween(minDate, s)) * PX_PER_DAY
     const width = Math.max(PX_PER_DAY, (daysBetween(s, e) + 1) * PX_PER_DAY)
     return left + width
-  }
+  }, [minDate])
 
   function barStyle(item: ScheduleItem): React.CSSProperties {
     const left = barLeft(item)
@@ -374,7 +374,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
     return { left, width }
   }
 
-  // ── Build SVG arrows for predecessor relationships ────────────────────────
+  // â”€â”€ Build SVG arrows for predecessor relationships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const arrows = useMemo(() => {
     if (!predecessors.length || !items.length) return null
 
@@ -393,7 +393,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
       const toItem   = items[toIdx]
 
       // Compute coordinates based on relationship type
-      let x1: number, y1: number, x2: number, y2: number
+      let x1: number, x2: number
 
       const fromRowTop = RULER_H + fromIdx * ROW_H
       const toRowTop   = RULER_H + toIdx   * ROW_H
@@ -413,8 +413,8 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
         x2 = barLeft(toItem)
       }
 
-      y1 = fromRowTop + BAR_MID_Y
-      y2 = toRowTop   + BAR_MID_Y
+      const y1 = fromRowTop + BAR_MID_Y
+      const y2 = toRowTop   + BAR_MID_Y
 
       const arrowColor = '#94a3b8' // slate-400
       const arrowSize  = 5
@@ -449,7 +449,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
         {paths}
       </svg>
     )
-  }, [predecessors, items, itemIndexMap, totalDays, minDate])
+  }, [predecessors, items, itemIndexMap, totalDays, barLeft, barRight])
 
   return (
     <div className="overflow-x-auto" ref={scrollRef}>
@@ -478,7 +478,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
           })}
         </div>
 
-        {/* Bar chart — fixed pixel width so bars stay legible at any timeline span */}
+        {/* Bar chart â€” fixed pixel width so bars stay legible at any timeline span */}
         <div className="relative shrink-0" style={{ width: totalDays * PX_PER_DAY }}>
           {/* SVG predecessor arrows overlay */}
           {arrows}
@@ -516,7 +516,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
                 <div key={item.id} className="relative h-11 border-b border-gray-50 flex items-center">
                   <div
                     onClick={() => onEdit(item)}
-                    title={`${item.title} · ${fmtShort(parseDay(item.start_date))} (Milestone)`}
+                    title={`${item.title} Â· ${fmtShort(parseDay(item.start_date))} (Milestone)`}
                     className="absolute cursor-pointer hover:opacity-80 transition-opacity"
                     style={{
                       left: diamondLeft - DIAMOND_SIZE / 2,
@@ -543,7 +543,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
               <div key={item.id} className="relative h-11 border-b border-gray-50 flex items-center">
                 <div
                   onClick={() => onEdit(item)}
-                  title={`${item.title} · ${fmtRange(item.start_date, item.end_date)}`}
+                  title={`${item.title} Â· ${fmtRange(item.start_date, item.end_date)}`}
                   className="absolute h-6 rounded cursor-pointer hover:opacity-80 transition-opacity flex items-center overflow-hidden text-white"
                   style={{ ...barStyle(item), backgroundColor: color }}
                 >
@@ -555,7 +555,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
                   )}
                   <span className="absolute inset-0 flex items-center px-2 text-[10px] font-semibold pointer-events-none whitespace-nowrap overflow-hidden">
                     {item.title}
-                    {item.percent_complete > 0 && ` · ${item.percent_complete}%`}
+                    {item.percent_complete > 0 && ` Â· ${item.percent_complete}%`}
                   </span>
                 </div>
               </div>
@@ -567,7 +567,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
   )
 }
 
-// ─── WEEK VIEW ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ WEEK VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
   const [weekStart, setWeekStart] = useState(() => {
@@ -620,7 +620,7 @@ function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
         </button>
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-navy-800">
-            {fmtShort(weekStart)} – {fmtShort(weekEnd)}
+            {fmtShort(weekStart)} â€“ {fmtShort(weekEnd)}
           </span>
           <button
             onClick={goToday}
@@ -705,14 +705,14 @@ function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
   )
 }
 
-// ─── MONTH VIEW ───────────────────────────────────────────────────────────────
-// Spanning bars — each item is a continuous colored bar across its dates,
+// â”€â”€â”€ MONTH VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Spanning bars â€” each item is a continuous colored bar across its dates,
 // stacked into lanes to avoid overlap, matching BuilderTrend calendar style.
 
 const MAX_BAR_SLOTS = 3 // visible event rows per week before "+N more"
-const BAR_H = 18       // px — height of each event bar
-const BAR_GAP = 3      // px — gap between bars
-const DAY_NUM_H = 24   // px — space for day number at top
+const BAR_H = 18       // px â€” height of each event bar
+const BAR_GAP = 3      // px â€” gap between bars
+const DAY_NUM_H = 24   // px â€” space for day number at top
 const WEEK_ROW_MIN = DAY_NUM_H + MAX_BAR_SLOTS * (BAR_H + BAR_GAP) + 8
 
 function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
@@ -724,7 +724,7 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
   const yr   = cursor.getFullYear()
   const mo   = cursor.getMonth()
   const today = new Date()
-  const startPad = new Date(yr, mo, 1).getDay()      // 0–6 (Sun-based)
+  const startPad = new Date(yr, mo, 1).getDay()      // 0â€“6 (Sun-based)
   const daysInMonth = new Date(yr, mo + 1, 0).getDate()
 
   // First cell in the grid (may be in previous month)
@@ -806,7 +806,6 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
             const cE = Math.max(0, Math.min(6, daysBetween(weekStartDate, e)))
 
             let slot = 0
-            // eslint-disable-next-line no-constant-condition
             while (true) {
               if (!slotOcc[slot]) slotOcc[slot] = Array(7).fill(false)
               let conflict = false
@@ -860,7 +859,7 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
                 })}
               </div>
 
-              {/* Event bars — absolutely positioned over the day grid */}
+              {/* Event bars â€” absolutely positioned over the day grid */}
               <div className="absolute inset-x-0 pointer-events-none" style={{ top: DAY_NUM_H }}>
                 {visibleItems.map(item => {
                   const s = parseDay(item.start_date)
@@ -879,7 +878,7 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
                     <button
                       key={item.id}
                       onClick={() => onEdit(item)}
-                      title={`${item.title} · ${fmtRange(item.start_date, item.end_date)}`}
+                      title={`${item.title} Â· ${fmtRange(item.start_date, item.end_date)}`}
                       className="absolute flex items-center text-white text-[10px] font-semibold hover:opacity-80 transition-opacity pointer-events-auto overflow-hidden"
                       style={{
                         top: slotIdx * (BAR_H + BAR_GAP),
@@ -957,7 +956,7 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
   )
 }
 
-// ─── YEAR VIEW ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ YEAR VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function YearView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
   const [year, setYear] = useState(() => new Date().getFullYear())
@@ -1051,7 +1050,7 @@ function YearView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
                 )}
                 <div
                   onClick={() => onEdit(item)}
-                  title={`${item.title} · ${fmtRange(item.start_date, item.end_date)}`}
+                  title={`${item.title} Â· ${fmtRange(item.start_date, item.end_date)}`}
                   className="absolute h-6 rounded cursor-pointer hover:opacity-80 transition-opacity flex items-center overflow-hidden text-white"
                   style={barStyle(item)}
                 >
@@ -1069,7 +1068,7 @@ function YearView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
       {visibleItems.length > 0 && (
         <div className="mt-4 md:hidden space-y-2">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-            {year} · {visibleItems.length} phase{visibleItems.length !== 1 ? 's' : ''}
+            {year} Â· {visibleItems.length} phase{visibleItems.length !== 1 ? 's' : ''}
           </p>
           {visibleItems.map(item => (
             <button
@@ -1093,7 +1092,7 @@ function YearView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
   )
 }
 
-// ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN EXPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Props {
   items: ScheduleItem[]
@@ -1146,7 +1145,7 @@ export function ScheduleList({ items, jobId, canCreate, onAdd, onEdit, onRefresh
     setFilters({ search: '', statuses: [], trades: [] })
   }
 
-  // ── Empty state ──
+  // â”€â”€ Empty state â”€â”€
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-border">
@@ -1170,7 +1169,7 @@ export function ScheduleList({ items, jobId, canCreate, onAdd, onEdit, onRefresh
               onClick={onAdd}
               className="mt-2 text-gold-600 hover:text-gold-700 font-medium text-sm transition-colors"
             >
-              Add the first phase →
+              Add the first phase â†’
             </button>
           )}
         </div>
@@ -1254,7 +1253,7 @@ export function ScheduleList({ items, jobId, canCreate, onAdd, onEdit, onRefresh
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search phases, trades…"
+              placeholder="Search phases, tradesâ€¦"
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
               className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-400 transition-colors"

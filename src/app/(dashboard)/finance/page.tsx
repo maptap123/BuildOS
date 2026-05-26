@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { FinanceDashboardClient } from '@/components/finance'
 import type { FinanceJobRow } from '@/components/finance'
 
-export const metadata = { title: 'Finance Overview — JDC Platform' }
+export const metadata = { title: 'Finance Overview — BuildOS' }
 
 export default async function FinancePage() {
   const supabase = await createClient()

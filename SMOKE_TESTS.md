@@ -69,7 +69,7 @@ Run through this before each release or major deployment. Check off items as you
 
 ## Job Detail (`/jobs/[id]`)
 
-- [ ] Job info card shows address, client, dates, team
+- [ ] Job info card shows address, homeowner, dates, team
 - [ ] Address link opens Google Maps
 - [ ] Recent Logs card shows up to 3 logs or "No logs yet"
 - [ ] Open Tasks card shows tasks or "No open tasks"

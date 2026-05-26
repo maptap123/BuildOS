@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'JDC Platform',
-  description: 'JDC Construction project management',
+  title: 'BuildOS',
+  description: 'JDC Construction operating system',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'JDC Platform',
+    title: 'BuildOS',
   },
 }
 

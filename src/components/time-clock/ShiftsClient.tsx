@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ArrowLeft, CheckCircle, XCircle, Clock, Filter, Download } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Filter } from 'lucide-react'
 import Link from 'next/link'
 import type { TimeEntry } from '@/types'
 

@@ -218,7 +218,7 @@ export default async function COApprovalPage({
 
       {/* Footer */}
       <footer className="py-6 text-center">
-        <p className="text-xs text-gray-400">Powered by JDC Platform</p>
+        <p className="text-xs text-gray-400">Powered by BuildOS</p>
       </footer>
     </div>
   )

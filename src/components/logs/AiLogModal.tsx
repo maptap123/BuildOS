@@ -16,10 +16,44 @@ function todayDate() {
 
 type Step = 'camera' | 'processing' | 'review'
 
+type SpeechRecognitionConstructor = new () => SpeechRecognition
+
+interface SpeechRecognitionAlternative {
+  transcript: string
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean
+  0: SpeechRecognitionAlternative
+}
+
+interface SpeechRecognitionEventLike {
+  resultIndex: number
+  results: {
+    length: number
+    [index: number]: SpeechRecognitionResultLike
+  }
+}
+
+interface SpeechRecognition {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
+interface SpeechRecognitionWindow extends Window {
+  SpeechRecognition?: SpeechRecognitionConstructor
+  webkitSpeechRecognition?: SpeechRecognitionConstructor
+}
+
 export function AiLogModal({ jobId, onClose, onSaved }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldListenRef = useRef(true)
 
   const [step, setStep] = useState<Step>('camera')
@@ -63,7 +97,8 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
   // Speech recognition
   useEffect(() => {
     if (step !== 'camera') return
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const speechWindow = window as SpeechRecognitionWindow
+    const SR = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
     if (!SR) { setSpeechSupported(false); return }
 
     shouldListenRef.current = true
@@ -72,7 +107,7 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
     rec.interimResults = true
     rec.lang = 'en-US'
 
-    rec.onresult = (e: any) => {
+    rec.onresult = (e: SpeechRecognitionEventLike) => {
       let finalChunk = ''
       let interim = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -206,7 +241,7 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
             <line x1="16" y1="16" x2="16" y2="16" />
           </svg>
         </div>
-        <p className="text-white font-display font-bold text-xl mb-1">Hermes is writing…</p>
+        <p className="text-white font-display font-bold text-xl mb-1">Fixer is writing…</p>
         <p className="text-[#4d6a9a] text-sm">Turning your voice into a daily log</p>
         <div className="mt-8 flex gap-2">
           {[0, 1, 2].map(i => (
@@ -264,7 +299,7 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Hermes&apos; draft — edit freely</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Fixer&apos;s draft — edit freely</label>
               <textarea
                 autoFocus
                 value={polished}

@@ -21,7 +21,6 @@ export function useChangeOrders(jobId: string, initial: ChangeOrder[] = []) {
   }, [jobId])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!initial.length) void fetch_()
   }, [fetch_, initial.length])
 

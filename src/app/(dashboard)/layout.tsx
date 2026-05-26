@@ -157,7 +157,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <div className="min-w-0">
               <p className="text-[#d4a83c] text-[10px] font-bold tracking-widest uppercase leading-none mb-0.5">
-                {jobId ? (job?.status ?? '…') : 'JDC Platform'}
+                {jobId ? (job?.status ?? '…') : 'BuildOS'}
               </p>
               <div className="flex items-center gap-1">
                 <span className="font-display text-base font-bold text-white truncate">
@@ -236,7 +236,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
-      {/* Hermes float button — desktop only (mobile uses the home screen button) */}
+      {/* Fixer float button — desktop only (mobile uses the home screen button) */}
       <div className="hidden md:block">
         <HermesChatPanel />
       </div>

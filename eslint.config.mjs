@@ -19,6 +19,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     ".tmp_pdf_lib/**",
+    ".bootstrap-stage-*/**",
     "bt-export/**",
     "tmp_althoff_logs_pages/**",
   ]),

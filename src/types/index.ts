@@ -1,4 +1,4 @@
-// Purpose: Shared TypeScript interfaces that mirror the core Supabase tables for JDC Platform.
+// Purpose: Shared TypeScript interfaces that mirror the core Supabase tables for BuildOS.
 
 export type PermissionModule =
   | "jobs"

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Target, Briefcase, DollarSign, Calendar, CheckSquare,
+  Target, DollarSign, Calendar, CheckSquare,
   FileText, Folder, Users, HardHat, BarChart3, TrendingUp,
   Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList,
 } from 'lucide-react'

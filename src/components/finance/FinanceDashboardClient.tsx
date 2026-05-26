@@ -24,6 +24,9 @@ export interface FinanceDashboardClientProps {
 
 type StatusFilter = 'all' | 'active' | 'completed'
 
+const COMPLETED_STATUSES: JobStatus[] = ['closed', 'archived']
+const ACTIVE_STATUSES: JobStatus[] = ['lead', 'presale', 'active', 'warranty']
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>
@@ -238,9 +241,6 @@ function JobsTable({ jobs }: { jobs: FinanceJobRow[] }) {
 
 export function FinanceDashboardClient({ jobs }: FinanceDashboardClientProps) {
   const [filter, setFilter] = useState<StatusFilter>('active')
-
-  const COMPLETED_STATUSES: JobStatus[] = ['closed', 'archived']
-  const ACTIVE_STATUSES: JobStatus[]    = ['lead', 'presale', 'active', 'warranty']
 
   const filtered = useMemo(() => {
     if (filter === 'all')       return jobs

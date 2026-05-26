@@ -1,6 +1,6 @@
 {
-  "name": "JDC Platform",
-  "short_name": "JDC",
+  "name": "BuildOS",
+  "short_name": "BuildOS",
   "description": "JDC Construction project management",
   "start_url": "/jobs",
   "display": "standalone",

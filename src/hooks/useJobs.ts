@@ -42,7 +42,6 @@ export function useJobs({ statuses, search, tags, manager_id }: UseJobsOptions =
   }, [statuses?.join(','), search, tags?.join(','), manager_id])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchJobs()
   }, [fetchJobs])
 

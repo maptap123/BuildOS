@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
   const jobId = searchParams.get('job_id')
-  const module = searchParams.get('module')
+  const documentModule = searchParams.get('module')
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   let query = supabase.from('documents').select('*').order('created_at', { ascending: false })
   if (jobId) query = query.eq('job_id', jobId)
-  if (module) query = query.eq('module', module)
+  if (documentModule) query = query.eq('module', documentModule)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const body = await request.json()
   const {
     job_id,
-    module,
+    module: documentModule,
     related_record_id,
     file_name,
     file_path,
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     storage_bucket,
   } = body
 
-  if (!module || !file_name || !file_path || !file_type || file_size == null) {
+  if (!documentModule || !file_name || !file_path || !file_type || file_size == null) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     .from('documents')
     .insert({
       job_id: job_id ?? null,
-      module,
+      module: documentModule,
       related_record_id: related_record_id ?? null,
       file_name,
       file_path,

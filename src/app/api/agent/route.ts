@@ -263,7 +263,7 @@ export async function POST(request: Request) {
             job_id: params.job_id,
             log_date: params.log_date ?? new Date().toISOString().slice(0, 10),
             logged_at: new Date().toISOString(),
-            author_name: userRow?.full_name || 'Hermes',
+            author_name: userRow?.full_name || 'Fixer',
             work_performed: String(params.work_performed).trim(),
             weather_summary: trimOrNull(params.weather_summary),
             temperature_high: params.temperature_high ?? null,

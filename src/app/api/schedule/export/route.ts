@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
   const ical = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//JDC Platform//BuildOS//EN',
+    'PRODID:-//JDC Construction//BuildOS//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcal(jobName)} Schedule`,

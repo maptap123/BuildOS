@@ -205,7 +205,7 @@ export default async function PrintChangeOrderPage({
             <> Original contract amount: {fmt(job.contract_amount)}.</>
           )}
           <br />
-          JDC Construction — JDC Platform
+          JDC Construction — BuildOS
         </footer>
       </body>
     </html>
