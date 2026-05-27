@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Bot, FileText, Calendar, Clock, Folder, ChevronRight, CheckSquare, AlertCircle } from 'lucide-react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useAgenda } from '@/hooks/useAgenda'
+import { useActiveJob } from '@/contexts/ActiveJobContext'
 import { LogModePicker } from './LogModePicker'
-import { JobPickerSheet } from '@/components/jobs/JobPickerSheet'
 import type { Job } from '@/types'
 
+// Props kept for backward compatibility but jobId/jobName are now sourced from context
 interface Props {
-  jobId: string | null
-  jobName: string | null
+  jobId?: string | null
+  jobName?: string | null
 }
 
 function greeting() {
@@ -30,22 +31,31 @@ function firstName(name: string | null | undefined): string {
   return name.split(' ')[0]
 }
 
-export function MobileHome({ jobId, jobName }: Props) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function MobileHome(_props: Props) {
   const router = useRouter()
   const { user } = useCurrentUser()
   const agenda = useAgenda()
 
+  // Active job context — shared with layout picker, persisted across boots
+  const { activeJob, activeJobId } = useActiveJob()
+  const jobId = activeJobId
+  const jobName = activeJob?.name ?? null
+
   const [logPickerOpen, setLogPickerOpen] = useState(false)
   const [hermesForcedOpen, setHermesForcedOpen] = useState(false)
-  const [jobPickerAction, setJobPickerAction] = useState(false)
 
   const totalAlerts = agenda.past_due.length + agenda.due_today.length
 
   function handleSchedule() {
+    // If we have an active job context, go directly — no picker needed
     if (jobId) {
       router.push(`/jobs/${jobId}/schedule`)
     } else {
-      setJobPickerAction(true)
+      // No active job set yet — the layout top-bar picker handles this;
+      // the user can tap the job name in the header to pick a job first.
+      // As a fallback, go to All Jobs so they can pick from there.
+      router.push('/jobs')
     }
   }
 
@@ -53,9 +63,10 @@ export function MobileHome({ jobId, jobName }: Props) {
     router.push('/documents')
   }
 
-  function handleJobPickerSelect(job: Job) {
-    setJobPickerAction(false)
-    router.push(`/jobs/${job.id}/schedule`)
+  // handleJobPickerSelect no longer needed — context picker is in the layout header
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function _handleJobPickerSelect(_job: Job) {
+    // kept as dead code placeholder; remove in next refactor
   }
 
   return (
@@ -292,7 +303,7 @@ export function MobileHome({ jobId, jobName }: Props) {
             ))}
             {(agenda.past_due.length + agenda.due_today.length) > 6 && (
               <button
-                onClick={() => router.push(jobId ? `/jobs/${jobId}/tasks` : '/jobs?selectJob=tasks')}
+                onClick={() => router.push(jobId ? `/jobs/${jobId}/tasks` : '/jobs')}
                 className="w-full text-center py-3 text-sm font-semibold text-[#1b2b4a]"
               >
                 View all {agenda.past_due.length + agenda.due_today.length} tasks →
@@ -334,15 +345,6 @@ export function MobileHome({ jobId, jobName }: Props) {
         <LogModePicker
           jobId={jobId}
           onClose={() => setLogPickerOpen(false)}
-        />
-      )}
-
-      {/* Job picker for schedule when no job selected */}
-      {jobPickerAction && (
-        <JobPickerSheet
-          onClose={() => setJobPickerAction(false)}
-          currentJobId={null}
-          onSelect={handleJobPickerSelect}
         />
       )}
 

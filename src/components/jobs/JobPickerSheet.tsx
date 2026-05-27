@@ -21,9 +21,11 @@ interface Props {
   onClose: () => void
   currentJobId?: string | null
   onSelect?: (job: Job) => void
+  /** Called when the user picks "All Jobs" — use to clear active context and/or navigate */
+  onSelectAllJobs?: () => void
 }
 
-export function JobPickerSheet({ onClose, currentJobId, onSelect }: Props) {
+export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJobs }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState<JobStatus[]>([])
@@ -269,7 +271,7 @@ export function JobPickerSheet({ onClose, currentJobId, onSelect }: Props) {
 
           {/* All Jobs */}
           <button
-            onClick={() => select('/jobs')}
+            onClick={() => onSelectAllJobs ? onSelectAllJobs() : select('/jobs')}
             className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
               !currentJobId ? 'bg-gold-50' : ''
             }`}

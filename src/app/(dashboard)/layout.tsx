@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -14,6 +14,8 @@ import { useJob } from '@/hooks/useJob'
 import { usePermissions } from '@/hooks/usePermissions'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
 import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
+import { ActiveJobProvider, useActiveJob } from '@/contexts/ActiveJobContext'
+import type { Job } from '@/types'
 
 // ── Desktop top tabs (unchanged) ─────────────────────────────────────────────
 const TABS = [
@@ -46,16 +48,51 @@ const MOBILE_NAV = [
   { key: 'more',       label: 'More',       icon: Grid3X3    },
 ]
 
+// ── Outer shell — just wraps with the context provider ───────────────────────
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ActiveJobProvider>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </ActiveJobProvider>
+  )
+}
+
+// ── Inner layout — consumes the active job context ────────────────────────────
+function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerFor, setPickerFor] = useState<string | null>(null)
 
-  const segments = pathname.split('/').filter(Boolean)
-  const jobId = segments[0] === 'jobs' && segments[1] ? segments[1] : null
+  // Active job context (persisted, shared across all mobile components)
+  const { activeJob, activeJobId, setActiveJob, clearActiveJob } = useActiveJob()
 
-  const { job } = useJob(jobId)
+  // Job ID from the current URL (e.g. /jobs/abc123/schedule → "abc123")
+  const segments = pathname.split('/').filter(Boolean)
+  const urlJobId = segments[0] === 'jobs' && segments[1] && segments[1] !== 'list'
+    ? segments[1]
+    : null
+
+  // Effective job ID: URL-based job takes precedence; fall back to persisted context
+  const effectiveJobId = urlJobId || activeJobId
+
+  // Fetch job data for whichever job is "effective" (used for mobile header + desktop name)
+  const { job } = useJob(effectiveJobId)
+
+  // When the user navigates to a specific job URL, sync it to the active context
+  useEffect(() => {
+    if (urlJobId && job && job.id === urlJobId) {
+      setActiveJob({
+        id: job.id,
+        name: job.name,
+        job_number: job.job_number ?? '',
+        status: job.status,
+        client_name: null,
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlJobId, job?.id])
+
   const { can, isAdmin } = usePermissions()
 
   const canManageOffice = isAdmin() || can('jobs', 'create') || can('jobs', 'edit')
@@ -96,29 +133,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (key === 'vendors')    return '/vendors'
     if (key === 'contacts')   return '/contacts'
     if (key === 'documents')  return '/documents'
-    if (!jobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
-    if (!jobId) return '/jobs'
-    return `/jobs/${jobId}/${key}`
+    if (!urlJobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
+    if (!urlJobId) return '/jobs'
+    return `/jobs/${urlJobId}/${key}`
   }
 
   function isActiveDesktop(key: string): boolean {
     if (key === 'leads')      return pathname.startsWith('/leads')
-    if (key === 'jobs')       return pathname === '/jobs' || (!!jobId && segments.length === 2)
+    if (key === 'jobs')       return pathname === '/jobs' || (!!urlJobId && segments.length === 2)
     if (key === 'finance')    return pathname.startsWith('/finance')
     if (key === 'admin')      return pathname.startsWith('/admin')
     if (key === 'time-clock') return pathname.startsWith('/time-clock')
     if (key === 'vendors')    return pathname.startsWith('/vendors')
     if (key === 'contacts')   return pathname.startsWith('/contacts')
     if (key === 'documents')  return pathname.startsWith('/documents')
-    if (!jobId) return false
-    return pathname.startsWith(`/jobs/${jobId}/${key}`)
+    if (!urlJobId) return false
+    return pathname.startsWith(`/jobs/${urlJobId}/${key}`)
   }
 
   // ── Mobile tab routing ────────────────────────────────────────────────────
+  // Uses effectiveJobId (URL job OR persisted active job) so tabs work
+  // without requiring navigation to a specific job URL first.
   function mobileTabHref(key: string): string | null {
     if (key === 'home')       return '/jobs'
-    if (key === 'jobs')       return null // opens picker
-    if (key === 'tasks')      return jobId ? `/jobs/${jobId}/tasks` : null // null → opens picker
+    if (key === 'jobs')       return null  // always opens the context picker
+    if (key === 'tasks')      return effectiveJobId ? `/jobs/${effectiveJobId}/tasks` : null
     if (key === 'time-clock') return '/time-clock'
     if (key === 'more')       return '/more'
     return null
@@ -133,11 +172,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return false
   }
 
+  // ── Picker: job selected ──────────────────────────────────────────────────
+  function handlePickerSelect(job: Job) {
+    // Always update the persistent active job context
+    setActiveJob({
+      id: job.id,
+      name: job.name,
+      job_number: (job as { job_number?: string }).job_number ?? '',
+      status: job.status,
+      client_name: (job as { client_name?: string | null }).client_name ?? null,
+    })
+    setPickerOpen(false)
+    // If there was a destination intent (e.g. Tasks tab → picker), navigate there
+    if (pickerFor) {
+      router.push(`/jobs/${job.id}/${pickerFor}`)
+    }
+    // If no pickerFor (Jobs tab context picker): stay on the current page ✓
+    setPickerFor(null)
+  }
+
+  // ── Picker: "All Jobs" selected ───────────────────────────────────────────
+  function handlePickerAllJobs() {
+    clearActiveJob()
+    setPickerOpen(false)
+    setPickerFor(null)
+    router.push('/jobs')
+  }
+
   return (
     <div className="flex h-full min-h-screen">
 
       {/* ── Desktop: permanent left job panel ── */}
-      <DesktopJobPanel currentJobId={jobId} />
+      <DesktopJobPanel currentJobId={urlJobId} />
 
       {/* ── Right side: top bar + content ── */}
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen min-w-0">
@@ -163,7 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )
           })}
 
-          {jobId && (
+          {urlJobId && (
             <div className="ml-auto flex items-center gap-2 py-2">
               <span className="text-xs text-gray-400 truncate max-w-[180px]">
                 {job?.name ?? '…'}
@@ -175,7 +241,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </nav>
 
-        {/* Mobile top bar */}
+        {/* ── Mobile top bar ──
+            Shows the effective job context (persisted active job or URL job).
+            Tap anywhere to open the context picker.
+        ── */}
         <header className="md:hidden bg-[#1b2b4a] px-4 py-3 flex items-center justify-between shrink-0">
           <button
             onClick={() => setPickerOpen(true)}
@@ -183,11 +252,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <div className="min-w-0">
               <p className="text-[#d4a83c] text-[10px] font-bold tracking-widest uppercase leading-none mb-0.5">
-                {jobId ? (job?.status ?? '…') : 'BuildOS'}
+                {effectiveJobId
+                  ? (job?.status ?? activeJob?.status ?? '…')
+                  : 'BuildOS'}
               </p>
               <div className="flex items-center gap-1">
                 <span className="font-display text-base font-bold text-white truncate">
-                  {jobId ? (job?.name ?? '…') : 'All Jobs'}
+                  {effectiveJobId
+                    ? (job?.name ?? activeJob?.name ?? '…')
+                    : 'All Jobs'}
                 </span>
                 <ChevronDown size={14} className="text-[#d4a83c] shrink-0" />
               </div>
@@ -219,12 +292,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const href = mobileTabHref(key)
             const active = isActiveMobile(key)
 
-            // Tabs with no href open the job picker (with optional destination intent)
+            // Tabs with no href open the job context picker
             if (href === null) {
               return (
                 <button
                   key={key}
-                  onClick={() => { setPickerFor(key === 'jobs' ? null : key); setPickerOpen(true) }}
+                  onClick={() => {
+                    // For destination-intent tabs (tasks), store the destination
+                    if (key !== 'jobs') setPickerFor(key)
+                    setPickerOpen(true)
+                  }}
                   className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors text-[#3a5280] hover:text-white"
                 >
                   <Icon size={22} />
@@ -249,16 +326,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </div>
 
-      {/* Mobile job picker sheet */}
+      {/* ── Mobile job context picker ──
+          - Selecting a job: sets active context, stays on current page
+            (unless pickerFor is set, in which case it also navigates)
+          - Selecting "All Jobs": clears context, navigates to /jobs
+      ── */}
       {pickerOpen && (
         <JobPickerSheet
           onClose={() => { setPickerOpen(false); setPickerFor(null) }}
-          currentJobId={jobId}
-          onSelect={pickerFor ? (job) => {
-            setPickerOpen(false)
-            setPickerFor(null)
-            router.push(`/jobs/${job.id}/${pickerFor}`)
-          } : undefined}
+          currentJobId={effectiveJobId}
+          onSelect={handlePickerSelect}
+          onSelectAllJobs={handlePickerAllJobs}
         />
       )}
 
