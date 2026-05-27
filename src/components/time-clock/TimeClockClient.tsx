@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Clock, Play, Square, MapPin, MapPinOff, ChevronRight,
-  CheckCircle, XCircle, AlertCircle, Loader2,
+  CheckCircle, XCircle, AlertCircle, Loader2, Pencil, X,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useActiveJob } from '@/contexts/ActiveJobContext'
 import type { TimeEntry } from '@/types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -28,7 +29,8 @@ interface EntryWithJob extends TimeEntry {
   job?: { id: string; name: string } | null
 }
 
-type Step = 'idle' | 'picking-job' | 'picking-code' | 'active' | 'clocking-out'
+// No more 'picking-code' — cost code is set after clock-in
+type Step = 'idle' | 'picking-job' | 'active' | 'clocking-out'
 
 type LocStatus = 'idle' | 'requesting' | 'captured' | 'denied' | 'unavailable' | 'skipped'
 interface LocState {
@@ -100,6 +102,14 @@ function sumHours(entries: EntryWithJob[]): number {
   return entries.reduce((sum, e) => sum + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0)
 }
 
+// Normalise any non-final LocState to 'skipped' before writing to the DB
+function finalLoc(loc: LocState): LocState {
+  if (loc.status === 'captured' || loc.status === 'denied' || loc.status === 'unavailable') {
+    return loc
+  }
+  return { status: 'skipped' }
+}
+
 // ─── GPS helper ───────────────────────────────────────────────────────────────
 
 function captureLocation(timeoutMs = 9000): Promise<LocState> {
@@ -154,8 +164,61 @@ function LocationBadge({ status }: { status: LocStatus | string | null }) {
       </span>
     )
   }
-  // unavailable / skipped / null / idle — show nothing
   return null
+}
+
+// ─── CostCodeSheet ────────────────────────────────────────────────────────────
+// Reusable bottom sheet for selecting (or clearing) a cost code
+
+interface CostCodeSheetProps {
+  current: string | null
+  saving?: boolean
+  onSelect: (code: string) => void
+  onClose: () => void
+}
+
+function CostCodeSheet({ current, saving, onSelect, onClose }: CostCodeSheetProps) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[80vh] flex flex-col">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pb-3 shrink-0">
+          <h3 className="font-display font-bold text-navy-900 text-base">Cost Code</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <X size={20} />
+          </button>
+        </div>
+        {/* Options */}
+        <div className="overflow-y-auto flex-1 divide-y divide-gray-100 pb-8">
+          {/* Clear/none */}
+          <button
+            onClick={() => onSelect('')}
+            disabled={saving}
+            className={`w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between disabled:opacity-50 ${!current ? 'bg-gold-50' : ''}`}
+          >
+            <span className="text-sm text-gray-400 italic">No cost code</span>
+            {!current && <div className="w-2 h-2 rounded-full bg-gold-500" />}
+          </button>
+          {COST_CODES.map((code) => (
+            <button
+              key={code}
+              onClick={() => onSelect(code)}
+              disabled={saving}
+              className={`w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between disabled:opacity-50 ${current === code ? 'bg-gold-50' : ''}`}
+            >
+              <span className="text-sm font-medium text-navy-900">{code}</span>
+              {current === code && <div className="w-2 h-2 rounded-full bg-gold-500" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -168,6 +231,9 @@ export function TimeClockClient({
   isAdmin,
   weekTotalHours,
 }: Props) {
+  // Active job context — shared with the layout picker
+  const { activeJob, activeJobId } = useActiveJob()
+
   const [entries, setEntries] = useState<EntryWithJob[]>(initialEntries)
   const [step, setStep] = useState<Step>(() =>
     initialEntries.find((e) => !e.clock_out) ? 'active' : 'idle',
@@ -176,17 +242,23 @@ export function TimeClockClient({
     () => initialEntries.find((e) => !e.clock_out) ?? null,
   )
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
-  const [selectedCode, setSelectedCode] = useState('')
   const [jobSearch, setJobSearch] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Clock-out form state
+
+  // Clock-out form
   const [breakMinutes, setBreakMinutes] = useState(0)
   const [clockOutNotes, setClockOutNotes] = useState('')
-  // GPS state
+
+  // GPS
   const [clockInLoc, setClockInLoc] = useState<LocState>({ status: 'idle' })
   const [clockOutLoc, setClockOutLoc] = useState<LocState>({ status: 'idle' })
+
+  // Cost code editing
+  const [editingCostCode, setEditingCostCode] = useState(false)     // on active entry
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null) // on a completed entry
+  const [savingCode, setSavingCode] = useState(false)
 
   // ── Live timer ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -211,35 +283,15 @@ export function TimeClockClient({
     return null
   }, [currentUserId])
 
-  // ── Start clock-in flow ─────────────────────────────────────────────────────
-  function startClockInFlow() {
-    setStep('picking-job')
-    setSelectedJob(null)
-    setSelectedCode('')
-    setJobSearch('')
-    setClockInLoc({ status: 'requesting' })
-    captureLocation().then(setClockInLoc)
-  }
-
-  // ── Start clock-out form ────────────────────────────────────────────────────
-  function startClockOutFlow() {
-    setBreakMinutes(0)
-    setClockOutNotes('')
-    setStep('clocking-out')
-    setClockOutLoc({ status: 'requesting' })
-    captureLocation().then(setClockOutLoc)
-  }
-
   // ── Clock In ────────────────────────────────────────────────────────────────
-  async function clockIn(code: string) {
-    if (!selectedJob) return
+  // Takes the job explicitly — no more picking a code first.
+  async function clockIn(job: Job, code: string) {
     setLoading(true)
     setError(null)
     try {
-      const loc: LocState =
-        clockInLoc.status === 'requesting' ? { status: 'skipped' } : clockInLoc
+      const loc = finalLoc(clockInLoc)
       const body: Record<string, unknown> = {
-        job_id: selectedJob.id,
+        job_id: job.id,
         clock_in: new Date().toISOString(),
         cost_code: code || null,
         location_status: loc.status,
@@ -264,8 +316,73 @@ export function TimeClockClient({
       setClockInLoc({ status: 'idle' })
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Clock in failed')
+      setStep('idle')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ── Start clock-in flow ─────────────────────────────────────────────────────
+  // Active job context → clock in immediately (no picker, no code step).
+  // No context → show job picker.
+  function startClockInFlow() {
+    // Always kick off GPS in background
+    setClockInLoc({ status: 'requesting' })
+    captureLocation().then(setClockInLoc)
+
+    if (activeJobId && activeJob) {
+      const job: Job = {
+        id: activeJobId,
+        name: activeJob.name,
+        job_number: activeJob.job_number,
+        status: activeJob.status,
+      }
+      setSelectedJob(job)
+      clockIn(job, '')
+    } else {
+      // No active job — show picker
+      setStep('picking-job')
+      setSelectedJob(null)
+      setJobSearch('')
+    }
+  }
+
+  // ── Open job picker to change the job (from idle or from "Change" link) ─────
+  function openJobPicker() {
+    setStep('picking-job')
+    setJobSearch('')
+    // Start GPS now so it's ready when the user picks
+    setClockInLoc({ status: 'requesting' })
+    captureLocation().then(setClockInLoc)
+  }
+
+  // ── Start clock-out form ────────────────────────────────────────────────────
+  function startClockOutFlow() {
+    setBreakMinutes(0)
+    setClockOutNotes('')
+    setStep('clocking-out')
+    setClockOutLoc({ status: 'requesting' })
+    captureLocation().then(setClockOutLoc)
+  }
+
+  // ── Update cost code on any entry ───────────────────────────────────────────
+  async function updateCostCode(entryId: string, code: string) {
+    setSavingCode(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/time-entries/${entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cost_code: code || null }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Update failed')
+      await refresh()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSavingCode(false)
+      setEditingCostCode(false)
+      setEditingShiftId(null)
     }
   }
 
@@ -280,8 +397,7 @@ export function TimeClockClient({
     setLoading(true)
     setError(null)
     try {
-      const loc: LocState =
-        opts.loc.status === 'requesting' ? { status: 'skipped' } : opts.loc
+      const loc = finalLoc(opts.loc)
       const body: Record<string, unknown> = {
         clock_out: new Date().toISOString(),
         break_minutes: opts.breakMins,
@@ -300,10 +416,9 @@ export function TimeClockClient({
       if (!res.ok) throw new Error((await res.json()).error ?? 'Clock out failed')
       await refresh()
       if (opts.thenSwitch) {
-        // Immediately start new job flow after switching
+        // Switch job: immediately start a new clock-in flow
         setStep('picking-job')
         setSelectedJob(null)
-        setSelectedCode('')
         setJobSearch('')
         setClockInLoc({ status: 'requesting' })
         captureLocation().then(setClockInLoc)
@@ -322,7 +437,7 @@ export function TimeClockClient({
     }
   }
 
-  // ── Switch job: silently close current shift, then start new ────────────────
+  // ── Switch job ──────────────────────────────────────────────────────────────
   async function switchJob() {
     await performClockOut({
       breakMins: 0,
@@ -408,15 +523,35 @@ export function TimeClockClient({
             </span>
           </div>
 
-          {/* Job & cost code */}
+          {/* Job name + cost code (editable while active) */}
           <div>
             <p className="font-semibold text-white text-lg leading-tight">
               {activeEntry.job?.name ?? 'Unknown Job'}
             </p>
-            {activeEntry.cost_code ? (
-              <p className="text-gold-400 text-sm mt-0.5">{activeEntry.cost_code}</p>
+
+            {step === 'active' ? (
+              /* Tappable cost code row */
+              <button
+                onClick={() => setEditingCostCode(true)}
+                className="flex items-center gap-1.5 mt-1 group"
+              >
+                {activeEntry.cost_code ? (
+                  <span className="text-gold-400 text-sm">{activeEntry.cost_code}</span>
+                ) : (
+                  <span className="text-navy-400 text-sm italic">Tap to add cost code</span>
+                )}
+                <Pencil
+                  size={11}
+                  className="text-navy-600 group-hover:text-navy-300 transition-colors shrink-0"
+                />
+              </button>
             ) : (
-              <p className="text-navy-400 text-sm mt-0.5">No cost code</p>
+              /* During clock-out form: show but still editable via sheet */
+              activeEntry.cost_code ? (
+                <p className="text-gold-400 text-sm mt-0.5">{activeEntry.cost_code}</p>
+              ) : (
+                <p className="text-navy-400 text-sm mt-0.5 italic">No cost code</p>
+              )
             )}
           </div>
 
@@ -458,6 +593,23 @@ export function TimeClockClient({
           {step === 'clocking-out' && (
             <div className="space-y-4 pt-3 border-t border-navy-700">
               <p className="text-sm font-bold text-navy-200">Clock Out Details</p>
+
+              {/* Cost code — review/edit before confirming */}
+              <div>
+                <label className="text-xs text-navy-400 font-medium mb-1.5 block">
+                  Cost code
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setEditingCostCode(true)}
+                  className="w-full flex items-center justify-between bg-navy-800 border border-navy-600 rounded-xl px-3 py-2.5 hover:border-gold-400 transition-colors"
+                >
+                  <span className={`text-sm ${activeEntry.cost_code ? 'text-white' : 'text-navy-400 italic'}`}>
+                    {activeEntry.cost_code || 'No cost code — tap to add'}
+                  </span>
+                  <Pencil size={13} className="text-navy-400 shrink-0" />
+                </button>
+              </div>
 
               {/* Break time */}
               <div>
@@ -502,7 +654,7 @@ export function TimeClockClient({
                 <LocationBadge status={clockOutLoc.status} />
               </div>
 
-              {/* Confirm button */}
+              {/* Confirm */}
               <button
                 onClick={() =>
                   performClockOut({
@@ -537,27 +689,63 @@ export function TimeClockClient({
       )}
 
       {/* ──────────────────────────────────────────────
-          IDLE: Big Clock In button
+          IDLE: Clock In
+          If active job context is set, show it above the button.
+          Tapping Clock In clocks in immediately — no pickers.
           ────────────────────────────────────────────── */}
       {step === 'idle' && (
-        <button
-          onClick={startClockInFlow}
-          className="w-full flex items-center justify-center gap-3 bg-gold-500 hover:bg-gold-600 active:bg-gold-700 text-navy-900 font-black text-2xl py-7 rounded-2xl transition-colors shadow-sm select-none"
-        >
-          <Play size={28} fill="currentColor" />
-          Clock In
-        </button>
+        <div className="space-y-3">
+
+          {/* Active job context — shown when a job is already selected */}
+          {activeJobId && activeJob ? (
+            <div className="flex items-center justify-between bg-white border border-border rounded-xl px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                  Clocking in to
+                </p>
+                <p className="font-semibold text-navy-900 truncate">{activeJob.name}</p>
+              </div>
+              <button
+                onClick={openJobPicker}
+                className="text-sm font-medium text-navy-500 hover:text-navy-900 transition-colors shrink-0 ml-4"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <p className="text-center text-xs text-gray-400 pb-1">
+              You&apos;ll be asked to select a job
+            </p>
+          )}
+
+          <button
+            onClick={startClockInFlow}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-gold-500 hover:bg-gold-600 active:bg-gold-700 text-navy-900 font-black text-2xl py-7 rounded-2xl transition-colors shadow-sm select-none disabled:opacity-60"
+          >
+            {loading ? (
+              <Loader2 size={28} className="animate-spin" />
+            ) : (
+              <>
+                <Play size={28} fill="currentColor" />
+                Clock In
+              </>
+            )}
+          </button>
+        </div>
       )}
 
       {/* ──────────────────────────────────────────────
           PICK JOB
+          Shown when no active context, or user tapped "Change".
+          Selecting a job clocks in immediately — no code step.
           ────────────────────────────────────────────── */}
       {step === 'picking-job' && (
         <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
           <div className="px-4 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h2 className="font-bold text-navy-900 text-base">Select Job</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Which job are you working on?</p>
+              <p className="text-xs text-gray-400 mt-0.5">Which job are you clocking in to?</p>
             </div>
             <button
               onClick={() => setStep('idle')}
@@ -589,81 +777,34 @@ export function TimeClockClient({
                 key={job.id}
                 onClick={() => {
                   setSelectedJob(job)
-                  setStep('picking-code')
+                  clockIn(job, '')
                 }}
-                className="w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between gap-3"
+                disabled={loading}
+                className={`w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between gap-3 disabled:opacity-50 ${
+                  job.id === activeJobId ? 'bg-gold-50' : ''
+                }`}
               >
                 <div className="min-w-0">
                   <p className="font-semibold text-navy-900 truncate">{job.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{job.job_number}</p>
                 </div>
-                <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                <div className="flex items-center gap-2 shrink-0">
+                  {job.id === activeJobId && (
+                    <span className="text-[10px] font-bold text-gold-600 bg-gold-50 px-2 py-0.5 rounded-full border border-gold-200">
+                      Context
+                    </span>
+                  )}
+                  {loading && selectedJob?.id === job.id ? (
+                    <Loader2 size={15} className="text-navy-400 animate-spin" />
+                  ) : (
+                    <ChevronRight size={16} className="text-gray-300" />
+                  )}
+                </div>
               </button>
             ))}
           </div>
 
-          {/* Location status footer */}
-          <div className="px-4 py-3 border-t border-border bg-gray-50 flex items-center justify-between text-xs text-gray-400">
-            <span>Clock-in location:</span>
-            <LocationBadge status={clockInLoc.status} />
-          </div>
-        </div>
-      )}
-
-      {/* ──────────────────────────────────────────────
-          PICK COST CODE
-          ────────────────────────────────────────────── */}
-      {step === 'picking-code' && selectedJob && (
-        <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-4 py-4 border-b border-border flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-navy-900 text-base">Cost Code</h2>
-              <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">
-                {selectedJob.name}
-              </p>
-            </div>
-            <button
-              onClick={() => setStep('picking-job')}
-              className="text-sm text-navy-600 hover:text-navy-900 font-medium"
-            >
-              ← Back
-            </button>
-          </div>
-
-          <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-            {/* Skip option */}
-            <button
-              onClick={() => clockIn('')}
-              disabled={loading}
-              className="w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 flex items-center justify-between"
-            >
-              <span className="text-sm text-gray-400 italic">
-                Skip — no cost code
-              </span>
-              {loading && selectedCode === '' && (
-                <Loader2 size={14} className="text-navy-400 animate-spin" />
-              )}
-            </button>
-
-            {COST_CODES.map((code) => (
-              <button
-                key={code}
-                onClick={() => {
-                  setSelectedCode(code)
-                  clockIn(code)
-                }}
-                disabled={loading}
-                className="w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between disabled:opacity-50"
-              >
-                <span className="text-sm font-medium text-navy-900">{code}</span>
-                {loading && selectedCode === code && (
-                  <Loader2 size={14} className="text-navy-400 animate-spin" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Location status footer */}
+          {/* GPS status footer */}
           <div className="px-4 py-3 border-t border-border bg-gray-50 flex items-center justify-between text-xs text-gray-400">
             <span>Clock-in location:</span>
             <LocationBadge status={clockInLoc.status} />
@@ -673,6 +814,7 @@ export function TimeClockClient({
 
       {/* ──────────────────────────────────────────────
           TODAY'S COMPLETED SHIFTS
+          Cost code is editable inline with the pencil icon.
           ────────────────────────────────────────────── */}
       {completedToday.length > 0 && (
         <div>
@@ -686,47 +828,63 @@ export function TimeClockClient({
               return (
                 <div
                   key={entry.id}
-                  className="bg-white border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                  className="bg-white border border-border rounded-xl px-4 py-3"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-navy-900 truncate">
-                      {entry.job?.name ?? '—'}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {formatTime(entry.clock_in)} – {formatTime(entry.clock_out!)}
-                      {entry.cost_code && (
-                        <span className="ml-2 text-navy-500">{entry.cost_code}</span>
-                      )}
-                      {entry.break_minutes > 0 && (
-                        <span className="ml-2 text-gray-400">
-                          {entry.break_minutes}m break
-                        </span>
-                      )}
-                    </p>
-                    {entry.notes && (
-                      <p className="text-xs text-gray-400 italic mt-0.5 truncate">
-                        {entry.notes}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-navy-900 truncate">
+                        {entry.job?.name ?? '—'}
                       </p>
-                    )}
-                  </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {formatTime(entry.clock_in)} – {formatTime(entry.clock_out!)}
+                        {entry.break_minutes > 0 && (
+                          <span className="ml-2">{entry.break_minutes}m break</span>
+                        )}
+                      </p>
 
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-navy-900">{hrs.toFixed(2)}h</p>
-                    {hasOT && (
-                      <p className="text-[10px] text-amber-600 mt-0.5">
-                        +{(entry.overtime_hours ?? 0).toFixed(2)}h OT
-                      </p>
-                    )}
-                    <div className="flex justify-end mt-1">
-                      {entry.approval_status === 'approved' && (
-                        <CheckCircle size={13} className="text-green-500" />
+                      {/* Cost code — always shown, always tappable to edit */}
+                      <button
+                        onClick={() => setEditingShiftId(entry.id)}
+                        className="flex items-center gap-1 mt-1.5 group"
+                      >
+                        {entry.cost_code ? (
+                          <span className="text-xs font-medium text-navy-600">
+                            {entry.cost_code}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Add cost code</span>
+                        )}
+                        <Pencil
+                          size={10}
+                          className="text-gray-300 group-hover:text-navy-400 transition-colors"
+                        />
+                      </button>
+
+                      {entry.notes && (
+                        <p className="text-xs text-gray-400 italic mt-0.5 truncate">
+                          {entry.notes}
+                        </p>
                       )}
-                      {entry.approval_status === 'rejected' && (
-                        <XCircle size={13} className="text-red-500" />
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-navy-900">{hrs.toFixed(2)}h</p>
+                      {hasOT && (
+                        <p className="text-[10px] text-amber-600 mt-0.5">
+                          +{(entry.overtime_hours ?? 0).toFixed(2)}h OT
+                        </p>
                       )}
-                      {entry.approval_status === 'pending' && (
-                        <Clock size={13} className="text-amber-400" />
-                      )}
+                      <div className="flex justify-end mt-1">
+                        {entry.approval_status === 'approved' && (
+                          <CheckCircle size={13} className="text-green-500" />
+                        )}
+                        {entry.approval_status === 'rejected' && (
+                          <XCircle size={13} className="text-red-500" />
+                        )}
+                        {entry.approval_status === 'pending' && (
+                          <Clock size={13} className="text-amber-400" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -743,6 +901,28 @@ export function TimeClockClient({
           <p className="text-sm font-semibold text-gray-500">No shifts today</p>
           <p className="text-xs text-gray-400 mt-1">Tap Clock In to start your shift</p>
         </div>
+      )}
+
+      {/* ── Cost code sheet — active entry ── */}
+      {editingCostCode && activeEntry && (
+        <CostCodeSheet
+          current={activeEntry.cost_code ?? null}
+          saving={savingCode}
+          onSelect={(code) => updateCostCode(activeEntry.id, code)}
+          onClose={() => setEditingCostCode(false)}
+        />
+      )}
+
+      {/* ── Cost code sheet — completed entry ── */}
+      {editingShiftId && (
+        <CostCodeSheet
+          current={
+            completedToday.find((e) => e.id === editingShiftId)?.cost_code ?? null
+          }
+          saving={savingCode}
+          onSelect={(code) => updateCostCode(editingShiftId, code)}
+          onClose={() => setEditingShiftId(null)}
+        />
       )}
     </div>
   )
