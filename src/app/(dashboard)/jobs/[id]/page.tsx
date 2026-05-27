@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { Job, DailyLog, Task, ScheduleItem, Contact } from '@/types'
 import { CloseoutPanel } from '@/components/jobs/CloseoutPanel'
 import { JobContactsPanel } from '@/components/jobs/JobContactsPanel'
+import { ConnectedSystemsCard } from '@/components/jobs/ConnectedSystemsCard'
 
 type JobDetail = Job & {
   pm: { full_name: string | null } | null
@@ -413,7 +414,10 @@ export default async function JobDetailPage({
         </div>
       )}
 
-      {/* Card 6 — Budget Snapshot (permission-gated) */}
+      {/* Card 6 — Connected Systems */}
+      <ConnectedSystemsCard jobId={id} />
+
+      {/* Card 7 — Budget Snapshot (permission-gated) */}
       {canSeeBudget && (
         <div className="bg-white rounded-xl border border-border p-5 md:col-span-2">
           <div className="flex items-center justify-between mb-4">
