@@ -1,0 +1,6060 @@
+{
+  "fetchedAt": "2026-05-27T19:05:05.355Z",
+  "total": 72,
+  "shifts": [
+    {
+      "id": 32310139,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700169,
+      "jobName": "General",
+      "date": {
+        "date": "2021-07-29T17:16:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 32310139
+      },
+      "name": "Lisa Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 32310139,
+        "timeStamp": "2021-07-29T17:16:00",
+        "location": {
+          "latitude": 39.23453,
+          "longitude": -84.8949054
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 32310139,
+        "timeStamp": "2021-07-29T17:17:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 32310139,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700169,
+        "displayName": "Lisa Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 32310128,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700169,
+      "jobName": "General",
+      "date": {
+        "date": "2021-07-29T17:16:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 32310128
+      },
+      "name": "Lisa Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 32310128,
+        "timeStamp": "2021-07-29T17:16:00",
+        "location": {
+          "latitude": 39.2414836,
+          "longitude": -84.8947814
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 32310128,
+        "timeStamp": "2021-07-29T17:17:00",
+        "location": {
+          "latitude": 39.2386128,
+          "longitude": -84.8947884
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 32310128,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700169,
+        "displayName": "Lisa Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 35798954,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2021-11-05T08:16:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 35798954
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 35798954,
+        "timeStamp": "2021-11-05T08:16:00",
+        "location": {
+          "latitude": 39.2490924,
+          "longitude": -84.9110093
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 35798954,
+        "timeStamp": "2021-11-05T16:24:00",
+        "location": {
+          "latitude": 39.0978596,
+          "longitude": -84.9252062
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 35798954,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 488,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 487.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 36457874,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-11-23T08:02:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36457874
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36457874,
+        "timeStamp": "2021-11-23T08:02:00",
+        "location": {
+          "latitude": 39.2412261,
+          "longitude": -84.9016991
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36457874,
+        "timeStamp": "2021-11-23T09:53:00",
+        "location": {
+          "latitude": 39.2657328,
+          "longitude": -84.9465811
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 36457874,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 111,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 111,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 36476233,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-11-23T11:20:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36476233
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36476233,
+        "timeStamp": "2021-11-23T11:20:00",
+        "location": {
+          "latitude": 39.2657328,
+          "longitude": -84.9465811
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36476233,
+        "timeStamp": "2021-11-23T15:56:00",
+        "location": {
+          "latitude": 39.2412842,
+          "longitude": -84.9017245
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 36476233,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 276,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 276,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 36510582,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-11-24T08:07:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36510582
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36510582,
+        "timeStamp": "2021-11-24T08:07:00",
+        "location": {
+          "latitude": 39.2657328,
+          "longitude": -84.9465811
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36510582,
+        "timeStamp": "2021-11-24T15:02:00",
+        "location": {
+          "latitude": 39.2397544,
+          "longitude": -84.9025905
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 36510582,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 415,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 415.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 36656560,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-11-30T08:13:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36656560
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36656560,
+        "timeStamp": "2021-11-30T08:13:00",
+        "location": {
+          "latitude": 39.2245498,
+          "longitude": -84.8601219
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36656560,
+        "timeStamp": "2021-11-30T08:14:00",
+        "location": {
+          "latitude": 39.2243065,
+          "longitude": -84.8590103
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 36656560,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 36670546,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-11-30T10:39:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36670546
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36670546,
+        "timeStamp": "2021-11-30T10:39:00",
+        "location": {
+          "latitude": 39.1517391,
+          "longitude": -84.9683245
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 36670546,
+        "timeStamp": "2021-11-30T12:50:00",
+        "location": {
+          "latitude": 39.2477943,
+          "longitude": -84.8984442
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 36670546,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 131,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 130.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 37097935,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-12-10T11:57:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 37097935
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 37097935,
+        "timeStamp": "2021-12-10T11:57:00",
+        "location": {
+          "latitude": 39.055121,
+          "longitude": -84.9029419
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 37097935,
+        "timeStamp": "2021-12-10T16:11:00",
+        "location": {
+          "latitude": 39.156658,
+          "longitude": -84.9135431
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 37097935,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 254,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 253.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 37197758,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2021-12-14T08:03:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 37197758
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 37197758,
+        "timeStamp": "2021-12-14T08:03:00",
+        "location": {
+          "latitude": 39.276191,
+          "longitude": -84.9612931
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 37197758,
+        "timeStamp": "2021-12-14T08:04:00",
+        "location": {
+          "latitude": 39.284991,
+          "longitude": -84.9828722
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 37197758,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 40943837,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2022-03-24T14:57:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 40943837
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 40943837,
+        "timeStamp": "2022-03-24T14:57:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 40943837,
+        "timeStamp": "2022-03-24T16:01:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 40943837,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 64,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 26.82,
+        "scale": 2
+      },
+      "rate": "$25.14",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 64.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 47243475,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2022-08-16T08:14:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 47243475
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 47243475,
+        "timeStamp": "2022-08-16T08:14:00",
+        "location": {
+          "latitude": 39.2412368,
+          "longitude": -84.9016618
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 47243475,
+        "timeStamp": "2022-08-16T09:17:00",
+        "location": {
+          "latitude": 39.1450148,
+          "longitude": -84.8592853
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 47243475,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 63,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 63,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 52175059,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2022-12-02T06:59:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52175059
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52175059,
+        "timeStamp": "2022-12-02T06:59:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52175059,
+        "timeStamp": "2022-12-02T07:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 52175059,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.42,
+        "scale": 2
+      },
+      "rate": "$25.14",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 52175196,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2022-12-02T07:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52175196
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52175196,
+        "timeStamp": "2022-12-02T07:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52175196,
+        "timeStamp": "2022-12-02T10:33:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 52175196,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 213,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 89.25,
+        "scale": 2
+      },
+      "rate": "$25.14",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 213,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 52182847,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2022-12-02T08:01:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52182847
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52182847,
+        "timeStamp": "2022-12-02T08:01:00",
+        "location": {
+          "latitude": 39.2412195,
+          "longitude": -84.90168
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 52182847,
+        "timeStamp": "2022-12-02T15:39:00",
+        "location": {
+          "latitude": 39.241333,
+          "longitude": -84.9020569
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 52182847,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 458,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 457.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 60384416,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2023-05-30T08:15:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 60384416
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 60384416,
+        "timeStamp": "2023-05-30T08:15:00",
+        "location": {
+          "latitude": 39.2412118,
+          "longitude": -84.9016943
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 60384416,
+        "timeStamp": "2023-05-30T09:12:00",
+        "location": {
+          "latitude": 39.0913806,
+          "longitude": -84.8722178
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 60384416,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 57,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 57,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 60457398,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 11440245,
+      "jobName": "General",
+      "date": {
+        "date": "2023-05-31T07:57:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 60457398
+      },
+      "name": "Cole Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 60457398,
+        "timeStamp": "2023-05-31T07:57:00",
+        "location": {
+          "latitude": 39.2412522,
+          "longitude": -84.9019584
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 60457398,
+        "timeStamp": "2023-05-31T09:26:00",
+        "location": {
+          "latitude": 39.0332593,
+          "longitude": -84.9959214
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 60457398,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 89,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 88.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 11440245,
+        "displayName": "Cole Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 61062445,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-06-08T10:25:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61062445
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61062445,
+        "timeStamp": "2023-06-08T10:25:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61062445,
+        "timeStamp": "2023-06-08T16:27:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 61062445,
+        "breakTime": 30,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 332,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 331.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700169,
+        "displayName": "Lisa Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 61273379,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-06-15T10:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61273379
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61273379,
+        "timeStamp": "2023-06-15T10:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61273379,
+        "timeStamp": "2023-06-15T14:14:00",
+        "location": {
+          "latitude": 39.2364032,
+          "longitude": -84.885504
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 61273379,
+        "breakTime": 41,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 213,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 213,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 61631807,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-06-22T10:22:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61631807
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61631807,
+        "timeStamp": "2023-06-22T10:22:00",
+        "location": {
+          "latitude": 39.2331264,
+          "longitude": -84.8887808
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61631807,
+        "timeStamp": "2023-06-22T16:33:00",
+        "location": {
+          "latitude": 39.2331264,
+          "longitude": -84.8887808
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 61631807,
+        "breakTime": 57,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 314,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 313.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 61996384,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-06-29T10:10:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61996384
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61996384,
+        "timeStamp": "2023-06-29T10:10:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 61996384,
+        "timeStamp": "2023-06-29T13:36:00",
+        "location": {
+          "latitude": 39.2364032,
+          "longitude": -84.8887808
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 61996384,
+        "breakTime": 35,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 171,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 171,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 62274403,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-07-06T10:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 62274403
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 62274403,
+        "timeStamp": "2023-07-06T10:00:00",
+        "location": {
+          "latitude": 39.241202,
+          "longitude": -84.9016583
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 62274403,
+        "timeStamp": "2023-07-06T15:11:00",
+        "location": {
+          "latitude": 39.230816,
+          "longitude": -84.9191963
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 62274403,
+        "breakTime": 50,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 261,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 261,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 62634523,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-07-13T09:04:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 62634523
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 62634523,
+        "timeStamp": "2023-07-13T09:04:00",
+        "location": {
+          "latitude": 39.2308204,
+          "longitude": -84.919298
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 62634523,
+        "timeStamp": "2023-07-13T15:01:00",
+        "location": {
+          "latitude": 39.2308204,
+          "longitude": -84.919298
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 62634523,
+        "breakTime": 106,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 251,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 250.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 63003762,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-07-20T09:50:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63003762
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63003762,
+        "timeStamp": "2023-07-20T09:50:00",
+        "location": {
+          "latitude": 39.23968,
+          "longitude": -84.901888
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63003762,
+        "timeStamp": "2023-07-20T12:41:00",
+        "location": {
+          "latitude": 39.2290097,
+          "longitude": -84.8792776
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 63003762,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 171,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 171,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 63358126,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-07-27T08:27:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63358126
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63358126,
+        "timeStamp": "2023-07-27T08:27:00",
+        "location": {
+          "latitude": 39.2200192,
+          "longitude": -84.8822272
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63358126,
+        "timeStamp": "2023-07-27T09:07:00",
+        "location": {
+          "latitude": 39.23968,
+          "longitude": -84.8953344
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 63358126,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 40,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 40.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 63381759,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-07-27T12:23:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63381759
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63381759,
+        "timeStamp": "2023-07-27T12:23:00",
+        "location": {
+          "latitude": 39.23968,
+          "longitude": -84.8953344
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63381759,
+        "timeStamp": "2023-07-27T16:54:00",
+        "location": {
+          "latitude": 39.23968,
+          "longitude": -84.8953344
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 63381759,
+        "breakTime": 103,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 168,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 168,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 63506573,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-07-31T08:48:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63506573
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63506573,
+        "timeStamp": "2023-07-31T08:48:00",
+        "location": {
+          "latitude": 39.2149577,
+          "longitude": -84.8714411
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63506573,
+        "timeStamp": "2023-07-31T13:26:00",
+        "location": {
+          "latitude": 39.2149577,
+          "longitude": -84.8714411
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 63506573,
+        "breakTime": 56,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 222,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 222,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 63658731,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29846477,
+      "jobName": "General",
+      "date": {
+        "date": "2023-08-02T09:08:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63658731
+      },
+      "name": "Emma Cox",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63658731,
+        "timeStamp": "2023-08-02T09:08:00",
+        "location": {
+          "latitude": 39.2308204,
+          "longitude": -84.919298
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 63658731,
+        "timeStamp": "2023-08-02T11:04:00",
+        "location": {
+          "latitude": 39.2308204,
+          "longitude": -84.919298
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 63658731,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 116,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 115.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 65284416,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-08-30T11:30:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 65284416
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 65284416,
+        "timeStamp": "2023-08-30T11:30:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 65284416,
+        "timeStamp": "2023-08-30T17:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 65284416,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 330,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 137.5,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 330,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 65616569,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-09-06T09:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 65616569
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 65616569,
+        "timeStamp": "2023-09-06T09:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 65616569,
+        "timeStamp": "2023-09-06T17:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 65616569,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 480,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 200,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 480,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 66368542,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-09-20T08:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 66368542
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 66368542,
+        "timeStamp": "2023-09-20T08:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 66368542,
+        "timeStamp": "2023-09-20T16:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 66368542,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 480,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 200,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 480,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 66725089,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-09-27T08:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 66725089
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 66725089,
+        "timeStamp": "2023-09-27T08:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 66725089,
+        "timeStamp": "2023-09-27T15:30:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 66725089,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 450,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 187.5,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 450,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 67087858,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-10-04T07:15:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 67087858
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 67087858,
+        "timeStamp": "2023-10-04T07:15:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 67087858,
+        "timeStamp": "2023-10-04T16:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 67087858,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 525,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 218.75,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 525,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 67305922,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2023-10-12T10:50:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 67305922
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 67305922,
+        "timeStamp": "2023-10-12T10:50:00",
+        "location": {
+          "latitude": 39.2143512,
+          "longitude": -84.8869196
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 67305922,
+        "timeStamp": "2023-10-12T10:51:00",
+        "location": {
+          "latitude": 39.2143512,
+          "longitude": -84.8869196
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 67305922,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.47,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 69314800,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-11-18T06:10:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 69314800
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 69314800,
+        "timeStamp": "2023-11-18T06:10:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 69314800,
+        "timeStamp": "2023-11-18T15:15:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 69314800,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 545,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 227.08,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 544.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Wynn"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 69590378,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2023-11-22T08:10:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 69590378
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 69590378,
+        "timeStamp": "2023-11-22T08:10:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 69590378,
+        "timeStamp": "2023-11-22T15:57:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 69590378,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 467,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 194.58,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 466.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Wynn"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 73235663,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-02-07T07:30:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73235663
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73235663,
+        "timeStamp": "2024-02-07T07:30:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73235663,
+        "timeStamp": "2024-02-07T16:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 73235663,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 510,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 212.5,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 510,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Wynn"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 73235112,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2024-02-12T07:34:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73235112
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73235112,
+        "timeStamp": "2024-02-12T07:34:00",
+        "location": {
+          "latitude": 39.0321461,
+          "longitude": -84.938171
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73235112,
+        "timeStamp": "2024-02-12T07:35:00",
+        "location": {
+          "latitude": 39.0302413,
+          "longitude": -84.941048
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 73235112,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.47,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 73578734,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-02-14T07:40:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73578734
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73578734,
+        "timeStamp": "2024-02-14T07:40:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73578734,
+        "timeStamp": "2024-02-14T15:30:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 73578734,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 470,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 195.83,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 469.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Wynn"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 73938306,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-02-21T13:00:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73938306
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73938306,
+        "timeStamp": "2024-02-21T13:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73938306,
+        "timeStamp": "2024-02-21T18:25:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 73938306,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 325,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 135.42,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 325.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29846477,
+        "displayName": "Emma Wynn"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 73846950,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2024-02-22T10:47:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73846950
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73846950,
+        "timeStamp": "2024-02-22T10:47:00",
+        "location": {
+          "latitude": 39.2412313,
+          "longitude": -84.9017493
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 73846950,
+        "timeStamp": "2024-02-22T15:47:00",
+        "location": {
+          "latitude": 39.2412198,
+          "longitude": -84.9017548
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 73846950,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 300,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 140,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 300,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 78400235,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-05-17T07:40:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78400235
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78400235,
+        "timeStamp": "2024-05-17T07:40:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78400235,
+        "timeStamp": "2024-05-17T10:55:00",
+        "location": {
+          "latitude": 39.158947,
+          "longitude": -84.8050086
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 78400235,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 195,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 81.25,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 195,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 78708939,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-05-23T07:31:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78708939
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78708939,
+        "timeStamp": "2024-05-23T07:31:00",
+        "location": {
+          "latitude": 39.1353053,
+          "longitude": -84.9569376
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78708939,
+        "timeStamp": "2024-05-23T08:10:00",
+        "location": {
+          "latitude": 39.2498217,
+          "longitude": -84.8945527
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 78708939,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 39,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 16.25,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 39,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 78743476,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2024-05-23T12:19:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78743476
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78743476,
+        "timeStamp": "2024-05-23T12:19:00",
+        "location": {
+          "latitude": 39.2412198,
+          "longitude": -84.9016564
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78743476,
+        "timeStamp": "2024-05-23T12:31:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 78743476,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 12,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 5.6,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 12,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 78902916,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-05-28T09:01:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78902916
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78902916,
+        "timeStamp": "2024-05-28T09:01:00",
+        "location": {
+          "latitude": 39.247862,
+          "longitude": -84.8978145
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78902916,
+        "timeStamp": "2024-05-28T09:02:00",
+        "location": {
+          "latitude": 39.2478351,
+          "longitude": -84.8978156
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 78902916,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.42,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 78967681,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-05-29T07:09:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78967681
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78967681,
+        "timeStamp": "2024-05-29T07:09:00",
+        "location": {
+          "latitude": 39.1563834,
+          "longitude": -84.9235378
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 78967681,
+        "timeStamp": "2024-05-29T07:57:00",
+        "location": {
+          "latitude": 39.2694929,
+          "longitude": -84.759426
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 78967681,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 48,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 20,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 48,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 80314377,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "General",
+      "date": {
+        "date": "2024-06-21T07:54:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 80314377
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 80314377,
+        "timeStamp": "2024-06-21T07:54:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 80314377,
+        "timeStamp": "2024-06-21T07:55:00",
+        "location": {
+          "latitude": 39.2480748,
+          "longitude": -84.8975744
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 80314377,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.42,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 81482410,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2024-07-14T20:30:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 81482410
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 81482410,
+        "timeStamp": "2024-07-14T20:30:00",
+        "location": {
+          "latitude": 39.0652214,
+          "longitude": -84.9002877
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 81482410,
+        "timeStamp": "2024-07-14T20:31:00",
+        "location": {
+          "latitude": 39.0652214,
+          "longitude": -84.9002877
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 81482410,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.47,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 84569165,
+      "jobId": 27087080,
+      "builderId": 69084,
+      "userID": 10700239,
+      "jobName": "Bryant",
+      "date": {
+        "date": "2024-09-07T06:58:00",
+        "builderId": 69084,
+        "jobId": 27087080,
+        "id": 84569165
+      },
+      "name": "Chad Byrne",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 27087080,
+        "id": 84569165,
+        "timeStamp": "2024-09-07T06:58:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 27087080,
+        "id": 84569165,
+        "timeStamp": "2024-09-07T08:37:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 84569165,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 99,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 69.3,
+        "scale": 2
+      },
+      "rate": "$42.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 99,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700239,
+        "displayName": "Chad Byrne"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 97295752,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2025-05-02T11:55:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 97295752
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 97295752,
+        "timeStamp": "2025-05-02T11:55:00",
+        "location": {
+          "latitude": 39.2145301,
+          "longitude": -84.8481747
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 97295752,
+        "timeStamp": "2025-05-02T11:56:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 97295752,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0.47,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 110854935,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 43052141,
+      "jobName": "General",
+      "date": {
+        "date": "2026-01-03T08:30:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 110854935
+      },
+      "name": "Xander Alvarez",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 110854935,
+        "timeStamp": "2026-01-03T08:30:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 110854935,
+        "timeStamp": "2026-01-03T14:00:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 110854935,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 330,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": true,
+        "updatedDate": "2026-01-04T10:56:58.92",
+        "updatedById": 10700169,
+        "updatedByName": "Lisa Cox"
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 330,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700169,
+        "displayName": "Lisa Cox"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 111016534,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 43052141,
+      "jobName": "General",
+      "date": {
+        "date": "2026-01-07T07:30:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 111016534
+      },
+      "name": "Xander Alvarez",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 111016534,
+        "timeStamp": "2026-01-07T07:30:00",
+        "location": {
+          "latitude": 39.2421040749192,
+          "longitude": -84.89705844923
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 111016534,
+        "timeStamp": "2026-01-07T13:45:00",
+        "location": {
+          "latitude": 39.2421058191285,
+          "longitude": -84.8970599754131
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 111016534,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 375,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 375,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 43052141,
+        "displayName": "Xander Alvarez"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 111193391,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 43052141,
+      "jobName": "General",
+      "date": {
+        "date": "2026-01-09T14:22:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 111193391
+      },
+      "name": "Xander Alvarez",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 111193391,
+        "timeStamp": "2026-01-09T14:22:00",
+        "location": {
+          "latitude": 39.2421040749192,
+          "longitude": -84.89705844923
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 111193391,
+        "timeStamp": "2026-01-09T14:33:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 111193391,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 11,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 0,
+        "scale": 2
+      },
+      "rate": "$0.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 10.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 43052141,
+        "displayName": "Xander Alvarez"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 114762534,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-03-16T07:38:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 114762534
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 114762534,
+        "timeStamp": "2026-03-16T07:38:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 114762534,
+        "timeStamp": "2026-03-16T15:58:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 114762534,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 500,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 233.33,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 499.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 114841848,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-03-17T07:27:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 114841848
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 114841848,
+        "timeStamp": "2026-03-17T07:27:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 114841848,
+        "timeStamp": "2026-03-17T08:40:00",
+        "location": {
+          "latitude": 39.1838396,
+          "longitude": -84.8286277
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 114841848,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 73,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 34.07,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 73.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 115164017,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-03-23T07:59:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115164017
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115164017,
+        "timeStamp": "2026-03-23T07:59:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115164017,
+        "timeStamp": "2026-03-23T16:05:00",
+        "location": {
+          "latitude": 39.2395893,
+          "longitude": -84.9023639
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 115164017,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 486,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 226.8,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 486,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 115241619,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-03-24T07:26:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115241619
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115241619,
+        "timeStamp": "2026-03-24T07:26:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115241619,
+        "timeStamp": "2026-03-24T15:53:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 115241619,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 507,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 236.6,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 507,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 115320506,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-03-25T07:29:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115320506
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115320506,
+        "timeStamp": "2026-03-25T07:29:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115320506,
+        "timeStamp": "2026-03-25T15:31:00",
+        "location": {
+          "latitude": 39.1790165,
+          "longitude": -84.858957
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 115320506,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 482,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 224.93,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 481.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 115473650,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-03-27T07:29:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115473650
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115473650,
+        "timeStamp": "2026-03-27T07:29:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115473650,
+        "timeStamp": "2026-03-27T10:30:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 115473650,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 181,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 84.47,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 181.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 115823122,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700239,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-04-02T09:55:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115823122
+      },
+      "name": "Chad Byrne",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115823122,
+        "timeStamp": "2026-04-02T09:55:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 115823122,
+        "timeStamp": "2026-04-02T14:34:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 115823122,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 279,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 195.3,
+        "scale": 2
+      },
+      "rate": "$42.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 279,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700239,
+        "displayName": "Chad Byrne"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116024243,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-04-07T07:28:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116024243
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116024243,
+        "timeStamp": "2026-04-07T07:28:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116024243,
+        "timeStamp": "2026-04-07T10:28:00",
+        "location": {
+          "latitude": 39.1159994,
+          "longitude": -84.881583
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116024243,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 180,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 84,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 180,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116107155,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-04-08T07:22:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116107155
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116107155,
+        "timeStamp": "2026-04-08T07:22:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116107155,
+        "timeStamp": "2026-04-08T07:23:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116107155,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 1,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": true,
+        "updatedDate": "2026-05-07T16:44:03.54",
+        "updatedById": 10726849,
+        "updatedByName": "August Cox"
+      },
+      "builderCost": {
+        "value": 0.42,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 17931571,
+          "costCodeTitle": "04 Concrete",
+          "totalMinutes": 1.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116107226,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-04-08T07:23:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116107226
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116107226,
+        "timeStamp": "2026-04-08T07:23:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116107226,
+        "timeStamp": "2026-04-08T08:11:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116107226,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 48,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": true,
+        "updatedDate": "2026-04-29T14:44:26.43",
+        "updatedById": 10700169,
+        "updatedByName": "Lisa Cox"
+      },
+      "builderCost": {
+        "value": 20,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 17931571,
+          "costCodeTitle": "04 Concrete",
+          "totalMinutes": 48,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116109622,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-04-08T07:34:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116109622
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116109622,
+        "timeStamp": "2026-04-08T07:34:00",
+        "location": {
+          "latitude": 39.2111019,
+          "longitude": -84.8990198
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116109622,
+        "timeStamp": "2026-04-08T08:51:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116109622,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 77,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": true,
+        "updatedDate": "2026-04-29T14:58:36.923",
+        "updatedById": 10700169,
+        "updatedByName": "Lisa Cox"
+      },
+      "builderCost": {
+        "value": 44.92,
+        "scale": 2
+      },
+      "rate": "$35.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 17931571,
+          "costCodeTitle": "04 Concrete",
+          "totalMinutes": 76.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116299398,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-04-10T12:42:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116299398
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116299398,
+        "timeStamp": "2026-04-10T12:42:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116299398,
+        "timeStamp": "2026-04-10T15:33:00",
+        "location": {
+          "latitude": 39.1737374,
+          "longitude": -84.8504908
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116299398,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 171,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 79.8,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 171,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116724900,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 43052141,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-04-18T08:02:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116724900
+      },
+      "name": "Xander Alvarez",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116724900,
+        "timeStamp": "2026-04-18T08:02:00",
+        "location": {
+          "latitude": 39.2411961,
+          "longitude": -84.9016493
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116724900,
+        "timeStamp": "2026-04-18T09:29:00",
+        "location": {
+          "latitude": 39.2195661,
+          "longitude": -84.894193
+        },
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116724900,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 87,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": true,
+        "updatedDate": "2026-05-07T16:43:54.66",
+        "updatedById": 10726849,
+        "updatedByName": "August Cox"
+      },
+      "builderCost": {
+        "value": 14.5,
+        "scale": 2
+      },
+      "rate": "$10.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 17931571,
+          "costCodeTitle": "04 Concrete",
+          "totalMinutes": 87,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 43052141,
+        "displayName": "Xander Alvarez"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116724890,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 29791588,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-04-18T08:02:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116724890
+      },
+      "name": "Cane Jenkins",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116724890,
+        "timeStamp": "2026-04-18T08:02:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 116724890,
+        "timeStamp": "2026-04-18T09:29:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116724890,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 87,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": true,
+        "updatedDate": "2026-05-07T16:43:49.857",
+        "updatedById": 10726849,
+        "updatedByName": "August Cox"
+      },
+      "builderCost": {
+        "value": 36.25,
+        "scale": 2
+      },
+      "rate": "$25.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 17931571,
+          "costCodeTitle": "04 Concrete",
+          "totalMinutes": 87,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 29791588,
+        "displayName": "Cane Jenkins"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 116800457,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700239,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-04-20T13:01:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116800457
+      },
+      "name": "Chad Byrne",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116800457,
+        "timeStamp": "2026-04-20T13:01:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 116800457,
+        "timeStamp": "2026-04-20T14:13:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 116800457,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 72,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 50.4,
+        "scale": 2
+      },
+      "rate": "$42.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 72,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700239,
+        "displayName": "Chad Byrne"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 117333142,
+      "jobId": null,
+      "builderId": 69084,
+      "userID": 10700240,
+      "jobName": "General",
+      "date": {
+        "date": "2026-04-29T08:50:00",
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 117333142
+      },
+      "name": "Kevin G",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 117333142,
+        "timeStamp": "2026-04-29T08:50:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 0,
+        "id": 117333142,
+        "timeStamp": "2026-04-29T15:51:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 117333142,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 421,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 196.47,
+        "scale": 2
+      },
+      "rate": "$28.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 421.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700240,
+        "displayName": "Kevin G"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 117750305,
+      "jobId": 43587803,
+      "builderId": 69084,
+      "userID": 10700239,
+      "jobName": "Bryant Bathroom",
+      "date": {
+        "date": "2026-05-06T10:21:00",
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 117750305
+      },
+      "name": "Chad Byrne",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 117750305,
+        "timeStamp": "2026-05-06T10:21:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 43587803,
+        "id": 117750305,
+        "timeStamp": "2026-05-06T13:28:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 117750305,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 187,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 130.9,
+        "scale": 2
+      },
+      "rate": "$42.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 187.002,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700239,
+        "displayName": "Chad Byrne"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 118549611,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 10700239,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-05-20T09:19:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 118549611
+      },
+      "name": "Chad Byrne",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 118549611,
+        "timeStamp": "2026-05-20T09:19:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 118549611,
+        "timeStamp": "2026-05-20T11:09:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 118549611,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 110,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 77,
+        "scale": 2
+      },
+      "rate": "$42.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 109.998,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700239,
+        "displayName": "Chad Byrne"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    },
+    {
+      "id": 118638216,
+      "jobId": 41939994,
+      "builderId": 69084,
+      "userID": 10700239,
+      "jobName": "Ryan Porch",
+      "date": {
+        "date": "2026-05-21T10:45:00",
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 118638216
+      },
+      "name": "Chad Byrne",
+      "timeIn": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 118638216,
+        "timeStamp": "2026-05-21T10:45:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "timeOut": {
+        "builderId": 69084,
+        "jobId": 41939994,
+        "id": 118638216,
+        "timeStamp": "2026-05-21T13:09:00",
+        "location": null,
+        "outOfBounds": false,
+        "canClockOut": false,
+        "showDate": false
+      },
+      "tags": [],
+      "breakTime": {
+        "id": 118638216,
+        "breakTime": 0,
+        "useDecimal": false,
+        "autoEndBreaks": false,
+        "isOnBreak": false,
+        "canEndBreak": false
+      },
+      "regularTime": 144,
+      "overTime": 0,
+      "doubleOverTime": 0,
+      "personalTimeOff": 0,
+      "totalWorkTime": 0,
+      "approvalStatus": {
+        "isApproved": false,
+        "updatedDate": null,
+        "updatedById": 0,
+        "updatedByName": ""
+      },
+      "builderCost": {
+        "value": 100.8,
+        "scale": 2
+      },
+      "rate": "$42.00",
+      "billableRate": null,
+      "billableAmount": null,
+      "costCodes": [
+        {
+          "id": 10456574,
+          "costCodeTitle": "Buildertrend Flat Rate",
+          "totalMinutes": 144,
+          "useDecimal": false
+        }
+      ],
+      "createdBy": {
+        "id": 10700239,
+        "displayName": "Chad Byrne"
+      },
+      "notes": "",
+      "edited": null,
+      "accounting": null,
+      "locationInfo": null,
+      "gustoSyncStatus": 0,
+      "relatedOwnerInvoices": null,
+      "createdDate": null,
+      "rowActionColumnResponse": null
+    }
+  ]
+}

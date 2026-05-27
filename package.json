@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "bt:import": "tsx scripts/bt-timeclock-import.ts",
+    "bt:import:dry": "tsx scripts/bt-timeclock-import.ts --dry-run",
+    "bt:import:file": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json",
+    "bt:import:file:dry": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
