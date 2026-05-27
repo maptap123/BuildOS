@@ -7,9 +7,8 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useAgenda } from '@/hooks/useAgenda'
 import { useActiveJob } from '@/contexts/ActiveJobContext'
 import { LogModePicker } from './LogModePicker'
-import type { Job } from '@/types'
 
-// Props kept for backward compatibility but jobId/jobName are now sourced from context
+// Props kept for backward compatibility; jobId/jobName are now sourced from context
 interface Props {
   jobId?: string | null
   jobName?: string | null
@@ -63,11 +62,6 @@ export function MobileHome(_props: Props) {
     router.push('/documents')
   }
 
-  // handleJobPickerSelect no longer needed — context picker is in the layout header
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function _handleJobPickerSelect(_job: Job) {
-    // kept as dead code placeholder; remove in next refactor
-  }
 
   return (
     <div className="min-h-screen bg-[#f0ede8] pb-32">
