@@ -1,11 +1,13 @@
-﻿'use client'
+'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle, XCircle, Filter, MapPin, Clock, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import type { TimeEntry } from '@/types'
+import type { ShiftRange } from '@/app/(dashboard)/time-clock/shifts/page'
 
-// â”€â”€â”€ Local types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Local types --------------------------------------------------------------
 
 interface EntryUser {
   id: string
@@ -41,30 +43,30 @@ interface Props {
   initialEntries: EntryRow[]
   users: SimpleUser[]
   jobs: SimpleJob[]
+  currentRange: ShiftRange
 }
 
 type ApprovalFilter = 'all' | 'open' | 'pending' | 'approved' | 'rejected'
-type DateRange = 'today' | '7d' | '30d'
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const RANGE_LABELS: Record<ShiftRange, string> = {
+  today: 'Today',
+  '7d':  '7 Days',
+  '30d': '30 Days',
+  '90d': '90 Days',
+  '1y':  '1 Year',
+  all:   'All Time',
+}
+
+const ALL_RANGES = Object.keys(RANGE_LABELS) as ShiftRange[]
+
+// --- Helpers ------------------------------------------------------------------
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
-
-function getDateCutoff(range: DateRange): Date {
-  if (range === 'today') {
-    const d = new Date(); d.setHours(0, 0, 0, 0); return d
-  }
-  if (range === '7d') {
-    const d = new Date(); d.setDate(d.getDate() - 7); return d
-  }
-  // 30d
-  const d = new Date(); d.setDate(d.getDate() - 30); return d
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -73,18 +75,18 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: 'bg-red-50 text-red-700 border-red-200',
 }
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Component ----------------------------------------------------------------
 
-export function ShiftsClient({ initialEntries, users, jobs }: Props) {
+export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Props) {
+  const router = useRouter()
   const [entries, setEntries] = useState<EntryRow[]>(initialEntries)
   const [filterStatus, setFilterStatus] = useState<ApprovalFilter>('all')
-  const [filterDateRange, setFilterDateRange] = useState<DateRange>('30d')
   const [filterUser, setFilterUser] = useState('')
   const [filterJob, setFilterJob] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // â”€â”€ Global stats (all 30d entries) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Global stats (all loaded entries) ---------------------------------------
   const stats = useMemo(() => ({
     open:     entries.filter((e) => !e.clock_out).length,
     pending:  entries.filter((e) => e.clock_out && e.approval_status === 'pending').length,
@@ -92,27 +94,25 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
     rejected: entries.filter((e) => e.approval_status === 'rejected').length,
   }), [entries])
 
-  // â”€â”€ Filtered entries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Filtered entries --------------------------------------------------------
   const filtered = useMemo(() => {
-    const cutoff = getDateCutoff(filterDateRange)
     return entries.filter((e) => {
-      if (new Date(e.clock_in) < cutoff) return false
       if (filterStatus === 'open') return !e.clock_out
       if (filterStatus !== 'all' && e.approval_status !== filterStatus) return false
       if (filterUser && e.user_id !== filterUser) return false
       if (filterJob && e.job_id !== filterJob) return false
       return true
     })
-  }, [entries, filterStatus, filterDateRange, filterUser, filterJob])
+  }, [entries, filterStatus, filterUser, filterJob])
 
-  // â”€â”€ Summary for filtered set â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Summary for filtered set ------------------------------------------------
   const summary = useMemo(() => ({
     totalHours:    filtered.reduce((s, e) => s + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0), 0),
     overtimeHours: filtered.reduce((s, e) => s + (e.overtime_hours ?? 0), 0),
     laborCost:     filtered.reduce((s, e) => s + (e.labor_cost ?? 0), 0),
   }), [filtered])
 
-  // â”€â”€ Approve / Reject â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Approve / Reject --------------------------------------------------------
   async function updateApproval(id: string, status: 'approved' | 'rejected') {
     setLoadingId(id)
     setError(null)
@@ -133,11 +133,11 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
     }
   }
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Render ------------------------------------------------------------------
   return (
     <div className="space-y-5">
 
-      {/* â”€â”€ Header â”€â”€ */}
+      {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/time-clock" className="text-gray-400 hover:text-navy-900 transition-colors p-1">
           <ArrowLeft size={18} />
@@ -158,7 +158,7 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
         </div>
       </div>
 
-      {/* â”€â”€ Error banner â”€â”€ */}
+      {/* Error banner */}
       {error && (
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
           <AlertCircle size={15} className="shrink-0 mt-0.5" />
@@ -166,7 +166,7 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
         </div>
       )}
 
-      {/* â”€â”€ Stats row â”€â”€ */}
+      {/* Stats row */}
       <div className="grid grid-cols-4 gap-2">
         {[
           { label: 'Open',     value: stats.open,     color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200' },
@@ -193,26 +193,26 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
         ))}
       </div>
 
-      {/* â”€â”€ Filters â”€â”€ */}
+      {/* Filters */}
       <div className="bg-white border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold">
           <Filter size={11} />
           Filters
         </div>
 
-        {/* Date range */}
-        <div className="flex gap-2">
-          {(['today', '7d', '30d'] as DateRange[]).map((r) => (
+        {/* Date range — drives server re-fetch via URL param */}
+        <div className="flex flex-wrap gap-2">
+          {ALL_RANGES.map((r) => (
             <button
               key={r}
-              onClick={() => setFilterDateRange(r)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border capitalize transition-colors ${
-                filterDateRange === r
+              onClick={() => router.push(`/time-clock/shifts?range=${r}`)}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                currentRange === r
                   ? 'bg-navy-900 text-white border-navy-900'
                   : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
               }`}
             >
-              {r === 'today' ? 'Today' : r === '7d' ? '7 days' : '30 days'}
+              {RANGE_LABELS[r]}
             </button>
           ))}
         </div>
@@ -263,7 +263,7 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
         </div>
       </div>
 
-      {/* â”€â”€ Shift cards â”€â”€ */}
+      {/* Shift cards */}
       <div className="space-y-2">
         {filtered.length === 0 && (
           <div className="text-center py-12 text-gray-400 text-sm">
@@ -317,15 +317,15 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
 
                   {/* Job + date */}
                   <p className="text-xs text-gray-500 mt-1">
-                    {entry.job?.name ?? 'â€”'} &middot; {formatDate(entry.clock_in)}
+                    {entry.job?.name ?? '—'} &middot; {formatDate(entry.clock_in)}
                   </p>
 
                   {/* Times */}
                   <p className="text-xs text-gray-400 mt-0.5">
                     {formatTime(entry.clock_in)}
                     {entry.clock_out
-                      ? ` â€“ ${formatTime(entry.clock_out)}`
-                      : <span className="text-green-600 font-medium"> â†’ clocked in now</span>}
+                      ? ` — ${formatTime(entry.clock_out)}`
+                      : <span className="text-green-600 font-medium"> → clocked in now</span>}
                     {entry.cost_code && (
                       <span className="ml-2 text-navy-500 font-medium">{entry.cost_code}</span>
                     )}
@@ -379,7 +379,7 @@ export function ShiftsClient({ initialEntries, users, jobs }: Props) {
                 </div>
               </div>
 
-              {/* Approve / Reject â€” only for completed pending entries */}
+              {/* Approve / Reject — only for completed pending entries */}
               {!isOpen && entry.approval_status === 'pending' && (
                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
                   <button
