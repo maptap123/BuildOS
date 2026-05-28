@@ -61,7 +61,9 @@ export default async function ShiftsPage({
     (() => {
       let q = admin
         .from('time_entries')
-        .select('*, user:users(id, full_name, avatar_url, hourly_rate), job:jobs(id, name, job_number)')
+        // Hint the FK to use — time_entries has 3 FKs to users (user_id, created_by, approved_by)
+        // Without the hint PostgREST returns null data with an ambiguous relationship error
+        .select('*, user:users!user_id(id, full_name, avatar_url, hourly_rate), job:jobs!job_id(id, name, job_number)')
         .order('clock_in', { ascending: false })
       if (cutoff) q = q.gte('clock_in', cutoff)
       return q

@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from('time_entries')
-    .select('*, user:users(id, full_name, avatar_url, hourly_rate), job:jobs(id, name)')
+    .select('*, user:users!user_id(id, full_name, avatar_url, hourly_rate), job:jobs!job_id(id, name)')
     .order('clock_in', { ascending: false })
 
   if (!isAdmin) query = query.eq('user_id', user.id)
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       device_info: device_info ?? null,
       created_by: user.id,
     })
-    .select('*, user:users(id, full_name, avatar_url), job:jobs(id, name)')
+    .select('*, user:users!user_id(id, full_name, avatar_url), job:jobs!job_id(id, name)')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

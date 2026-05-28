@@ -14,7 +14,7 @@ export async function GET(
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('time_entries')
-    .select('*, user:users(id, full_name, avatar_url, hourly_rate), job:jobs(id, name)')
+    .select('*, user:users!user_id(id, full_name, avatar_url, hourly_rate), job:jobs!job_id(id, name)')
     .eq('id', id)
     .single()
 
@@ -105,7 +105,7 @@ export async function PATCH(
     .from('time_entries')
     .update(updates)
     .eq('id', id)
-    .select('*, user:users(id, full_name, avatar_url), job:jobs(id, name)')
+    .select('*, user:users!user_id(id, full_name, avatar_url), job:jobs!job_id(id, name)')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
