@@ -322,6 +322,7 @@ export interface DailyLog {
   temperature_low: number | null;
   manpower_count: number | null;
   work_performed: string | null;
+  cost_code: string | null;
   delays: string | null;
   safety_notes: string | null;
   inspection_notes: string | null;

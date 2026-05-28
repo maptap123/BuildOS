@@ -6,12 +6,19 @@ import { FileText, Bot, Sparkles, X } from 'lucide-react'
 import { JobPickerSheet } from '@/components/jobs'
 import type { Job } from '@/types'
 
-interface Props {
-  jobId: string | null
-  onClose: () => void
+interface JobInfo {
+  id: string
+  name: string
 }
 
-export function LogModePicker({ jobId, onClose }: Props) {
+interface Props {
+  jobId: string | null
+  activeJob: JobInfo | null
+  onClose: () => void
+  onTraditionalOpen: (job: JobInfo | null) => void
+}
+
+export function LogModePicker({ jobId, activeJob, onClose, onTraditionalOpen }: Props) {
   const router = useRouter()
   const [showJobPicker, setShowJobPicker] = useState(false)
   const [pendingMode, setPendingMode] = useState<'traditional' | 'ai' | null>(null)
@@ -22,21 +29,22 @@ export function LogModePicker({ jobId, onClose }: Props) {
       setShowJobPicker(true)
       return
     }
-    openMode(mode, jobId)
+    openMode(mode, jobId, activeJob)
   }
 
-  function openMode(mode: 'traditional' | 'ai', jid: string) {
-    onClose()
+  function openMode(mode: 'traditional' | 'ai', jid: string, job: JobInfo | null) {
     if (mode === 'traditional') {
-      router.push(`/jobs/${jid}/logs?newLog=1`)
+      onTraditionalOpen(job ?? { id: jid, name: jid })
+      onClose()
     } else {
+      onClose()
       router.push(`/jobs/${jid}/logs?newLog=1&aiMode=1`)
     }
   }
 
   function handleJobPicked(job: Job) {
     setShowJobPicker(false)
-    if (pendingMode) openMode(pendingMode, job.id)
+    if (pendingMode) openMode(pendingMode, job.id, { id: job.id, name: job.name })
   }
 
   return (

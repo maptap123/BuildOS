@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useAgenda } from '@/hooks/useAgenda'
 import { useActiveJob } from '@/contexts/ActiveJobContext'
 import { LogModePicker } from './LogModePicker'
+import { MobileTraditionalLogSheet } from './MobileTraditionalLogSheet'
 
 // Props kept for backward compatibility; jobId/jobName are now sourced from context
 interface Props {
@@ -42,6 +43,8 @@ export function MobileHome(_props: Props) {
   const jobName = activeJob?.name ?? null
 
   const [logPickerOpen, setLogPickerOpen] = useState(false)
+  const [traditionalSheetOpen, setTraditionalSheetOpen] = useState(false)
+  const [traditionalSheetJob, setTraditionalSheetJob] = useState<{ id: string; name: string } | null>(null)
   const [hermesForcedOpen, setHermesForcedOpen] = useState(false)
 
   const totalAlerts = agenda.past_due.length + agenda.due_today.length
@@ -338,7 +341,23 @@ export function MobileHome(_props: Props) {
       {logPickerOpen && (
         <LogModePicker
           jobId={jobId}
+          activeJob={activeJob ? { id: activeJob.id, name: activeJob.name } : null}
           onClose={() => setLogPickerOpen(false)}
+          onTraditionalOpen={(job) => {
+            setTraditionalSheetJob(job)
+            setTraditionalSheetOpen(true)
+          }}
+        />
+      )}
+
+      {/* Traditional log entry sheet */}
+      {traditionalSheetOpen && (
+        <MobileTraditionalLogSheet
+          initialJob={traditionalSheetJob}
+          onClose={() => {
+            setTraditionalSheetOpen(false)
+            setTraditionalSheetJob(null)
+          }}
         />
       )}
 
