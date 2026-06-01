@@ -24,6 +24,8 @@ type SyncStatus = 'not_linked' | 'candidate' | 'linked' | 'error'
 
 interface Props {
   jobId: string
+  /** When true, renders as a full-page view (no card wrapper, no grid span). */
+  fullPage?: boolean
 }
 
 function fileIcon(name: string, mimeType: string | null) {
@@ -118,7 +120,7 @@ function VisibilityBadge({
   )
 }
 
-export function JobFilesPanel({ jobId }: Props) {
+export function JobFilesPanel({ jobId, fullPage = false }: Props) {
   const [files, setFiles]         = useState<JobFile[]>([])
   const [linked, setLinked]       = useState(false)
   const [isAdmin, setIsAdmin]     = useState(false)
@@ -185,10 +187,16 @@ export function JobFilesPanel({ jobId }: Props) {
   const folders = files.filter(f => f.isFolder)
   const docs    = files.filter(f => !f.isFolder)
 
+  const containerClass = fullPage
+    ? 'space-y-4'
+    : 'bg-white rounded-xl border border-border p-5 md:col-span-2'
+
   return (
-    <div className="bg-white rounded-xl border border-border p-5 md:col-span-2">
+    <div className={containerClass}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-semibold text-navy-900 text-base">Job Documents</h3>
+        {!fullPage && (
+          <h3 className="font-display font-semibold text-navy-900 text-base">Job Documents</h3>
+        )}
         {syncStatus === 'linked' && (
           <button
             onClick={() => fetchFiles(true)}

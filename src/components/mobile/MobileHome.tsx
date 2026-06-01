@@ -62,7 +62,11 @@ export function MobileHome(_props: Props) {
   }
 
   function handleDocuments() {
-    router.push('/documents')
+    if (jobId) {
+      router.push(`/jobs/${jobId}/documents`)
+    } else {
+      router.push('/documents')
+    }
   }
 
 
