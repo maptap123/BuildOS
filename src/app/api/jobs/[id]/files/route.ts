@@ -25,14 +25,21 @@ export async function GET(
 
   const { data: job } = await admin
     .from('jobs')
-    .select('id, sharepoint_drive_item_id, documents_sync_status')
+    .select('id, sharepoint_drive_item_id, sharepoint_folder_url, sharepoint_folder_path, documents_sync_status, documents_sync_error')
     .eq('id', id)
     .single()
 
   if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const folderMeta = {
+    folderUrl:  (job.sharepoint_folder_url  as string | null) ?? null,
+    folderPath: (job.sharepoint_folder_path as string | null) ?? null,
+    syncStatus: ((job.documents_sync_status as string) ?? 'not_linked') as 'not_linked' | 'candidate' | 'linked' | 'error',
+    syncError:  (job.documents_sync_error   as string | null) ?? null,
+  }
+
   if (!job.sharepoint_drive_item_id || job.documents_sync_status !== 'linked') {
-    return NextResponse.json({ linked: false, files: [] })
+    return NextResponse.json({ linked: false, files: [], ...folderMeta })
   }
 
   let spItems
@@ -71,5 +78,5 @@ export async function GET(
     // Non-admins only see files explicitly set to 'all'
     .filter(f => isAdmin || f.visibility === 'all')
 
-  return NextResponse.json({ linked: true, files, isAdmin })
+  return NextResponse.json({ linked: true, files, isAdmin, ...folderMeta })
 }

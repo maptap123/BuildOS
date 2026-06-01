@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   File, FileText, FileImage, FolderOpen,
   ExternalLink, RefreshCw, Lock, Users, ChevronDown,
+  CheckCircle, Clock, AlertCircle,
 } from 'lucide-react'
 
 type Visibility = 'admin_only' | 'all'
@@ -18,6 +19,8 @@ interface JobFile {
   lastModified: string | null
   visibility: Visibility
 }
+
+type SyncStatus = 'not_linked' | 'candidate' | 'linked' | 'error'
 
 interface Props {
   jobId: string
@@ -116,13 +119,17 @@ function VisibilityBadge({
 }
 
 export function JobFilesPanel({ jobId }: Props) {
-  const [files, setFiles]       = useState<JobFile[]>([])
-  const [linked, setLinked]     = useState(false)
-  const [isAdmin, setIsAdmin]   = useState(false)
-  const [loading, setLoading]   = useState(true)
+  const [files, setFiles]         = useState<JobFile[]>([])
+  const [linked, setLinked]       = useState(false)
+  const [isAdmin, setIsAdmin]     = useState(false)
+  const [folderUrl, setFolderUrl] = useState<string | null>(null)
+  const [folderPath, setFolderPath] = useState<string | null>(null)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('not_linked')
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError]       = useState<string | null>(null)
-  const [updating, setUpdating] = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+  const [updating, setUpdating]   = useState<string | null>(null)
 
   const fetchFiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -138,6 +145,10 @@ export function JobFilesPanel({ jobId }: Props) {
       setLinked(json.linked ?? false)
       setFiles(json.files ?? [])
       setIsAdmin(json.isAdmin ?? false)
+      setFolderUrl(json.folderUrl ?? null)
+      setFolderPath(json.folderPath ?? null)
+      setSyncStatus(json.syncStatus ?? 'not_linked')
+      setSyncError(json.syncError ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load files')
     } finally {
@@ -201,66 +212,159 @@ export function JobFilesPanel({ jobId }: Props) {
             </div>
           ))}
         </div>
-      ) : !linked ? (
-        <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm gap-2">
-          <FolderOpen size={28} className="text-gray-200" />
-          <p>No OneDrive folder linked to this job.</p>
-          <p className="text-xs text-gray-400">Use the Connected Systems card to auto-match a folder.</p>
-        </div>
-      ) : files.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm gap-2">
-          <FolderOpen size={28} className="text-gray-200" />
-          <p>{isAdmin ? 'No files in the linked OneDrive folder.' : 'No files are shared with you for this job.'}</p>
-        </div>
       ) : (
         <div className="space-y-4">
-          {/* Folders */}
-          {folders.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Folders</p>
-              <div className="divide-y divide-gray-50">
-                {folders.map(f => (
-                  <FileRow
-                    key={f.id}
-                    file={f}
-                    isAdmin={isAdmin}
-                    updatingId={updating}
-                    onVisibilityChange={updateVisibility}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+          {/* OneDrive folder connection card */}
+          <OneDriveFolderCard
+            syncStatus={syncStatus}
+            folderUrl={folderUrl}
+            folderPath={folderPath}
+            syncError={syncError}
+          />
 
-          {/* Files */}
-          {docs.length > 0 && (
-            <div>
-              {folders.length > 0 && (
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Files</p>
-              )}
-              <div className="divide-y divide-gray-50">
-                {docs.map(f => (
-                  <FileRow
-                    key={f.id}
-                    file={f}
-                    isAdmin={isAdmin}
-                    updatingId={updating}
-                    onVisibilityChange={updateVisibility}
-                  />
-                ))}
+          {/* File listing — only shown when Graph API confirmed the folder is linked */}
+          {linked && (
+            files.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-gray-400 text-sm gap-2">
+                <FolderOpen size={24} className="text-gray-200" />
+                <p>{isAdmin ? 'No files in the linked OneDrive folder.' : 'No files are shared with you for this job.'}</p>
               </div>
-            </div>
-          )}
-
-          {isAdmin && (
-            <p className="text-[11px] text-gray-400 pt-1">
-              New files default to <strong>Admin only</strong>. Toggle visibility to share with all users.
-            </p>
+            ) : (
+              <div className="space-y-4">
+                {folders.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Folders</p>
+                    <div className="divide-y divide-gray-50">
+                      {folders.map(f => (
+                        <FileRow
+                          key={f.id}
+                          file={f}
+                          isAdmin={isAdmin}
+                          updatingId={updating}
+                          onVisibilityChange={updateVisibility}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {docs.length > 0 && (
+                  <div>
+                    {folders.length > 0 && (
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Files</p>
+                    )}
+                    <div className="divide-y divide-gray-50">
+                      {docs.map(f => (
+                        <FileRow
+                          key={f.id}
+                          file={f}
+                          isAdmin={isAdmin}
+                          updatingId={updating}
+                          onVisibilityChange={updateVisibility}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {isAdmin && (
+                  <p className="text-[11px] text-gray-400 pt-1">
+                    New files default to <strong>Admin only</strong>. Toggle visibility to share with all users.
+                  </p>
+                )}
+              </div>
+            )
           )}
         </div>
       )}
     </div>
   )
+}
+
+function OneDriveFolderCard({
+  syncStatus,
+  folderUrl,
+  folderPath,
+  syncError,
+}: {
+  syncStatus: SyncStatus
+  folderUrl: string | null
+  folderPath: string | null
+  syncError: string | null
+}) {
+  if (syncStatus === 'not_linked') {
+    return (
+      <div className="flex flex-col items-center justify-center py-6 text-gray-400 text-sm gap-1.5">
+        <FolderOpen size={24} className="text-gray-200" />
+        <p>No OneDrive folder linked to this job.</p>
+        <p className="text-xs">Use the Connected Systems card to auto-match a folder.</p>
+      </div>
+    )
+  }
+
+  if (syncStatus === 'linked') {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+        <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-green-800">OneDrive folder connected</p>
+          {folderPath && (
+            <p className="text-xs text-green-700 mt-0.5 truncate">{folderPath}</p>
+          )}
+        </div>
+        {folderUrl && (
+          <a
+            href={folderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 shrink-0 text-xs font-semibold text-green-700 hover:text-green-900 transition-colors"
+          >
+            <ExternalLink size={13} />
+            Open OneDrive Folder
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  if (syncStatus === 'candidate') {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <Clock size={16} className="text-amber-500 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-amber-800">Possible OneDrive folder found — review needed</p>
+          {folderPath && (
+            <p className="text-xs text-amber-700 mt-0.5 truncate">{folderPath}</p>
+          )}
+        </div>
+        {folderUrl && (
+          <a
+            href={folderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 shrink-0 text-xs font-semibold text-amber-700 hover:text-amber-900 transition-colors"
+          >
+            <ExternalLink size={13} />
+            Open OneDrive Folder
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  if (syncStatus === 'error') {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+        <AlertCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-red-800">OneDrive folder sync error</p>
+          {syncError && (
+            <p className="text-xs text-red-700 mt-0.5">{syncError}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 function FileRow({

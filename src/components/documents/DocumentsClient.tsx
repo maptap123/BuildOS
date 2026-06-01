@@ -91,7 +91,8 @@ export function DocumentsClient({ initialDocuments, permissions }: Props) {
       {documents.length === 0 ? (
         <div className="bg-white rounded-xl border border-border p-10 text-center">
           <FileText size={32} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-gray-400">No documents yet.</p>
+          <p className="text-sm text-gray-400">No files have been uploaded to BuildOS yet.</p>
+          <p className="text-xs text-gray-400 mt-1">OneDrive-linked files are visible on the individual job page.</p>
           {permissions.can_create && (
             <button
               onClick={() => setShowUpload(true)}
