@@ -94,6 +94,7 @@ export async function GET(
       id:           item.id,
       name:         item.name,
       webUrl:       item.webUrl,
+      driveId:      item.parentReference?.driveId ?? null,
       size:         item.size ?? null,
       mimeType:     item.file?.mimeType ?? null,
       isFolder:     !!item.folder,

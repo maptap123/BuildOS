@@ -222,3 +222,25 @@ export async function listSharePointFolderContents(
 
   return items
 }
+
+/**
+ * Returns a pre-signed download URL for a SharePoint drive item.
+ * The URL is valid for several hours and does NOT require the caller to be
+ * signed into OneDrive — anyone with the URL can download the file.
+ */
+export async function getSharePointItemDownloadUrl(
+  driveId: string,
+  itemId: string
+): Promise<string> {
+  const res = await graphFetch(
+    `/drives/${driveId}/items/${itemId}?$select=id,@microsoft.graph.downloadUrl`
+  )
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Graph download URL fetch failed (${res.status}): ${text}`)
+  }
+  const json = await res.json()
+  const url = json['@microsoft.graph.downloadUrl'] as string | undefined
+  if (!url) throw new Error('Graph API did not return a download URL for this item')
+  return url
+}

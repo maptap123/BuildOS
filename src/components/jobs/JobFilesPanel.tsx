@@ -13,6 +13,7 @@ interface JobFile {
   id: string
   name: string
   webUrl: string
+  driveId: string | null
   size: number | null
   mimeType: string | null
   isFolder: boolean
@@ -268,6 +269,7 @@ export function JobFilesPanel({ jobId, fullPage = false }: Props) {
                         <FileRow
                           key={f.id}
                           file={f}
+                          jobId={jobId}
                           isAdmin={isAdmin}
                           updatingId={updating}
                           onVisibilityChange={updateVisibility}
@@ -286,6 +288,7 @@ export function JobFilesPanel({ jobId, fullPage = false }: Props) {
                         <FileRow
                           key={f.id}
                           file={f}
+                          jobId={jobId}
                           isAdmin={isAdmin}
                           updatingId={updating}
                           onVisibilityChange={updateVisibility}
@@ -398,15 +401,22 @@ function OneDriveFolderCard({
 
 function FileRow({
   file,
+  jobId,
   isAdmin,
   updatingId,
   onVisibilityChange,
 }: {
   file: JobFile
+  jobId: string
   isAdmin: boolean
   updatingId: string | null
   onVisibilityChange: (id: string, v: Visibility) => void
 }) {
+  const downloadHref =
+    !file.isFolder && file.driveId
+      ? `/api/jobs/${jobId}/files/${file.id}/download?driveId=${encodeURIComponent(file.driveId)}`
+      : file.webUrl
+
   return (
     <div className="flex items-center gap-3 py-2.5">
       {file.isFolder
@@ -415,7 +425,15 @@ function FileRow({
       }
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-navy-800 truncate">{file.name}</p>
+        <a
+          href={downloadHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-medium text-navy-800 hover:text-gold-600 truncate block transition-colors"
+          title={file.isFolder ? 'Open folder in OneDrive' : 'Download file'}
+        >
+          {file.name}
+        </a>
         {(file.size || file.lastModified) && (
           <p className="text-[11px] text-gray-400">
             {[formatBytes(file.size), formatDate(file.lastModified)].filter(Boolean).join(' · ')}
@@ -431,11 +449,11 @@ function FileRow({
           onToggle={v => onVisibilityChange(file.id, v)}
         />
         <a
-          href={file.webUrl}
+          href={downloadHref}
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-400 hover:text-gold-600 transition-colors"
-          title="Open in OneDrive"
+          title={file.isFolder ? 'Open folder in OneDrive' : 'Download file'}
         >
           <ExternalLink size={14} />
         </a>
