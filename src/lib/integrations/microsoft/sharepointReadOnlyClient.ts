@@ -194,7 +194,10 @@ export async function listSharePointFolderContentsByUrl(
 export async function listSharePointFolderContents(
   compositeId: string
 ): Promise<SPDriveItem[]> {
-  const sep = compositeId.indexOf('!')
+  // SharePoint driveIds have the form "b!{base64}" which itself contains a "!".
+  // Use lastIndexOf so we split at the separator between driveId and itemId,
+  // not at the "!" inside the "b!" prefix.
+  const sep = compositeId.lastIndexOf('!')
   if (sep === -1) throw new Error('sharepoint_drive_item_id has no driveId (missing "!")')
 
   const driveId  = compositeId.slice(0, sep)
