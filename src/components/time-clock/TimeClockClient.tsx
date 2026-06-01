@@ -479,7 +479,7 @@ export function TimeClockClient({
         {isAdmin && (
           <Link
             href="/time-clock/shifts"
-            className="flex items-center gap-1 text-sm font-medium text-navy-600 hover:text-navy-900 transition-colors mt-1"
+            className="hidden md:flex items-center gap-1 text-sm font-medium text-navy-600 hover:text-navy-900 transition-colors mt-1"
           >
             Manage Shifts
             <ChevronRight size={14} />

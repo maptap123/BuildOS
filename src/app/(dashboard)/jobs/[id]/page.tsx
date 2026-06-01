@@ -7,6 +7,7 @@ import type { Job, DailyLog, Task, ScheduleItem, Contact } from '@/types'
 import { CloseoutPanel } from '@/components/jobs/CloseoutPanel'
 import { JobContactsPanel } from '@/components/jobs/JobContactsPanel'
 import { ConnectedSystemsCard } from '@/components/jobs/ConnectedSystemsCard'
+import { JobFilesPanel } from '@/components/jobs/JobFilesPanel'
 
 type JobDetail = Job & {
   pm: { full_name: string | null } | null
@@ -417,7 +418,10 @@ export default async function JobDetailPage({
       {/* Card 6 — Connected Systems */}
       <ConnectedSystemsCard jobId={id} />
 
-      {/* Card 7 — Budget Snapshot (permission-gated) */}
+      {/* Card 7 — Job Documents (OneDrive files with per-file visibility control) */}
+      <JobFilesPanel jobId={id} />
+
+      {/* Card 8 — Budget Snapshot (permission-gated) */}
       {canSeeBudget && (
         <div className="bg-white rounded-xl border border-border p-5 md:col-span-2">
           <div className="flex items-center justify-between mb-4">

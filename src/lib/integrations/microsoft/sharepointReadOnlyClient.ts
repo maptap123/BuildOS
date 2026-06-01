@@ -71,7 +71,9 @@ export interface SPDriveItem {
   id: string
   name: string
   webUrl: string
+  size?: number
   folder?: { childCount: number }
+  file?: { mimeType: string }
   parentReference?: { driveId: string; path: string }
   createdDateTime?: string
   lastModifiedDateTime?: string
@@ -151,4 +153,37 @@ export async function listSharePointFolderChildren(
 
   const json = await res.json()
   return (json?.value ?? []) as SPDriveItem[]
+}
+
+/**
+ * List all files (and optionally folders) in a SharePoint folder, with pagination.
+ * Parses a composite driveItemId in the form "{driveId}!{itemId}" as stored in jobs.sharepoint_drive_item_id.
+ */
+export async function listSharePointFolderContents(
+  compositeId: string
+): Promise<SPDriveItem[]> {
+  const sep = compositeId.indexOf('!')
+  if (sep === -1) throw new Error('sharepoint_drive_item_id has no driveId (missing "!")')
+
+  const driveId  = compositeId.slice(0, sep)
+  const folderId = compositeId.slice(sep + 1)
+
+  const select = 'id,name,webUrl,size,file,folder,parentReference,createdDateTime,lastModifiedDateTime'
+  let nextLink: string | null =
+    `/drives/${driveId}/items/${folderId}/children?$select=${select}&$top=200`
+
+  const items: SPDriveItem[] = []
+
+  while (nextLink) {
+    const res = await graphFetch(nextLink)
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`SharePoint file list failed (${res.status}): ${text}`)
+    }
+    const json = await res.json()
+    items.push(...((json?.value ?? []) as SPDriveItem[]))
+    nextLink = json['@odata.nextLink'] ?? null
+  }
+
+  return items
 }
