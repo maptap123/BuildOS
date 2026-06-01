@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSharePointItemDownloadUrl } from '@/lib/integrations/microsoft/sharepointReadOnlyClient'
+import { fetchSharePointItemContent } from '@/lib/integrations/microsoft/sharepointReadOnlyClient'
 
 export async function GET(
   req: Request,
@@ -45,10 +45,28 @@ export async function GET(
   }
 
   try {
-    const downloadUrl = await getSharePointItemDownloadUrl(driveId, fileId)
-    return NextResponse.redirect(downloadUrl)
+    const graphRes = await fetchSharePointItemContent(driveId, fileId)
+
+    if (!graphRes.ok) {
+      const text = await graphRes.text()
+      return NextResponse.json(
+        { error: `SharePoint fetch failed (${graphRes.status}): ${text}` },
+        { status: 502 }
+      )
+    }
+
+    const contentType = graphRes.headers.get('content-type') ?? 'application/octet-stream'
+    const contentDisposition = graphRes.headers.get('content-disposition') ?? 'attachment'
+
+    return new NextResponse(graphRes.body, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': contentDisposition,
+        'Cache-Control': 'private, no-cache',
+      },
+    })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to get download URL'
+    const message = err instanceof Error ? err.message : 'Failed to fetch file'
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }
