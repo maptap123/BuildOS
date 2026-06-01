@@ -102,36 +102,46 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
     if (!SR) { setSpeechSupported(false); return }
 
     shouldListenRef.current = true
-    const rec = new SR()
-    rec.continuous = true
-    rec.interimResults = true
-    rec.lang = 'en-US'
 
-    rec.onresult = (e: SpeechRecognitionEventLike) => {
-      let finalChunk = ''
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalChunk += e.results[i][0].transcript + ' '
-        else interim += e.results[i][0].transcript
+    function makeRecognizer(): SpeechRecognition {
+      const rec = new SR!()
+      rec.continuous = false
+      rec.interimResults = true
+      rec.lang = 'en-US'
+
+      rec.onresult = (e: SpeechRecognitionEventLike) => {
+        let finalChunk = ''
+        let interim = ''
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalChunk += e.results[i][0].transcript + ' '
+          else interim += e.results[i][0].transcript
+        }
+        if (finalChunk) setTranscript(t => t + finalChunk)
+        setInterimText(interim)
       }
-      if (finalChunk) setTranscript(t => t + finalChunk)
-      setInterimText(interim)
+
+      rec.onend = () => {
+        setInterimText('')
+        if (shouldListenRef.current) {
+          // Always create a fresh instance to avoid stale results replaying
+          const next = makeRecognizer()
+          recognitionRef.current = next
+          try { next.start() } catch {}
+        } else {
+          setIsListening(false)
+        }
+      }
+
+      return rec
     }
 
-    rec.onend = () => {
-      if (shouldListenRef.current) {
-        try { rec.start() } catch {}
-      } else {
-        setIsListening(false)
-      }
-    }
-
+    const rec = makeRecognizer()
     try { rec.start(); setIsListening(true) } catch {}
     recognitionRef.current = rec
 
     return () => {
       shouldListenRef.current = false
-      try { rec.stop() } catch {}
+      try { recognitionRef.current?.stop() } catch {}
     }
   }, [step])
 
@@ -182,12 +192,15 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
           text: fullText || 'Field crew documented work today with photos.',
         }),
       })
-      if (!res.ok) throw new Error('AI error')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `AI error (${res.status})`)
+      }
       const data = await res.json()
       setPolished(data.result ?? fullText)
-    } catch {
+    } catch (e) {
       setPolished(fullText)
-      setError('AI failed — edit manually')
+      setError(e instanceof Error ? `AI failed: ${e.message}` : 'AI failed — edit manually')
     }
     setStep('review')
   }
