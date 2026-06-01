@@ -156,6 +156,38 @@ export async function listSharePointFolderChildren(
 }
 
 /**
+ * Resolve a SharePoint folder web URL to a composite drive item ID ({driveId}!{itemId})
+ * using the Microsoft Graph /shares/ endpoint. Also returns the children of that folder.
+ *
+ * Works with any direct SharePoint folder URL stored in jobs.sharepoint_folder_url.
+ * Microsoft Graph accepts the u!{base64url(webUrl)} sharing token for direct item URLs.
+ */
+export async function listSharePointFolderContentsByUrl(
+  webUrl: string
+): Promise<{ items: SPDriveItem[]; compositeId: string }> {
+  const b64 = Buffer.from(webUrl, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+  const token = `u!${b64}`
+
+  const res = await graphFetch(`/shares/${token}/driveItem?$select=id,parentReference`)
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Cannot access SharePoint folder via URL (${res.status}): ${text}`)
+  }
+
+  const item = (await res.json()) as SPDriveItem
+  const driveId = item.parentReference?.driveId
+  if (!driveId) throw new Error('SharePoint response missing driveId — check app permissions')
+
+  const compositeId = `${driveId}!${item.id}`
+  const items = await listSharePointFolderContents(compositeId)
+  return { items, compositeId }
+}
+
+/**
  * List all files (and optionally folders) in a SharePoint folder, with pagination.
  * Parses a composite driveItemId in the form "{driveId}!{itemId}" as stored in jobs.sharepoint_drive_item_id.
  */

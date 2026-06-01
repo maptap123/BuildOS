@@ -126,15 +126,17 @@ export function JobFilesPanel({ jobId }: Props) {
   const [folderPath, setFolderPath] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('not_linked')
   const [syncError, setSyncError] = useState<string | null>(null)
-  const [loading, setLoading]     = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const [updating, setUpdating]   = useState<string | null>(null)
+  const [loading, setLoading]           = useState(true)
+  const [refreshing, setRefreshing]     = useState(false)
+  const [error, setError]               = useState<string | null>(null)
+  const [fileListError, setFileListError] = useState<string | null>(null)
+  const [updating, setUpdating]         = useState<string | null>(null)
 
   const fetchFiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     else setRefreshing(true)
     setError(null)
+    setFileListError(null)
     try {
       const res = await fetch(`/api/jobs/${jobId}/files`)
       if (!res.ok) {
@@ -149,6 +151,7 @@ export function JobFilesPanel({ jobId }: Props) {
       setFolderPath(json.folderPath ?? null)
       setSyncStatus(json.syncStatus ?? 'not_linked')
       setSyncError(json.syncError ?? null)
+      setFileListError(json.fileListError ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load files')
     } finally {
@@ -186,7 +189,7 @@ export function JobFilesPanel({ jobId }: Props) {
     <div className="bg-white rounded-xl border border-border p-5 md:col-span-2">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display font-semibold text-navy-900 text-base">Job Documents</h3>
-        {linked && (
+        {syncStatus === 'linked' && (
           <button
             onClick={() => fetchFiles(true)}
             disabled={refreshing || loading}
@@ -222,7 +225,25 @@ export function JobFilesPanel({ jobId }: Props) {
             syncError={syncError}
           />
 
-          {/* File listing — only shown when Graph API confirmed the folder is linked */}
+          {/* File listing — shown when Graph API returned a file list */}
+          {syncStatus === 'linked' && !linked && fileListError && (
+            <div className="flex flex-col items-center justify-center py-6 text-gray-400 text-sm gap-1.5">
+              <FolderOpen size={24} className="text-gray-200" />
+              <p>Could not load file list from OneDrive.</p>
+              {isAdmin && <p className="text-xs text-red-400">{fileListError}</p>}
+              {folderUrl && (
+                <a
+                  href={folderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-gold-600 hover:text-gold-700 transition-colors"
+                >
+                  <ExternalLink size={13} />
+                  Browse files directly in OneDrive
+                </a>
+              )}
+            </div>
+          )}
           {linked && (
             files.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-gray-400 text-sm gap-2">

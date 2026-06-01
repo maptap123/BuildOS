@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { listSharePointFolderContents } from '@/lib/integrations/microsoft/sharepointReadOnlyClient'
+import {
+  listSharePointFolderContents,
+  listSharePointFolderContentsByUrl,
+  type SPDriveItem,
+} from '@/lib/integrations/microsoft/sharepointReadOnlyClient'
 
 export async function GET(
   _req: Request,
@@ -38,18 +42,40 @@ export async function GET(
     syncError:  (job.documents_sync_error   as string | null) ?? null,
   }
 
-  if (!job.sharepoint_drive_item_id || job.documents_sync_status !== 'linked') {
-    return NextResponse.json({ linked: false, files: [], ...folderMeta })
+  if (job.documents_sync_status !== 'linked') {
+    return NextResponse.json({ linked: false, files: [], isAdmin, ...folderMeta })
   }
 
-  let spItems
-  try {
-    spItems = await listSharePointFolderContents(job.sharepoint_drive_item_id)
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'SharePoint fetch failed' },
-      { status: 502 }
-    )
+  // Attempt file listing: try composite ID first, fall back to resolving from URL.
+  let spItems: SPDriveItem[] | null = null
+  let fileListError: string | null = null
+
+  if (job.sharepoint_drive_item_id) {
+    try {
+      spItems = await listSharePointFolderContents(job.sharepoint_drive_item_id as string)
+    } catch {
+      // Drive item ID may be stale or malformed — fall through to URL resolution.
+    }
+  }
+
+  if (!spItems && job.sharepoint_folder_url) {
+    try {
+      const resolved = await listSharePointFolderContentsByUrl(job.sharepoint_folder_url as string)
+      spItems = resolved.items
+      // Backfill the drive item ID so future calls skip the URL resolution step.
+      if (!job.sharepoint_drive_item_id) {
+        admin.from('jobs')
+          .update({ sharepoint_drive_item_id: resolved.compositeId })
+          .eq('id', id)
+          .then(() => { /* fire-and-forget */ })
+      }
+    } catch (err) {
+      fileListError = err instanceof Error ? err.message : 'SharePoint fetch failed'
+    }
+  }
+
+  if (!spItems) {
+    return NextResponse.json({ linked: false, files: [], isAdmin, fileListError, ...folderMeta })
   }
 
   // Load all permission records for this job in one query
