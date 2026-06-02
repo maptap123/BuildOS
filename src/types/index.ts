@@ -556,6 +556,10 @@ export interface Estimate {
   show_cost_breakdown: boolean
   proposal_header_text: string | null
   proposal_footer_text: string | null
+  // Lock
+  is_locked: boolean
+  locked_at: string | null
+  locked_by: string | null
 }
 
 export interface EstimateLine {

@@ -10,24 +10,29 @@ interface Props {
 }
 
 export function EstimateTotals({ lines }: Props) {
-  const subtotal = lines.reduce((s, l) => s + l.quantity * l.unit_cost, 0)
-  const markup   = lines.reduce((s, l) => s + l.quantity * l.unit_cost * (l.markup_pct / 100), 0)
-  const total    = subtotal + markup
+  const builderCost = lines.reduce((s, l) => s + l.quantity * l.unit_cost, 0)
+  const markup      = lines.reduce((s, l) => s + l.quantity * l.unit_cost * (l.markup_pct / 100), 0)
+  const total       = builderCost + markup
+  const marginPct   = total > 0 ? (markup / total) * 100 : 0
 
   return (
     <div className="bg-white border border-border rounded-xl p-5">
       <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Summary</h3>
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Subtotal (cost)</span>
-          <span className="font-medium text-navy-800 tabular-nums">{fmt(subtotal)}</span>
+          <span className="text-gray-500">Builder cost</span>
+          <span className="font-medium text-navy-800 tabular-nums">{fmt(builderCost)}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Markup</span>
-          <span className="font-medium text-navy-800 tabular-nums">{fmt(markup)}</span>
+          <span className="text-gray-500">Profit</span>
+          <span className="font-medium text-gold-600 tabular-nums">+{fmt(markup)}</span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-400">Margin</span>
+          <span className="text-gray-500 tabular-nums">{marginPct.toFixed(1)}%</span>
         </div>
         <div className="border-t border-gray-100 pt-2 mt-2 flex items-center justify-between">
-          <span className="text-sm font-semibold text-navy-900">Total</span>
+          <span className="text-sm font-semibold text-navy-900">Client Total</span>
           <span className="text-lg font-bold text-navy-900 tabular-nums">{fmt(total)}</span>
         </div>
       </div>

@@ -35,10 +35,12 @@ const RETAILER_LABELS: Record<string, string> = {
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
 
+function lineBuilderCost(line: EstimateLine): number {
+  return line.quantity * line.unit_cost
+}
+
 function lineTotal(line: EstimateLine): number {
-  const cost   = line.quantity * line.unit_cost
-  const markup = cost * (line.markup_pct / 100)
-  return cost + markup
+  return lineBuilderCost(line) * (1 + line.markup_pct / 100)
 }
 
 async function persistVisibility(id: string, client_visible: boolean) {
@@ -56,8 +58,9 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
   const [lookupSource, setLookupSource]   = useState<PriceLookupResponse['source'] | null>(null)
   const [lookupMsg, setLookupMsg]         = useState<string | null>(null)
 
-  const total    = lineTotal(line)
-  const isHidden = line.client_visible === false
+  const builderCost = lineBuilderCost(line)
+  const total       = lineTotal(line)
+  const isHidden    = line.client_visible === false
 
   function toggleVisibility() {
     const next = !line.client_visible
@@ -190,6 +193,11 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
           )}
         </td>
 
+        {/* builder cost */}
+        <td className={`px-2 py-2.5 w-28 text-right${isHidden ? ' opacity-50' : ''}`}>
+          <span className="text-sm text-gray-500 tabular-nums">{fmt(builderCost)}</span>
+        </td>
+
         {/* markup % */}
         <td className={`px-2 py-2.5 w-20 hidden md:table-cell${isHidden ? ' opacity-50' : ''}`}>
           {canEdit ? (
@@ -230,7 +238,7 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
       {/* Expanded notes + price lookup row */}
       {expanded && (
         <tr className="bg-gray-50">
-          <td colSpan={10} className="px-10 pb-3 pt-1 space-y-2">
+          <td colSpan={11} className="px-10 pb-3 pt-1 space-y-2">
             {canEdit ? (
               <>
                 <input

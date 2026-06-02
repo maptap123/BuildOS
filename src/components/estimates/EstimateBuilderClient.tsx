@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, Fragment } from 'react'
+import { useState, useCallback, Fragment, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -20,6 +20,9 @@ import {
   Layers,
   Settings2,
   Sparkles,
+  Lock,
+  Unlock,
+  TrendingUp,
 } from 'lucide-react'
 import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow } from './EstimateLineRow'
@@ -164,6 +167,52 @@ export function EstimateBuilderClient({
   // Assembly modal
   const [showAssemblies, setShowAssemblies]   = useState(false)
   const [addingAssembly, setAddingAssembly]   = useState<string | null>(null)
+
+  // Refs for stable autosave callback
+  const linesRef          = useRef(lines)
+  const dirtyLinesRef     = useRef(dirtyLines)
+  const activeEstimateRef = useRef(activeEstimate)
+  useEffect(() => { linesRef.current = lines },           [lines])
+  useEffect(() => { dirtyLinesRef.current = dirtyLines }, [dirtyLines])
+  useEffect(() => { activeEstimateRef.current = activeEstimate }, [activeEstimate])
+
+  // Autosave — silently flush dirty lines 1.5 s after last change
+  const saveLinesSilently = useCallback(async () => {
+    if (!activeEstimateRef.current || dirtyLinesRef.current.size === 0) return
+    const toSave = linesRef.current.filter(l => dirtyLinesRef.current.has(l.id))
+    if (toSave.length === 0) return
+    try {
+      await Promise.all(
+        toSave.map(l =>
+          fetch(`/api/estimate-lines/${l.id}`, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              description:   l.description,
+              phase:         l.phase,
+              cost_code:     l.cost_code,
+              uom:           l.uom,
+              quantity:      l.quantity,
+              unit_cost:     l.unit_cost,
+              markup_pct:    l.markup_pct,
+              sort_order:    l.sort_order,
+              notes:         l.notes,
+              internal_note: l.internal_note,
+            }),
+          })
+        )
+      )
+      setDirtyLines(new Set())
+    } catch {
+      // silent — user can still manually save if needed
+    }
+  }, [])
+
+  useEffect(() => {
+    if (dirtyLines.size === 0) return
+    const t = setTimeout(saveLinesSilently, 1500)
+    return () => clearTimeout(t)
+  }, [dirtyLines, saveLinesSilently])
 
   // AI Generate modal
   const [showAIGenerate, setShowAIGenerate]         = useState(false)
@@ -456,6 +505,25 @@ export function EstimateBuilderClient({
     }
   }
 
+  // ── Lock / unlock estimate ─────────────────────────────────────
+  async function toggleLock() {
+    if (!activeEstimate) return
+    setSaving(true)
+    setError(null)
+    try {
+      const nowLocked = !activeEstimate.is_locked
+      await patchEstimate({
+        is_locked: nowLocked,
+        locked_at: nowLocked ? new Date().toISOString() : null,
+        locked_by: nowLocked ? undefined : null,  // server fills locked_by via patchEstimate user context
+      } as Partial<Estimate>)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update lock')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ── Toggle phase collapse ──────────────────────────────────────
   function togglePhase(phase: string) {
     setCollapsedPhases(prev => {
@@ -556,9 +624,12 @@ export function EstimateBuilderClient({
     })
   }
 
-  const groupedLines = groupByPhase(lines)
-  const grandTotal   = lines.reduce((s, l) => s + lineTotal(l), 0)
-  const hasDirty     = dirtyLines.size > 0
+  const groupedLines    = groupByPhase(lines)
+  const totalBuilderCost = lines.reduce((s, l) => s + l.quantity * l.unit_cost, 0)
+  const grandTotal      = lines.reduce((s, l) => s + lineTotal(l), 0)
+  const totalProfit     = grandTotal - totalBuilderCost
+  const marginPct       = grandTotal > 0 ? (totalProfit / grandTotal) * 100 : 0
+  const hasDirty        = dirtyLines.size > 0
 
   // ─────────────────────────────────────────────────────────────
   return (
@@ -641,6 +712,21 @@ export function EstimateBuilderClient({
                     Client Link
                   </button>
                 )}
+                {permissions.can_edit && lines.length > 0 && (
+                  <button
+                    onClick={toggleLock}
+                    disabled={saving}
+                    title={activeEstimate.is_locked ? 'Unlock estimate to allow editing' : 'Lock estimate to prevent changes'}
+                    className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border transition-colors disabled:opacity-50 ${
+                      activeEstimate.is_locked
+                        ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {activeEstimate.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
+                    {activeEstimate.is_locked ? 'Locked' : 'Lock'}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -680,6 +766,34 @@ export function EstimateBuilderClient({
               </span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Profit summary bar */}
+      {activeEstimate && lines.length > 0 && (
+        <div className="bg-navy-900 rounded-xl px-6 py-4 flex items-center gap-8">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold text-navy-400 uppercase tracking-wide mb-0.5">Builder Cost</p>
+            <p className="text-xl font-bold text-white tabular-nums">{fmt(totalBuilderCost)}</p>
+          </div>
+          <span className="text-navy-500 text-xl font-light select-none">+</span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold text-navy-400 uppercase tracking-wide mb-0.5">
+              Profit <span className="text-gold-400">({marginPct.toFixed(1)}% margin)</span>
+            </p>
+            <p className="text-xl font-bold text-gold-400 tabular-nums">{fmt(totalProfit)}</p>
+          </div>
+          <span className="text-navy-500 text-xl font-light select-none">=</span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold text-navy-400 uppercase tracking-wide mb-0.5">Client Total</p>
+            <p className="text-2xl font-bold text-white tabular-nums">{fmt(grandTotal)}</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <TrendingUp size={14} className="text-navy-500" />
+            <span className="text-xs text-navy-400">
+              {lines.length} line{lines.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
       )}
 
@@ -831,6 +945,12 @@ export function EstimateBuilderClient({
 
           {/* Left: Cost catalog */}
           <div className="lg:col-span-1 space-y-3">
+            {activeEstimate.is_locked && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+                <Lock size={13} className="shrink-0" />
+                Estimate is locked. Unlock to make changes.
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setShowCatalog(v => !v)}
@@ -840,7 +960,7 @@ export function EstimateBuilderClient({
                 Cost Catalog
               </button>
               <div className="flex items-center gap-2">
-                {permissions.can_create && (
+                {permissions.can_create && !activeEstimate.is_locked && (
                   <button
                     onClick={openAIGenerate}
                     className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors"
@@ -849,7 +969,7 @@ export function EstimateBuilderClient({
                     AI Generate
                   </button>
                 )}
-                {permissions.can_create && (
+                {permissions.can_create && !activeEstimate.is_locked && (
                   <button
                     onClick={() => setShowAssemblies(true)}
                     className="flex items-center gap-1 text-xs text-navy-600 hover:text-navy-800 font-medium transition-colors"
@@ -858,7 +978,7 @@ export function EstimateBuilderClient({
                     Assemblies
                   </button>
                 )}
-                {permissions.can_create && (
+                {permissions.can_create && !activeEstimate.is_locked && (
                   <button
                     onClick={addBlankLine}
                     className="flex items-center gap-1 text-xs text-gold-600 hover:text-gold-700 font-medium transition-colors"
@@ -870,7 +990,7 @@ export function EstimateBuilderClient({
               </div>
             </div>
             {showCatalog && (
-              <CostCatalogSearch onSelect={permissions.can_create ? addCatalogItem : () => {}} />
+              <CostCatalogSearch onSelect={permissions.can_create && !activeEstimate.is_locked ? addCatalogItem : () => {}} />
             )}
             <EstimateTotals lines={lines} />
           </div>
@@ -884,12 +1004,15 @@ export function EstimateBuilderClient({
                     {activeEstimate.title ?? `Estimate v${activeEstimate.version}`}
                   </h2>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {lines.length} line{lines.length !== 1 ? 's' : ''} · Total {fmt(grandTotal)}
+                    {lines.length} line{lines.length !== 1 ? 's' : ''}
+                    {lines.length > 0 && (
+                      <> · cost {fmt(totalBuilderCost)} → price {fmt(grandTotal)}</>
+                    )}
                   </p>
                 </div>
                 {hasDirty && (
-                  <span className="text-[10px] text-gold-600 font-medium bg-gold-50 px-2 py-1 rounded-full">
-                    Unsaved changes
+                  <span className="text-[10px] text-gray-400 font-medium bg-gray-100 px-2 py-1 rounded-full animate-pulse">
+                    Saving…
                   </span>
                 )}
               </div>
@@ -930,15 +1053,18 @@ export function EstimateBuilderClient({
                         <th className="px-2 py-2.5 text-center w-16 hidden md:table-cell">UOM</th>
                         <th className="px-2 py-2.5 text-right w-20">Qty</th>
                         <th className="px-2 py-2.5 text-right w-28">Unit Cost</th>
+                        <th className="px-2 py-2.5 text-right w-28">Cost</th>
                         <th className="px-2 py-2.5 text-right w-20 hidden md:table-cell">Markup</th>
-                        <th className="px-2 py-2.5 text-right w-28">Total</th>
+                        <th className="px-2 py-2.5 text-right w-28">Price</th>
                         <th className="pr-3 pl-1 py-2.5 w-8" />
                       </tr>
                     </thead>
                     <tbody>
                       {Array.from(groupedLines.entries()).map(([phase, phaseLines]) => {
-                        const phaseTotal  = phaseLines.reduce((s, l) => s + lineTotal(l), 0)
-                        const isCollapsed = collapsedPhases.has(phase)
+                        const phaseBuilderCost = phaseLines.reduce((s, l) => s + l.quantity * l.unit_cost, 0)
+                        const phaseTotal       = phaseLines.reduce((s, l) => s + lineTotal(l), 0)
+                        const phaseProfit      = phaseTotal - phaseBuilderCost
+                        const isCollapsed      = collapsedPhases.has(phase)
                         return (
                           <Fragment key={phase}>
                             <tr
@@ -951,13 +1077,19 @@ export function EstimateBuilderClient({
                                   : <ChevronDown  size={12} className="text-gray-400" />
                                 }
                               </td>
-                              <td colSpan={7} className="px-2 py-2">
+                              <td colSpan={6} className="px-2 py-2">
                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                                   {phase}
                                 </span>
                                 <span className="text-[10px] text-gray-400 ml-2">
                                   {phaseLines.length} item{phaseLines.length !== 1 ? 's' : ''}
                                 </span>
+                              </td>
+                              <td className="px-2 py-2 text-right">
+                                <span className="text-[10px] text-gray-400 tabular-nums">{fmt(phaseBuilderCost)}</span>
+                              </td>
+                              <td className="px-2 py-2 text-right hidden md:table-cell">
+                                <span className="text-[10px] text-gold-500 tabular-nums">+{fmt(phaseProfit)}</span>
                               </td>
                               <td className="px-2 py-2 text-right">
                                 <span className="text-xs font-semibold text-navy-700 tabular-nums">
@@ -971,8 +1103,8 @@ export function EstimateBuilderClient({
                               <EstimateLineRow
                                 key={line.id}
                                 line={line}
-                                canEdit={permissions.can_edit}
-                                canDelete={permissions.can_delete}
+                                canEdit={permissions.can_edit && !activeEstimate.is_locked}
+                                canDelete={permissions.can_delete && !activeEstimate.is_locked}
                                 onChange={handleLineChange}
                                 onDelete={deleteLine}
                               />
@@ -984,9 +1116,13 @@ export function EstimateBuilderClient({
 
                     <tfoot>
                       <tr className="border-t-2 border-gray-200 bg-gray-50">
-                        <td colSpan={8} className="px-5 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
+                        <td colSpan={7} className="px-5 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
                           Grand Total
                         </td>
+                        <td className="px-2 py-3 text-right">
+                          <span className="text-sm font-semibold text-gray-500 tabular-nums">{fmt(totalBuilderCost)}</span>
+                        </td>
+                        <td className="px-2 py-3 hidden md:table-cell" />
                         <td className="px-2 py-3 text-right">
                           <span className="font-bold text-navy-900 tabular-nums">{fmt(grandTotal)}</span>
                         </td>
