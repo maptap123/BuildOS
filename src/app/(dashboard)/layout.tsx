@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -17,35 +17,76 @@ import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
 import { ActiveJobProvider, useActiveJob } from '@/contexts/ActiveJobContext'
 import type { Job } from '@/types'
 
-// ── Desktop top tabs (unchanged) ─────────────────────────────────────────────
-const TABS = [
-  { key: 'leads',         label: 'Leads',         icon: Target       },
-  { key: 'jobs',          label: 'Jobs',          icon: Briefcase    },
-  { key: 'budget',        label: 'Budget',        icon: DollarSign   },
-  { key: 'schedule',      label: 'Schedule',      icon: Calendar     },
-  { key: 'tasks',         label: 'Tasks',         icon: CheckSquare  },
-  { key: 'logs',          label: 'Logs',          icon: FileText     },
-  { key: 'estimates',     label: 'Estimates',     icon: ClipboardList},
-  { key: 'profitability', label: 'Profitability', icon: TrendingUp   },
-  { key: 'finance',       label: 'Finance',       icon: BarChart3    },
-  { key: 'vendors',       label: 'Vendors',       icon: HardHat      },
-  { key: 'contacts',      label: 'Contacts',      icon: Users        },
-  { key: 'documents',     label: 'Documents',     icon: Folder       },
-  { key: 'time-clock',    label: 'Time Clock',    icon: Clock        },
-  { key: 'admin',         label: 'Admin',         icon: ShieldCheck  },
-] as const
+// ── Individual tab definition ────────────────────────────────────────────────
+type TabItem = {
+  key: string
+  label: string
+  icon: React.ComponentType<{ size?: number }>
+}
 
-type NavKey = typeof TABS[number]['key'] | 'home' | 'more'
+// ── Top-level nav item: either a standalone tab or a dropdown group ──────────
+type NavGroup = {
+  key: string
+  label: string
+  icon: React.ComponentType<{ size?: number }>
+  children: TabItem[]
+}
+type NavItem = TabItem | NavGroup
+
+function isGroup(item: NavItem): item is NavGroup {
+  return 'children' in item && Array.isArray((item as NavGroup).children)
+}
+
+// ── Desktop grouped nav ──────────────────────────────────────────────────────
+const DESKTOP_NAV: NavItem[] = [
+  { key: 'leads',    label: 'Leads',    icon: Target    },
+  { key: 'jobs',     label: 'Jobs',     icon: Briefcase },
+  {
+    key: 'finance-group',
+    label: 'Finance',
+    icon: BarChart3,
+    children: [
+      { key: 'budget',        label: 'Budget',        icon: DollarSign    },
+      { key: 'estimates',     label: 'Estimates',     icon: ClipboardList },
+      { key: 'profitability', label: 'Profitability', icon: TrendingUp    },
+      { key: 'finance',       label: 'Finance',       icon: BarChart3     },
+    ],
+  },
+  {
+    key: 'operations-group',
+    label: 'Operations',
+    icon: Calendar,
+    children: [
+      { key: 'schedule', label: 'Schedule', icon: Calendar    },
+      { key: 'tasks',    label: 'Tasks',    icon: CheckSquare },
+      { key: 'logs',     label: 'Logs',     icon: FileText    },
+    ],
+  },
+  {
+    key: 'people-group',
+    label: 'People',
+    icon: Users,
+    children: [
+      { key: 'vendors',  label: 'Vendors',  icon: HardHat },
+      { key: 'contacts', label: 'Contacts', icon: Users   },
+    ],
+  },
+  { key: 'documents',  label: 'Documents',  icon: Folder      },
+  { key: 'time-clock', label: 'Time Clock', icon: Clock       },
+  { key: 'admin',      label: 'Admin',      icon: ShieldCheck },
+]
+
+type NavKey = string
 
 const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'estimates', 'profitability'])
 
 // ── Mobile bottom nav (5 tabs) ────────────────────────────────────────────────
 const MOBILE_NAV = [
-  { key: 'home',       label: 'Home',       icon: Home       },
-  { key: 'jobs',       label: 'Jobs',       icon: Briefcase  },
-  { key: 'tasks',      label: 'Tasks',      icon: CheckSquare},
-  { key: 'time-clock', label: 'Time Clock', icon: Clock      },
-  { key: 'more',       label: 'More',       icon: Grid3X3    },
+  { key: 'home',       label: 'Home',       icon: Home        },
+  { key: 'jobs',       label: 'Jobs',       icon: Briefcase   },
+  { key: 'tasks',      label: 'Tasks',      icon: CheckSquare },
+  { key: 'time-clock', label: 'Time Clock', icon: Clock       },
+  { key: 'more',       label: 'More',       icon: Grid3X3     },
 ]
 
 // ── Outer shell — just wraps with the context provider ───────────────────────
@@ -63,6 +104,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerFor, setPickerFor] = useState<string | null>(null)
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const navRef = useRef<HTMLElement>(null)
 
   // Active job context (persisted, shared across all mobile components)
   const { activeJob, activeJobId, setActiveJob, clearActiveJob } = useActiveJob()
@@ -92,6 +135,20 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlJobId, job?.id])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setOpenGroup(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  // Close dropdown on route change
+  useEffect(() => { setOpenGroup(null) }, [pathname])
 
   const { can, isAdmin } = usePermissions()
 
@@ -151,9 +208,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     return pathname.startsWith(`/jobs/${urlJobId}/${key}`)
   }
 
+  function isGroupActive(group: NavGroup): boolean {
+    return group.children.some(child => isActiveDesktop(child.key))
+  }
+
   // ── Mobile tab routing ────────────────────────────────────────────────────
-  // Uses effectiveJobId (URL job OR persisted active job) so tabs work
-  // without requiring navigation to a specific job URL first.
   function mobileTabHref(key: string): string | null {
     if (key === 'home')       return '/jobs'
     if (key === 'jobs')       return null  // always opens the context picker
@@ -174,7 +233,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   // ── Picker: job selected ──────────────────────────────────────────────────
   function handlePickerSelect(job: Job) {
-    // Always update the persistent active job context
     setActiveJob({
       id: job.id,
       name: job.name,
@@ -183,11 +241,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       client_name: (job as { client_name?: string | null }).client_name ?? null,
     })
     setPickerOpen(false)
-    // If there was a destination intent (e.g. Tasks tab → picker), navigate there
     if (pickerFor) {
       router.push(`/jobs/${job.id}/${pickerFor}`)
     }
-    // If no pickerFor (Jobs tab context picker): stay on the current page ✓
     setPickerFor(null)
   }
 
@@ -208,23 +264,78 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       {/* ── Right side: top bar + content ── */}
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen min-w-0">
 
-        {/* Desktop top tab bar */}
-        <nav className="hidden md:flex items-center gap-1 bg-white border-b border-border px-4 shrink-0 overflow-x-auto scrollbar-none">
-          {TABS.filter(({ key }) => canUseNav(key)).map(({ key, label, icon: Icon }) => {
-            const href = tabHref(key)
-            const active = isActiveDesktop(key)
+        {/* Desktop top grouped tab bar */}
+        <nav
+          ref={navRef}
+          className="hidden md:flex items-center gap-0.5 bg-white border-b border-border px-4 shrink-0 overflow-x-auto scrollbar-none"
+        >
+          {DESKTOP_NAV.map((item) => {
+            if (isGroup(item)) {
+              const visibleChildren = item.children.filter(c => canUseNav(c.key))
+              if (visibleChildren.length === 0) return null
+              const groupActive = isGroupActive(item)
+              const isOpen = openGroup === item.key
+              const GroupIcon = item.icon
+              return (
+                <div key={item.key} className="relative">
+                  <button
+                    onClick={() => setOpenGroup(isOpen ? null : item.key)}
+                    className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      groupActive || isOpen
+                        ? 'border-gold-500 text-navy-900'
+                        : 'border-transparent text-gray-500 hover:text-navy-900 hover:border-gray-300'
+                    }`}
+                  >
+                    <GroupIcon size={15} />
+                    {item.label}
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="absolute top-full left-0 z-50 mt-0 w-44 bg-white border border-border rounded-b-lg shadow-lg py-1">
+                      {visibleChildren.map(child => {
+                        const ChildIcon = child.icon
+                        const childActive = isActiveDesktop(child.key)
+                        return (
+                          <Link
+                            key={child.key}
+                            href={tabHref(child.key)}
+                            className={`flex items-center gap-2.5 px-3 py-2 text-sm transition-colors ${
+                              childActive
+                                ? 'text-navy-900 bg-gold-50 font-semibold'
+                                : 'text-gray-600 hover:text-navy-900 hover:bg-gray-50'
+                            }`}
+                          >
+                            <ChildIcon size={14} />
+                            {child.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            // Standalone tab
+            if (!canUseNav(item.key)) return null
+            const TabIcon = item.icon
+            const active = isActiveDesktop(item.key)
             return (
               <Link
-                key={key}
-                href={href}
+                key={item.key}
+                href={tabHref(item.key)}
                 className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
                   active
                     ? 'border-gold-500 text-navy-900'
                     : 'border-transparent text-gray-500 hover:text-navy-900 hover:border-gray-300'
                 }`}
               >
-                <Icon size={15} />
-                {label}
+                <TabIcon size={15} />
+                {item.label}
               </Link>
             )
           })}
@@ -241,10 +352,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        {/* ── Mobile top bar ──
-            Shows the effective job context (persisted active job or URL job).
-            Tap anywhere to open the context picker.
-        ── */}
+        {/* ── Mobile top bar ── */}
         <header className="md:hidden bg-[#1b2b4a] px-4 py-3 flex items-center justify-between shrink-0">
           <button
             onClick={() => setPickerOpen(true)}
@@ -292,13 +400,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
             const href = mobileTabHref(key)
             const active = isActiveMobile(key)
 
-            // Tabs with no href open the job context picker
             if (href === null) {
               return (
                 <button
                   key={key}
                   onClick={() => {
-                    // For destination-intent tabs (tasks), store the destination
                     if (key !== 'jobs') setPickerFor(key)
                     setPickerOpen(true)
                   }}
@@ -326,11 +432,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
 
-      {/* ── Mobile job context picker ──
-          - Selecting a job: sets active context, stays on current page
-            (unless pickerFor is set, in which case it also navigates)
-          - Selecting "All Jobs": clears context, navigates to /jobs
-      ── */}
+      {/* ── Mobile job context picker ── */}
       {pickerOpen && (
         <JobPickerSheet
           onClose={() => { setPickerOpen(false); setPickerFor(null) }}
@@ -340,7 +442,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Fixer float button — desktop only (mobile uses the home screen button) */}
+      {/* Hermes float button — desktop only */}
       <div className="hidden md:block">
         <HermesChatPanel />
       </div>
