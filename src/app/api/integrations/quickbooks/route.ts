@@ -22,13 +22,24 @@ export async function GET() {
 
   if (!adminPerm?.can_manage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data, error } = await admin
+  const { data } = await admin
     .from('integration_settings')
     .select('service, is_connected, realm_id, connected_at, last_sync_at, sync_error')
     .eq('service', 'quickbooks')
-    .single()
+    .maybeSingle()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // No row (or table briefly unavailable) → respond gracefully as "not connected"
+  if (!data) {
+    return NextResponse.json({
+      service: 'quickbooks',
+      is_connected: false,
+      realm_id: null,
+      connected_at: null,
+      last_sync_at: null,
+      sync_error: null,
+    })
+  }
+
   return NextResponse.json(data)
 }
 
@@ -55,7 +66,7 @@ export async function POST(request: Request) {
     .from('integration_settings')
     .select('is_connected, realm_id')
     .eq('service', 'quickbooks')
-    .single()
+    .maybeSingle()
 
   if (!integration?.is_connected) {
     return NextResponse.json({

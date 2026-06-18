@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Clock, CheckSquare, CalendarDays, Plus, FileText, Cloud, Users, Briefcase } from 'lucide-react'
 import { useAgenda } from '@/hooks/useAgenda'
@@ -181,11 +181,16 @@ function JobsDashboardContent() {
   const selectJobFor = searchParams.get('selectJob')
   const selectJobLabel = selectJobFor ? SELECT_JOB_LABELS[selectJobFor] : null
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
+  // Live "today" date — computed after mount so SSR and first client render
+  // match (avoids hydration mismatch from timezone/second-boundary differences).
+  const [today, setToday] = useState('')
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    }))
+  }, [])
 
   function handleJobCreated(job: Job) {
     setShowAddJob(false)

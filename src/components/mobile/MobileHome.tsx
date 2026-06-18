@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bot, FileText, Calendar, Clock, Folder, ChevronRight, CheckSquare, AlertCircle } from 'lucide-react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -15,14 +15,14 @@ interface Props {
   jobName?: string | null
 }
 
-function greeting() {
+function computeGreeting() {
   const h = new Date().getHours()
   if (h < 12) return 'Good morning'
   if (h < 17) return 'Good afternoon'
   return 'Good evening'
 }
 
-function dayLabel() {
+function computeDayLabel() {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
@@ -41,6 +41,15 @@ export function MobileHome(_props: Props) {
   const { activeJob, activeJobId } = useActiveJob()
   const jobId = activeJobId
   const jobName = activeJob?.name ?? null
+
+  // Live greeting/date — computed after mount so SSR and first client render
+  // match (avoids hydration mismatch from timezone/second-boundary differences).
+  const [greeting, setGreeting] = useState('')
+  const [dayLabel, setDayLabel] = useState('')
+  useEffect(() => {
+    setGreeting(computeGreeting())
+    setDayLabel(computeDayLabel())
+  }, [])
 
   const [logPickerOpen, setLogPickerOpen] = useState(false)
   const [traditionalSheetOpen, setTraditionalSheetOpen] = useState(false)
@@ -83,10 +92,10 @@ export function MobileHome(_props: Props) {
         {/* Greeting */}
         <div className="mb-6">
           <p className="text-[#d4a83c] text-xs font-semibold tracking-[0.18em] uppercase mb-1">
-            {dayLabel()}
+            {dayLabel}
           </p>
           <h1 className="font-display text-3xl font-bold text-white leading-tight">
-            {greeting()}{user?.full_name ? `, ${firstName(user.full_name)}` : ''}
+            {greeting}{greeting && user?.full_name ? `, ${firstName(user.full_name)}` : ''}
           </h1>
           {jobName && (
             <p className="text-[#4d6a9a] text-sm mt-1.5">

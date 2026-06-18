@@ -210,7 +210,7 @@ export function HermesChatPanel() {
             <Bot size={16} className="text-gold-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-display font-bold text-navy-900 text-sm leading-none">Hermes</p>
+            <p className="font-display font-bold text-navy-900 text-sm leading-none">Fixer</p>
             <p className="text-[10px] text-gray-400 mt-0.5">JDC AI Assistant</p>
           </div>
           <button
