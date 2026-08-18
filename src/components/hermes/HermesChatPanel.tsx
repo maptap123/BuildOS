@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, Loader2, Bot } from 'lucide-react'
+import { MessageCircle, X, Send, Loader2, Bot, Mic } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useSpeechInput } from '@/hooks/useSpeechInput'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -23,6 +24,14 @@ const QUICK_PROMPTS = [
   "What's scheduled this week?",
 ]
 
+// Always-visible chips above the input (Klutch-style)
+const PERSISTENT_CHIPS = [
+  'My tasks today',
+  "What's overdue?",
+  'Start a log',
+  'Summarize this job',
+]
+
 export function HermesChatPanel() {
   const pathname = usePathname()
   const router = useRouter()
@@ -37,6 +46,12 @@ export function HermesChatPanel() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // Voice input — appends the recognized phrase to the draft message
+  const speech = useSpeechInput(text => {
+    setInput(prev => (prev ? prev + ' ' : '') + text)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  })
 
   useEffect(() => {
     if (open) {
@@ -279,8 +294,22 @@ export function HermesChatPanel() {
           <div ref={bottomRef} />
         </div>
 
+        {/* Persistent quick chips */}
+        <div className="shrink-0 flex gap-1.5 overflow-x-auto px-3 pt-2 scrollbar-none">
+          {PERSISTENT_CHIPS.map(chip => (
+            <button
+              key={chip}
+              onClick={() => send(chip)}
+              disabled={loading}
+              className="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full border border-gold-300 text-navy-700 bg-gold-50 hover:bg-gold-100 disabled:opacity-40 transition-colors"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+
         {/* Input */}
-        <div className="shrink-0 px-3 pb-3 pt-2 border-t border-gray-100">
+        <div className="shrink-0 px-3 pb-3 pt-2 border-t border-gray-100 mt-2">
           <div className="flex items-end gap-2 bg-gray-50 rounded-xl px-3 py-2">
             <textarea
               ref={inputRef}
@@ -298,6 +327,20 @@ export function HermesChatPanel() {
                 el.style.height = `${el.scrollHeight}px`
               }}
             />
+            {speech.supported && (
+              <button
+                onClick={speech.toggle}
+                disabled={loading}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                  speech.listening
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'text-gray-400 hover:text-navy-900 hover:bg-gray-200'
+                }`}
+                aria-label={speech.listening ? 'Stop voice input' : 'Start voice input'}
+              >
+                <Mic size={14} />
+              </button>
+            )}
             <button
               onClick={() => send(input)}
               disabled={!input.trim() || loading}

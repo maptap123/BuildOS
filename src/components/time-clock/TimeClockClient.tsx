@@ -721,14 +721,21 @@ export function TimeClockClient({
           <button
             onClick={startClockInFlow}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-gold-500 hover:bg-gold-600 active:bg-gold-700 text-navy-900 font-black text-2xl py-7 rounded-2xl transition-colors shadow-sm select-none disabled:opacity-60"
+            className="w-full flex flex-col items-center justify-center gap-1 bg-gold-500 hover:bg-gold-600 active:bg-gold-700 text-navy-900 py-6 rounded-2xl transition-colors shadow-sm select-none disabled:opacity-60"
           >
             {loading ? (
               <Loader2 size={28} className="animate-spin" />
             ) : (
               <>
-                <Play size={28} fill="currentColor" />
-                Clock In
+                <span className="flex items-center gap-3 font-black text-2xl">
+                  <Play size={28} fill="currentColor" />
+                  Clock In
+                </span>
+                {activeJob && (
+                  <span className="text-sm font-semibold opacity-80 truncate max-w-[90%]">
+                    {activeJob.name}
+                  </span>
+                )}
               </>
             )}
           </button>

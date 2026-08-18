@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Pencil } from 'lucide-react'
+import { ChevronLeft, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { JobStatusSelect } from '@/components/jobs'
@@ -29,6 +29,15 @@ export default async function JobLayout({
 
   return (
     <div>
+      {/* Mobile back breadcrumb — every job sub-page gets a way out */}
+      <Link
+        href="/jobs"
+        className="md:hidden inline-flex items-center gap-1 text-sm font-semibold text-navy-600 active:text-navy-900 -mt-2 mb-3"
+      >
+        <ChevronLeft size={16} />
+        Home
+      </Link>
+
       <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
         <div className="flex-1 min-w-0">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">

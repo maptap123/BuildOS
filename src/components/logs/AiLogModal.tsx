@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, RotateCcw, ZapOff, Settings, Mic, MicOff } from 'lucide-react'
+import { X, RotateCcw, ZapOff, Settings, Mic, MicOff, CloudOff } from 'lucide-react'
+import { saveLogDraft, clearLogDraft, markLogDraftPending } from '@/lib/logDrafts'
 import type { DailyLog } from '@/types'
 
 interface Props {
@@ -68,6 +69,20 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
   const [logDate, setLogDate] = useState(todayDate())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savedOffline, setSavedOffline] = useState(false)
+
+  const draftKey = `ai:${jobId}`
+
+  // Autosave the reviewed text so a dropped connection can't lose it
+  useEffect(() => {
+    if (step !== 'review') return
+    saveLogDraft({
+      key: draftKey,
+      job_id: jobId,
+      log_date: logDate,
+      work_performed: polished,
+    })
+  }, [step, draftKey, jobId, logDate, polished])
 
   // Camera
   useEffect(() => {
@@ -231,9 +246,17 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
         }))
       }
 
+      clearLogDraft(draftKey)
       onSaved(savedLog)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      // Network failure → keep the draft on the phone and auto-retry later
+      if (e instanceof TypeError) {
+        markLogDraftPending(draftKey)
+        setSavedOffline(true)
+        setError(null)
+      } else {
+        setError(e instanceof Error ? e.message : 'Save failed')
+      }
       setSaving(false)
     }
   }
@@ -350,6 +373,17 @@ export function AiLogModal({ jobId, onClose, onSaved }: Props) {
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+            )}
+
+            {savedOffline && (
+              <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                <CloudOff size={15} className="shrink-0 mt-0.5" />
+                <span>
+                  No connection — your log is saved on this phone and will send automatically when
+                  you&apos;re back online.
+                  {capturedPhotos.length > 0 && ' Photos stay attached here until it sends.'}
+                </span>
+              </div>
             )}
 
             <div className="flex gap-3 pb-2">

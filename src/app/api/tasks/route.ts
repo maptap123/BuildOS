@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
   const jobId = searchParams.get('job_id')
+  const scope = searchParams.get('scope')
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,6 +19,20 @@ export async function GET(request: Request) {
     .single()
 
   if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // scope=open: open tasks across all active jobs with the job name joined —
+  // powers the mobile cross-job "My Tasks" screen
+  if (scope === 'open') {
+    const { data, error } = await createAdminClient()
+      .from('tasks')
+      .select('*, job:jobs!inner(id, name, status)')
+      .in('status', ['todo', 'in_progress', 'blocked'])
+      .not('jobs.status', 'in', '("archived","closed")')
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('created_at')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data ?? [])
+  }
 
   let query = supabase.from('tasks').select('*').order('due_date', { nullsFirst: false }).order('created_at')
   if (jobId) query = query.eq('job_id', jobId)

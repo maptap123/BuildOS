@@ -44,21 +44,21 @@ This plan is based on a code audit done 2026-08-18, not the ROADMAP checkboxes. 
 The crew must be able to run a full day — clock in, see tasks, log with photos, find the site — with one hand, on LTE, without training beyond 15 minutes.
 
 ### Day 1–2 (Mon–Tue)
-- [ ] **Camera capture** — add `capture="environment"` photo path to `AddLogModal`, `LogPhotoUploader`, `MobileTraditionalLogSheet` (keep gallery as secondary option — crews also upload shots taken earlier). Test on a real Android + iPhone, not just Playwright. *(~½ day)*
-- [ ] **Mobile My Tasks screen** — new `/tasks` page: my open tasks across all jobs, grouped Today / Overdue / Upcoming, tap-to-complete with optimistic update, pull-to-refresh. Reuse TaskList's mobile card branch. Point the Tasks tab here instead of the job picker. Add "blocked / need help" action that flags the task and (once #4 lands) notifies the PM. *(~1 day)*
-- [ ] **Fix Tasks tab routing** on desktop unchanged; mobile goes to `/tasks`.
+- [x] **Camera capture** — added `capture="environment"` "Take Photo" (primary) + "Gallery" (secondary) to `AddLogModal`, `LogPhotoUploader`, `MobileTraditionalLogSheet`. *(code done 2026-08-18 — real Android + iPhone test still pending)*
+- [x] **Mobile My Tasks screen** — new `/tasks` page (`MyTasksClient`): open tasks across all active jobs via `/api/tasks?scope=open`, grouped Overdue / Today / Upcoming / No due date, Mine/All filter (defaults to Mine when tasks are assigned), tap-to-complete with optimistic update, pull-to-refresh, "blocked / need help" flag (PATCH → status blocked; PM notification lands with Week 2 #4).
+- [x] **Fix Tasks tab routing** — mobile Tasks tab + More page + MobileHome "view all" now go to `/tasks`; desktop unchanged.
 
 ### Day 3 (Wed)
-- [ ] **Offline-tolerant logs** — autosave log drafts (text + queued photos) to localStorage on every keystroke in all three log entry paths; on submit failure, keep the draft and show "saved on phone — will retry"; retry on reconnect/app open. This is draft persistence, not full offline sync — keep it simple. *(~1 day)*
+- [x] **Offline-tolerant logs** — `src/lib/logDrafts.ts`: text autosaved to localStorage on every keystroke in all three log paths (AddLogModal, MobileTraditionalLogSheet, AiLogModal review); on network failure the draft is marked pending with a "saved on this phone — will send when online" banner; `LogDraftSync` (mounted in dashboard layout) retries on app open + `online` event and toasts when synced. Photos stay attached in-screen (not persisted to localStorage by design).
 
 ### Day 4 (Thu)
-- [ ] **Mobile job detail pass** — job header on phone gets: address with tap-to-open Google Maps directions, homeowner + contacts with tap-to-call / tap-to-text, status, and this week's schedule items. Back breadcrumb on every job sub-page. *(~½ day)*
-- [ ] **One-tap time clock** — "Clock in to {active job}" single button with job pre-filled from context, live elapsed timer while clocked in, clock-out confirm. No manager UI on this screen. *(~½ day)*
+- [x] **Mobile job detail pass** — address now opens Google Maps *directions* deep link; homeowner phone + every job contact get tap-to-call and a Text (sms:) button; mobile back breadcrumb on every job sub-page via the job layout. This-week schedule card already existed.
+- [x] **One-tap time clock** — verified already built (context-prefilled clock-in, live timer, clock-out confirm, no manager UI on mobile); Clock In button now shows the active job name.
 
 ### Day 5 (Fri)
-- [ ] **Role-gate mobile navigation** — crew roles never see Budget/Estimates/Finance/Vendors/Admin/Profitability anywhere on mobile (nav, More page, job tabs, JobPickerSheet destinations). PM/Owner on a phone can still reach them (desktop tables are tolerable for occasional PM use). *(~½ day)*
-- [ ] **Schedule read view on mobile** — verify ScheduleList's existing mobile branch covers: my week, per-job list. Fix rough edges only. *(~¼ day)*
-- [ ] **Fixer polish (Klutch-style)** — voice input via keyboard mic + `webkitSpeechRecognition` fallback, persistent quick chips: "My tasks today", "What's overdue?", "Start a log", "Summarize this job". *(~½ day)*
+- [x] **Role-gate mobile navigation** — More page now hard-gates Budget/Estimates/Finance/Profitability/Vendors/Leads behind office-level access (admin or budget/finance view) so permission fallbacks can't leak money screens to crew; bottom nav was already field-only; job-detail money cards were already permission-gated. (API-level enforcement is Week 2 Day 8.)
+- [x] **Schedule read view on mobile** — verified: ScheduleList's list view has a complete mobile card branch (status, trade, dates, progress); MobileHome + job detail cover "my week". No changes needed.
+- [x] **Fixer polish (Klutch-style)** — `useSpeechInput` hook (webkitSpeechRecognition) wired as a mic button in both Fixer panels; persistent quick chips ("My tasks today", "What's overdue?", "Start a log", "Summarize this job") above the input; Fixer float button now shows on every mobile screen; fixed leftover "Hermes" label in the mobile panel header.
 
 ### Weekend buffer / stretch
 - [ ] Quick wins from MOBILE_UX plan: weather chip (`⛅ 71°/43°`), log list pagination, filter count badges

@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { X, Camera, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Camera, Image as ImageIcon, Trash2, CloudOff } from 'lucide-react'
+import { saveLogDraft, loadLogDraft, clearLogDraft, markLogDraftPending } from '@/lib/logDrafts'
 import type { DailyLog } from '@/types'
 
 interface Props {
@@ -22,18 +23,44 @@ type FormState = {
 
 export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
   const isEdit = Boolean(log)
+  const draftKey = `add:${jobId}`
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savedOffline, setSavedOffline] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
-  const [form, setForm] = useState<FormState>({
-    log_date:       log?.log_date ?? todayDate(),
-    work_performed: log?.work_performed ?? '',
+  const [form, setForm] = useState<FormState>(() => {
+    // New logs: restore an unsent draft from this phone if one exists
+    if (!log) {
+      const draft = typeof window !== 'undefined' ? loadLogDraft(`add:${jobId}`) : null
+      if (draft) return { log_date: draft.log_date, work_performed: draft.work_performed }
+    }
+    return {
+      log_date:       log?.log_date ?? todayDate(),
+      work_performed: log?.work_performed ?? '',
+    }
   })
+
+  // Autosave the draft on every change (new logs only)
+  useEffect(() => {
+    if (isEdit) return
+    saveLogDraft({
+      key: draftKey,
+      job_id: jobId,
+      log_date: form.log_date,
+      work_performed: form.work_performed,
+    })
+  }, [isEdit, draftKey, jobId, form.log_date, form.work_performed])
 
   function set<K extends keyof FormState>(field: K, value: string) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function addPhotos(incoming: FileList | null) {
+    if (!incoming) return
+    setPhotos(prev => [...prev, ...Array.from(incoming)])
   }
 
   async function submit(e: React.FormEvent) {
@@ -44,6 +71,7 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
     }
     setSaving(true)
     setError(null)
+    setSavedOffline(false)
     try {
       const payload = {
         ...(isEdit ? { id: log!.id } : { job_id: jobId }),
@@ -74,9 +102,19 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
         }
       }
 
+      if (!isEdit) clearLogDraft(draftKey)
       onSaved(savedLog)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      // Network failure (dead zone) vs. server rejection: only network
+      // failures are retried automatically from the saved draft.
+      const isNetworkError = e instanceof TypeError
+      if (isNetworkError && !isEdit) {
+        markLogDraftPending(draftKey)
+        setSavedOffline(true)
+        setError(null)
+      } else {
+        setError(e instanceof Error ? e.message : 'Something went wrong')
+      }
       setSaving(false)
     }
   }
@@ -110,26 +148,42 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
           {!isEdit && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">Photos</label>
+              {/* Camera: opens the device camera directly on phones */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={e => { addPhotos(e.target.files); e.target.value = '' }}
+              />
+              {/* Gallery: pick shots taken earlier */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 multiple
                 className="hidden"
-                onChange={e => {
-                  const files = Array.from(e.target.files ?? [])
-                  setPhotos(prev => [...prev, ...files])
-                  e.target.value = ''
-                }}
+                onChange={e => { addPhotos(e.target.files); e.target.value = '' }}
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 text-xs font-semibold text-navy-700 border border-navy-200 hover:border-navy-400 hover:bg-navy-50 px-3 py-2 rounded-lg transition-colors"
-              >
-                <Camera size={13} className="text-gold-500" />
-                Add Photos
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex items-center gap-2 text-xs font-semibold bg-navy-900 hover:bg-navy-800 text-white px-3 py-2 rounded-lg transition-colors"
+                >
+                  <Camera size={13} className="text-gold-400" />
+                  Take Photo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 text-xs font-semibold text-navy-700 border border-navy-200 hover:border-navy-400 hover:bg-navy-50 px-3 py-2 rounded-lg transition-colors"
+                >
+                  <ImageIcon size={13} className="text-gold-500" />
+                  Gallery
+                </button>
+              </div>
               {photos.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {photos.map((file, i) => (
@@ -156,6 +210,17 @@ export function AddLogModal({ jobId, log, onClose, onSaved }: Props) {
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          {savedOffline && (
+            <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+              <CloudOff size={15} className="shrink-0 mt-0.5" />
+              <span>
+                No connection — your log is saved on this phone and will send automatically when
+                you&apos;re back online.
+                {photos.length > 0 && ' Photos stay attached here until it sends.'}
+              </span>
+            </div>
           )}
 
           <div className="flex gap-3 pt-1 pb-2">

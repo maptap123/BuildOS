@@ -81,13 +81,21 @@ export function JobContactsPanel({ jobId, initialContacts, canCreate }: Props) {
                   </div>
                   <div className="mt-0.5 space-y-0.5">
                     {contact.phone && (
-                      <a
-                        href={`tel:${contact.phone}`}
-                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy-900 transition-colors"
-                      >
-                        <Phone size={11} className="text-gray-400 shrink-0" />
-                        {contact.phone}
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`tel:${contact.phone}`}
+                          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy-900 transition-colors"
+                        >
+                          <Phone size={11} className="text-gray-400 shrink-0" />
+                          {contact.phone}
+                        </a>
+                        <a
+                          href={`sms:${contact.phone}`}
+                          className="text-[11px] font-semibold text-navy-600 border border-navy-200 rounded-full px-2 py-0.5 hover:border-navy-400 hover:bg-navy-50 transition-colors"
+                        >
+                          Text
+                        </a>
+                      </div>
                     )}
                     {contact.email && (
                       <a

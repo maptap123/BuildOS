@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bot, FileText, Calendar, Clock, Folder, ChevronRight, CheckSquare, AlertCircle } from 'lucide-react'
+import { Bot, FileText, Calendar, Clock, Folder, ChevronRight, CheckSquare, AlertCircle, Mic } from 'lucide-react'
+import { useSpeechInput } from '@/hooks/useSpeechInput'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useAgenda } from '@/hooks/useAgenda'
 import { useActiveJob } from '@/contexts/ActiveJobContext'
@@ -313,7 +314,7 @@ export function MobileHome(_props: Props) {
             ))}
             {(agenda.past_due.length + agenda.due_today.length) > 6 && (
               <button
-                onClick={() => router.push(jobId ? `/jobs/${jobId}/tasks` : '/jobs')}
+                onClick={() => router.push('/tasks')}
                 className="w-full text-center py-3 text-sm font-semibold text-[#1b2b4a]"
               >
                 View all {agenda.past_due.length + agenda.due_today.length} tasks →
@@ -407,6 +408,11 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
     "Did we log today?",
   ]
 
+  const PERSISTENT_CHIPS = ['My tasks today', "What's overdue?", 'Start a log', 'Summarize this job']
+
+  // Voice input — appends the recognized phrase to the draft message
+  const speech = useSpeechInput(text => setInput(prev => (prev ? prev + ' ' : '') + text))
+
   async function send(text: string) {
     const msg = text.trim()
     if (!msg || loading) return
@@ -464,7 +470,7 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
           <Bot size={16} className="text-[#d4a83c]" />
         </div>
         <div className="flex-1">
-          <p className="font-display font-bold text-[#1b2b4a] text-sm leading-none">Hermes</p>
+          <p className="font-display font-bold text-[#1b2b4a] text-sm leading-none">Fixer</p>
           <p className="text-[10px] text-gray-400 mt-0.5">JDC AI Assistant</p>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-[#1b2b4a] p-1 transition-colors">
@@ -503,8 +509,23 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </div>
+      {/* Persistent quick chips */}
+      <div className="shrink-0 flex gap-1.5 overflow-x-auto px-3 pt-2 scrollbar-none">
+        {PERSISTENT_CHIPS.map(chip => (
+          <button
+            key={chip}
+            onClick={() => send(chip)}
+            disabled={loading}
+            className="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full disabled:opacity-40 transition-colors"
+            style={{ background: 'rgba(212,168,60,0.12)', color: '#8a6a1e', border: '1px solid rgba(212,168,60,0.35)' }}
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
+
       {/* Input */}
-      <div className="shrink-0 px-3 pb-6 pt-2 border-t border-gray-100">
+      <div className="shrink-0 px-3 pb-6 pt-2 border-t border-gray-100 mt-2">
         <div className="flex items-center gap-2 bg-gray-50 rounded-2xl px-4 py-3">
           <input
             value={input}
@@ -514,6 +535,18 @@ function HermesChatPanelInline({ onClose }: { onClose: () => void }) {
             disabled={loading}
             className="flex-1 bg-transparent text-sm text-[#1b2b4a] placeholder-gray-400 outline-none"
           />
+          {speech.supported && (
+            <button
+              onClick={speech.toggle}
+              disabled={loading}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                speech.listening ? 'bg-red-500 animate-pulse' : 'bg-gray-200'
+              }`}
+              aria-label={speech.listening ? 'Stop voice input' : 'Start voice input'}
+            >
+              <Mic size={14} className={speech.listening ? 'text-white' : 'text-[#1b2b4a]'} />
+            </button>
+          )}
           <button
             onClick={() => send(input)}
             disabled={!input.trim() || loading}

@@ -28,7 +28,7 @@ const SECTIONS = [
       { key: 'estimates',     label: 'Estimates',      icon: ClipboardList,href: '/jobs?selectJob=estimates',     description: 'Estimate builder' },
       { key: 'logs',          label: 'Daily Logs',     icon: FileText,     href: '/jobs?selectJob=logs',          description: 'Field logs & photos' },
       { key: 'schedule',      label: 'Schedule',       icon: Calendar,     href: '/jobs?selectJob=schedule',      description: 'Job timeline' },
-      { key: 'tasks',         label: 'Tasks',          icon: CheckSquare,  href: '/jobs?selectJob=tasks',         description: 'All tasks' },
+      { key: 'tasks',         label: 'Tasks',          icon: CheckSquare,  href: '/tasks',                        description: 'My tasks across all jobs' },
       { key: 'documents',     label: 'Documents',      icon: Folder,       href: '/documents',                    description: 'File center' },
     ],
   },
@@ -48,7 +48,14 @@ export default function MorePage() {
   const canManageOffice = isAdmin() || can('jobs', 'create') || can('jobs', 'edit')
   const canViewBudget = isAdmin() || can('budget', 'view')
 
+  // Launch role gate: money/office screens are desktop territory. On mobile,
+  // only office-level users (admin, or budget/finance view) ever see them —
+  // crew get Today / Jobs / Log / Tasks / Clock and the field tools below.
+  const isOfficeUser = isAdmin() || can('budget', 'view') || can('finance', 'view')
+  const OFFICE_ONLY = new Set(['budget', 'estimates', 'finance', 'profitability', 'vendors', 'leads'])
+
   function canUseItem(key: string): boolean {
+    if (OFFICE_ONLY.has(key) && !isOfficeUser) return false
     if (key === 'time-clock') return isAdmin() || can('time_clock', 'view') || can('jobs', 'view')
     if (key === 'logs') return isAdmin() || can('logs', 'view')
     if (key === 'schedule') return isAdmin() || can('schedule', 'view')

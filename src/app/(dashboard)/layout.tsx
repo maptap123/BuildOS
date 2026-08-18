@@ -14,6 +14,7 @@ import { useJob } from '@/hooks/useJob'
 import { usePermissions } from '@/hooks/usePermissions'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
 import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
+import { LogDraftSync } from '@/components/logs/LogDraftSync'
 import { ActiveJobProvider, useActiveJob } from '@/contexts/ActiveJobContext'
 import type { Job } from '@/types'
 
@@ -216,7 +217,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   function mobileTabHref(key: string): string | null {
     if (key === 'home')       return '/jobs'
     if (key === 'jobs')       return null  // always opens the context picker
-    if (key === 'tasks')      return effectiveJobId ? `/jobs/${effectiveJobId}/tasks` : null
+    if (key === 'tasks')      return '/tasks'  // cross-job My Tasks, no job pick needed
     if (key === 'time-clock') return '/time-clock'
     if (key === 'more')       return '/more'
     return null
@@ -225,7 +226,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   function isActiveMobile(key: string): boolean {
     if (key === 'home')       return pathname === '/jobs' && !segments[1]
     if (key === 'jobs')       return false // picker button, never "active"
-    if (key === 'tasks')      return pathname.endsWith('/tasks')
+    if (key === 'tasks')      return pathname === '/tasks' || pathname.endsWith('/tasks')
     if (key === 'time-clock') return pathname.startsWith('/time-clock')
     if (key === 'more')       return pathname === '/more'
     return false
@@ -442,10 +443,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Hermes float button — desktop only */}
-      <div className="hidden md:block">
-        <HermesChatPanel />
-      </div>
+      {/* Fixer float button — every screen, both viewports */}
+      <HermesChatPanel />
+
+      {/* Offline log drafts: retry pending sends on app open / reconnect */}
+      <LogDraftSync />
     </div>
   )
 }

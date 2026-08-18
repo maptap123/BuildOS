@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { X, Camera, Briefcase, Tag, ChevronRight, Check } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Camera, Image as ImageIcon, Briefcase, Tag, ChevronRight, Check, CloudOff } from 'lucide-react'
 import { JobPickerSheet } from '@/components/jobs'
+import { saveLogDraft, loadLogDraft, clearLogDraft, markLogDraftPending } from '@/lib/logDrafts'
 import type { DailyLog, Job } from '@/types'
 
 interface JobInfo {
@@ -20,16 +21,41 @@ function todayDate() {
   return new Date().toISOString().split('T')[0]
 }
 
+const DRAFT_KEY = 'traditional'
+
 export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Props) {
-  const [job, setJob] = useState<JobInfo | null>(initialJob)
+  // Restore an unsent draft from this phone (draft job wins only if none was passed in)
+  const [job, setJob] = useState<JobInfo | null>(() => {
+    if (initialJob) return initialJob
+    const draft = typeof window !== 'undefined' ? loadLogDraft(DRAFT_KEY) : null
+    return draft?.job_id ? { id: draft.job_id, name: draft.job_name ?? '' } : null
+  })
   const [jobPickerOpen, setJobPickerOpen] = useState(false)
-  const [notes, setNotes] = useState('')
-  const [costCode, setCostCode] = useState('')
+  const [notes, setNotes] = useState(() =>
+    typeof window !== 'undefined' ? (loadLogDraft(DRAFT_KEY)?.work_performed ?? '') : ''
+  )
+  const [costCode, setCostCode] = useState(() =>
+    typeof window !== 'undefined' ? (loadLogDraft(DRAFT_KEY)?.cost_code ?? '') : ''
+  )
   const [photos, setPhotos] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [savedOffline, setSavedOffline] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  // Autosave the draft on every keystroke
+  useEffect(() => {
+    saveLogDraft({
+      key: DRAFT_KEY,
+      job_id: job?.id ?? null,
+      job_name: job?.name ?? null,
+      log_date: todayDate(),
+      work_performed: notes,
+      cost_code: costCode || null,
+    })
+  }, [job, notes, costCode])
 
   async function handleSave() {
     if (!job) {
@@ -67,11 +93,19 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
         }))
       }
 
+      clearLogDraft(DRAFT_KEY)
       onSaved?.(savedLog)
       setSaved(true)
       setTimeout(onClose, 900)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      // Network failure → keep the draft on the phone and auto-retry later
+      if (e instanceof TypeError) {
+        markLogDraftPending(DRAFT_KEY)
+        setSavedOffline(true)
+        setError(null)
+      } else {
+        setError(e instanceof Error ? e.message : 'Something went wrong')
+      }
       setSaving(false)
     }
   }
@@ -160,6 +194,20 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
             <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Photos
             </label>
+            {/* Camera: opens the device camera directly */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={e => {
+                const files = Array.from(e.target.files ?? [])
+                setPhotos(prev => [...prev, ...files])
+                e.target.value = ''
+              }}
+            />
+            {/* Gallery: shots taken earlier */}
             <input
               ref={fileInputRef}
               type="file"
@@ -172,14 +220,25 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
                 e.target.value = ''
               }}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-xl py-3.5 text-sm text-gray-500 hover:border-[#d4a83c] hover:text-[#1b2b4a] transition-colors"
-            >
-              <Camera size={16} className="text-[#d4a83c]" />
-              Add Photos
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex-[2] flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold text-white transition-colors active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg, #1b2b4a, #2e4168)' }}
+              >
+                <Camera size={16} className="text-[#d4a83c]" />
+                Take Photo
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-xl py-3.5 text-sm text-gray-500 hover:border-[#d4a83c] hover:text-[#1b2b4a] transition-colors"
+              >
+                <ImageIcon size={16} className="text-[#d4a83c]" />
+                Gallery
+              </button>
+            </div>
             {photos.length > 0 && (
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {photos.map((file, i) => (
@@ -205,6 +264,17 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5">{error}</p>
+          )}
+
+          {savedOffline && (
+            <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+              <CloudOff size={15} className="shrink-0 mt-0.5" />
+              <span>
+                No connection — your log is saved on this phone and will send automatically when
+                you&apos;re back online.
+                {photos.length > 0 && ' Photos stay attached here until it sends.'}
+              </span>
+            </div>
           )}
         </div>
 

@@ -4,7 +4,7 @@
 // The API route /api/photos handles server-side upload to this bucket.
 
 import { useRef, useState } from 'react'
-import { Camera, Loader2, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Camera, Image as ImageIcon, Loader2, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface Props {
   logId: string
@@ -24,6 +24,7 @@ export function LogPhotoUploader({ logId, jobId, onUploaded }: Props) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [results, setResults] = useState<UploadResult[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return
@@ -84,7 +85,16 @@ export function LogPhotoUploader({ logId, jobId, onUploaded }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* File picker */}
+      {/* Camera: opens the device camera directly on phones */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={e => { addFiles(e.target.files); e.target.value = '' }}
+      />
+      {/* Gallery picker */}
       <input
         ref={fileInputRef}
         type="file"
@@ -98,11 +108,20 @@ export function LogPhotoUploader({ logId, jobId, onUploaded }: Props) {
         <button
           type="button"
           disabled={uploading}
+          onClick={() => cameraInputRef.current?.click()}
+          className="flex items-center gap-2 text-xs font-semibold bg-navy-900 hover:bg-navy-800 text-white disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 rounded-lg transition-colors"
+        >
+          <Camera size={13} className="text-gold-400" />
+          Take Photo
+        </button>
+        <button
+          type="button"
+          disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-2 text-xs font-semibold text-navy-700 border border-navy-200 hover:border-navy-400 hover:bg-navy-50 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 rounded-lg transition-colors"
         >
-          <Camera size={13} className="text-gold-500" />
-          Select Photos
+          <ImageIcon size={13} className="text-gold-500" />
+          Gallery
         </button>
 
         {files.length > 0 && !uploading && (

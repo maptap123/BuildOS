@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { MapPin, Phone, Calendar, Users, Plus, FileText, CheckSquare, CalendarDays, DollarSign, AlertCircle, TrendingUp, Tag } from 'lucide-react'
+import { MapPin, Phone, MessageSquare, Calendar, Users, Plus, FileText, CheckSquare, CalendarDays, DollarSign, AlertCircle, TrendingUp, Tag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Job, DailyLog, Task, ScheduleItem, Contact } from '@/types'
@@ -136,7 +136,8 @@ export default async function JobDetailPage({
   const budgetVariance = totalBudget - totalForecast
 
   const addressParts = [job.site_address, job.city, job.state, job.postal_code].filter(Boolean)
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(addressParts.join(', '))}`
+  // Directions deep link — opens turn-by-turn from the crew's current location
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressParts.join(', '))}`
 
   const isOverdue = (due: string | null) => {
     if (!due) return false
@@ -170,13 +171,22 @@ export default async function JobDetailPage({
             <span className="text-navy-700">{job.client_name}</span>
           </div>
           {job.client_phone && (
-            <a
-              href={`tel:${job.client_phone}`}
-              className="flex items-center gap-2.5 text-navy-700 hover:text-gold-600 transition-colors pl-[22px]"
-            >
-              <Phone size={13} className="text-gray-400 shrink-0" />
-              {job.client_phone}
-            </a>
+            <div className="flex items-center gap-2 pl-[22px]">
+              <a
+                href={`tel:${job.client_phone}`}
+                className="flex items-center gap-2 text-navy-700 hover:text-gold-600 transition-colors"
+              >
+                <Phone size={13} className="text-gray-400 shrink-0" />
+                {job.client_phone}
+              </a>
+              <a
+                href={`sms:${job.client_phone}`}
+                className="flex items-center gap-1 text-xs font-semibold text-navy-600 border border-navy-200 rounded-full px-2.5 py-1 hover:border-navy-400 hover:bg-navy-50 transition-colors"
+              >
+                <MessageSquare size={11} className="text-gold-500" />
+                Text
+              </a>
+            </div>
           )}
 
           <div className="flex items-start gap-2.5 pt-2 border-t border-gray-100">
