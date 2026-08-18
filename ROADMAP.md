@@ -33,7 +33,7 @@ These decisions reflect August's current direction and should guide roadmap clea
 
 ### Launch focus
 
-- First real launch should prioritize an extremely usable **Crew mobile** experience.
+- First real launch should prioritize an extremely usable **Crew mobile** experience. **Reaffirmed 2026-08-18:** mobile and desktop are two distinct experiences on one codebase, and mobile is built right first — the May 2026 "web is desktop-first, crew gets a native app later" detour is dead.
 - August and Lisa will primarily use the full desktop web app.
 - Other users should be mobile-first unless their role requires office/admin tools.
 - All jobs are generally visible internally, but feature access and sensitive money visibility must be controlled by role/person/module.
@@ -585,7 +585,8 @@ BuildOS runs as a single Next.js app but renders a fundamentally different UI de
 ### Philosophy
 - **Mobile = field tool.** Built for a phone in one hand on a job site. The primary users are Jason, Cane, and August in the field. Every screen is optimized for speed, large touch targets, camera access, and offline-tolerant patterns. Feature set is deliberately narrow: the things field workers actually need every hour.
 - **Desktop = management tool.** Built for an owner or PM at a desk. Full data density, all modules visible, sidebar navigation, tables, charts, and the full feature set.
-- **How the split works:** The `(dashboard)/layout.tsx` detects viewport width and renders either the `<MobileLayout>` or `<DesktopLayout>` wrapper. Pages and components can further branch with `useMobileLayout()` hook. Mobile-specific pages live in `src/components/mobile/`. Desktop-specific pages are untouched.
+- **Build order (decided 2026-08-18):** Mobile first, to completion. Mobile has to be *right* before desktop work resumes. Desktop is not downgraded — it is a first-class experience that comes second in sequence.
+- **How the split actually works:** Tailwind breakpoints only — `md:hidden` for mobile-only, `hidden md:block` for desktop-only. There is **no** `useMobileLayout()` hook and **no** `<MobileLayout>`/`<DesktopLayout>` wrapper; earlier drafts of this doc described an architecture that was never built. Mobile-specific components live in `src/components/mobile/`. Desktop code is untouched when adding mobile features.
 
 ### Mobile Nav (5 items max)
 | Tab | What it is |
@@ -620,7 +621,7 @@ BuildOS runs as a single Next.js app but renders a fundamentally different UI de
 
 **Files built/changed:**
 - `src/components/mobile/MobileHome.tsx` — navy/gold launchpad: Fixer hero button, 4-tile action grid, Today's Tasks, This Week schedule
-- `src/components/mobile/LogModePicker.tsx` — bottom sheet: Traditional vs AI Log mode (AI = BETA stub, Phase 2)
+- `src/components/mobile/LogModePicker.tsx` — bottom sheet: Traditional vs AI Log mode (AI Log now fully built, see Sprint 2)
 - `src/app/(dashboard)/more/page.tsx` — full mobile nav: Management, Job Tools, Settings sections + sign out
 - `src/hooks/useCurrentUser.ts` + `src/app/api/me/profile/route.ts` — personalized greeting
 - `src/app/(dashboard)/layout.tsx` — 5-tab mobile bottom nav (Home, Jobs, Tasks, Time Clock, More); tabs with no job open `JobPickerSheet` with destination intent routing
@@ -638,16 +639,17 @@ BuildOS runs as a single Next.js app but renders a fundamentally different UI de
 - ✅ Tasks nav tab (no job) → job picker with `tasks` intent → `/jobs/{id}/tasks`
 - ✅ More tab → `/more` page
 
-### Mobile Sprint 2 — Field Tools (next)
-- [ ] Build mobile Tasks screen — my tasks list, tap to complete, pull to refresh
-- [ ] Add camera capture to photo upload (not just file picker)
-- [ ] Add weather auto-fetch on log creation (already in desktop log form, needs mobile hook)
-- [ ] Add offline draft storage for logs (localStorage → sync on reconnect)
-- [ ] AI Log mode (Phase 2) — camera + voice → Fixer writes the log (Klutch AI pattern)
+### Mobile Sprint 2 — Field Tools (partially done, verified 2026-08-18)
+- [x] **AI Log mode** — camera + voice → Fixer writes the log (`src/components/logs/AiLogModal.tsx`, ~517 lines). Uses `getUserMedia` + Web Speech API; summary runs on **DeepSeek**, not Claude.
+- [x] **Inline Traditional log sheet** on mobile — `src/components/mobile/MobileTraditionalLogSheet.tsx`, no page navigation required
+- [x] **Weather auto-fetch** on log creation — `src/lib/weather/open-meteo.ts`, non-blocking on save
+- [ ] **Mobile Tasks screen** — my tasks list, tap to complete, pull to refresh. *(Not started: `TaskClient`/tasks page have no `md:hidden` branch; the Tasks tab still routes to the desktop task page.)*
+- [ ] **Camera capture on photo upload** — *(Not started: no `capture="environment"` anywhere in `src`. `AddLogModal`, `LogPhotoUploader`, and `MobileTraditionalLogSheet` all use plain `accept="image/*"`, so the phone opens the gallery, not the camera. `AiLogModal` is the only camera path today, via `getUserMedia`.)*
+- [ ] **Offline draft storage for logs** (localStorage → sync on reconnect) — *(Not started: `localStorage` is used only by `ActiveJobContext`.)*
 
-### Mobile Sprint 3 — Hermes on Mobile
-- [ ] Voice-to-text input for Hermes (native mobile keyboard mic)
-- [ ] Fixer AI Log — open camera, talk + snap photos, Fixer writes the log entry on submit
+### Mobile Sprint 3 — Fixer on Mobile
+- [x] Fixer AI Log — open camera, talk + snap photos, Fixer writes the log entry on submit *(shipped as part of Sprint 2)*
+- [ ] Voice-to-text input for Fixer chat (mobile keyboard mic)
 - [ ] Quick chips persistent across sessions: "My tasks today", "What's overdue?", "Start a log"
 
 ---
@@ -688,11 +690,16 @@ Goal: once the job and budget modules are more fully built out, allow admins to 
 
 Start here unless we intentionally reprioritize.
 
+**Priority order confirmed 2026-08-18: mobile is the build target until it is right.** Desktop and back-office work below stays queued behind the mobile items.
+
 - [x] **[Mobile Sprint 1]** ✅ Done — MobileHome launchpad, LogModePicker, More page, 5-tab nav, Fixer chat, all routing verified in Playwright
-- [ ] **[Mobile Sprint 2]** Camera capture on photo upload (mobile file picker currently opens gallery, need `capture="environment"`)
-- [ ] **[Mobile Sprint 2]** Weather auto-fetch on mobile log creation
-- [ ] **[Mobile Sprint 2]** Offline draft storage for logs
-- [ ] **[Mobile Sprint 2]** AI Log mode — camera + voice → Fixer writes the log (Klutch AI pattern, currently BETA stub)
+- [x] **[Mobile Sprint 2]** AI Log mode — camera + voice → Fixer writes the log — ✅ Done (DeepSeek summary)
+- [x] **[Mobile Sprint 2]** Weather auto-fetch on mobile log creation — ✅ Done
+- [ ] **[Mobile — NEXT]** Camera capture on photo upload — add `capture="environment"` to `AddLogModal`, `LogPhotoUploader`, `MobileTraditionalLogSheet`; today the phone opens the gallery instead of the camera
+- [ ] **[Mobile — NEXT]** Mobile Tasks screen — the Tasks tab currently lands on the desktop task page; needs a real `md:hidden` card list with tap-to-complete
+- [ ] **[Mobile]** Offline draft storage for logs (localStorage → sync on reconnect)
+- [ ] **[Mobile]** Audit every module for a real phone experience — Budget, Schedule, Estimates, Documents, Vendors, Profitability and Admin still render desktop tables on mobile (only 18 files carry a breakpoint branch today)
+- [ ] **[Mobile]** Voice-to-text input for Fixer chat + persistent quick chips
 - [ ] **[Price Intelligence]** Decide which retailers to include, then start Phase 5a (Apify client + price_cache schema + HD scraper)
 - [ ] Add job activity feed
 - [ ] Phase 7: AI daily brief + budget overrun risk detection (Sprint D)

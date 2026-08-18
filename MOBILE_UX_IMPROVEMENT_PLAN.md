@@ -1,19 +1,27 @@
 # BuildOS Mobile UX Improvement Plan
-## Web Platform + Future Mobile App — Updated May 2026
+## Mobile-First Web Platform — Updated August 2026
 
 ---
 
 ## Product Strategy
 
-**Web platform** → Built for office/PM/admin use. Desktop-first. Continue building this to completion.
+**One codebase. Two genuinely different experiences. Mobile gets built right first.**
 
-**Mobile app** → Separate product for field crew. Purpose-built for phones. Built after the web platform is feature-complete. Shares the same Supabase backend.
+This is not responsive tweaking of a desktop app, and it is not a desktop app with a mobile fallback. Mobile and desktop are two distinct products that share the same Supabase data layer and API routes — different navigation, different screens, different feature sets, each designed for its own user.
 
-The original plan was to mobile-optimize the web app. That direction has changed. Items below are now split accordingly.
+- **Mobile = field tool.** Field crew (Jason, Cane, August in the field) live on phones. A phone in one hand on a job site: large tap targets, card layouts, camera-first flows, minimal typing. Deliberately narrow — the things field workers need every hour, nothing else.
+- **Desktop = management tool.** Owner or PM at a desk (August and Lisa). Full data density, all modules, sidebar navigation, tables, charts, admin, reporting.
+- **Sequencing: mobile first, to completion.** Mobile is the priority build target and has to be *right* before desktop work resumes. Desktop is not being abandoned or downgraded — it is a first-class experience that comes second in build order.
+- **When a shared component forces a tradeoff, mobile wins**, and desktop gets its own branch rather than compromising the phone experience.
+- **No separate native app is planned.** A dedicated Expo/React Native crew app remains a possible future option, but it is not the plan and no roadmap item should be deferred to it.
+
+> **History:** A May 2026 revision of this document declared the web app desktop-first with field work deferred to a future native app. **That direction was reversed in August 2026.** Field-crew items that were parked for a hypothetical native app are folded back into this roadmap (see *Field Crew Backlog* below) and are in scope for the web app.
+
+**How the split is implemented:** Tailwind breakpoints only — `md:hidden` for mobile-only, `hidden md:block` for desktop-only. There is no `useMobileLayout` hook and no `<MobileLayout>`/`<DesktopLayout>` shell component. Mobile-specific components live in `src/components/mobile/`.
 
 ---
 
-## Web Platform Roadmap
+## Roadmap
 
 ### Priority 1 — Jobs List Page (HIGH, ~2 days)
 
@@ -139,9 +147,9 @@ Improvements:
 
 ---
 
-## Future Mobile App (Field Crew — Build After Web is Done)
+## Field Crew Backlog (in scope for this web app)
 
-These items were originally in this roadmap as web UX fixes. They now belong in the dedicated field crew mobile app.
+These items were parked in May 2026 for a hypothetical native app. With the mobile-first decision they are back in scope here, and should be built as mobile branches in the existing Next.js app.
 
 **Navigation:**
 - 5-item bottom nav: Dashboard · Jobs · Logs · Clock · More
@@ -165,8 +173,7 @@ These items were originally in this roadmap as web UX fixes. They now belong in 
 - Map view with driving directions tap-to-launch
 - No table/saved views — field crew just needs "what am I working on today"
 
-**Tech stack when ready:**
-- Expo + React Native
-- Same Supabase project (shared auth, tables, storage)
-- TypeScript types shared from this repo (`src/types/index.ts`)
-- Supabase React Native SDK for auth + realtime
+**Implementation notes:**
+- Build these as `md:hidden` mobile branches / components in `src/components/mobile/`, against the existing API routes — no new backend work required.
+- PWA install (manifest + icons) is already shipped, so the phone experience can be home-screen launched today.
+- A native Expo/React Native client sharing the same Supabase project stays on the table as a *later* option, but nothing on this roadmap waits for it.
