@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { notify, getAdminUserIds } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
 
 // Public route — authenticated by client_token (UUID). No user session required.
@@ -62,7 +63,7 @@ export async function POST(
   // Fetch current CO to verify it's submitted
   const { data: existing, error: fetchError } = await admin
     .from('change_orders')
-    .select('id, status')
+    .select('id, status, job_id, co_number, client_name')
     .eq('client_token', token)
     .single()
 
@@ -92,6 +93,16 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const clientName = existing.client_name || 'The client'
+  const adminIds = await getAdminUserIds(admin)
+  await notify({
+    admin,
+    userIds: adminIds,
+    type: action === 'approve' ? 'co_signed' : 'co_rejected',
+    title: `${clientName} ${action === 'approve' ? 'signed' : 'declined'} CO ${existing.co_number} — ${data.title}`,
+    link: existing.job_id ? `/jobs/${existing.job_id}/change-orders` : undefined,
+  })
 
   return NextResponse.json(data)
 }

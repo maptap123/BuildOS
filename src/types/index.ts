@@ -629,3 +629,24 @@ export interface WorkOrder {
   vendors?: Pick<Vendor, 'id' | 'name' | 'trade' | 'vendor_type'> | null
   budget_lines?: Pick<BudgetLine, 'id' | 'cost_code' | 'description'> | null
 }
+
+export type NotificationType =
+  | 'proposal_accepted'
+  | 'proposal_declined'
+  | 'co_signed'
+  | 'co_rejected'
+  | 'lead_created'
+  | 'task_assigned'
+  | 'task_blocked'
+  | 'log_missing'
+
+export interface Notification {
+  id: string
+  user_id: string
+  type: NotificationType
+  title: string
+  body: string | null
+  link: string | null
+  read_at: string | null
+  created_at: string
+}

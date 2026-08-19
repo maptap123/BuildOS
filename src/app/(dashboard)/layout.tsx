@@ -15,6 +15,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { JobPickerSheet, DesktopJobPanel } from '@/components/jobs'
 import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
 import { LogDraftSync } from '@/components/logs/LogDraftSync'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ActiveJobProvider, useActiveJob } from '@/contexts/ActiveJobContext'
 import type { Job } from '@/types'
 
@@ -341,16 +342,19 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
             )
           })}
 
-          {urlJobId && (
-            <div className="ml-auto flex items-center gap-2 py-2">
-              <span className="text-xs text-gray-400 truncate max-w-[180px]">
-                {job?.name ?? '…'}
-              </span>
-              <span className="text-[10px] text-gray-400 capitalize bg-gray-100 rounded-full px-2 py-0.5">
-                {job?.status ?? ''}
-              </span>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-3 py-2">
+            {urlJobId && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 truncate max-w-[180px]">
+                  {job?.name ?? '…'}
+                </span>
+                <span className="text-[10px] text-gray-400 capitalize bg-gray-100 rounded-full px-2 py-0.5">
+                  {job?.status ?? ''}
+                </span>
+              </div>
+            )}
+            <NotificationBell variant="light" />
+          </div>
         </nav>
 
         {/* ── Mobile top bar ── */}
@@ -375,13 +379,16 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </button>
-          <button
-            onClick={signOut}
-            className="text-[#4d6a9a] hover:text-white transition-colors shrink-0 ml-3"
-            aria-label="Sign out"
-          >
-            <LogOut size={20} />
-          </button>
+          <div className="flex items-center gap-3 shrink-0 ml-3">
+            <NotificationBell variant="dark" />
+            <button
+              onClick={signOut}
+              className="text-[#4d6a9a] hover:text-white transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 px-4 py-6 md:px-8 md:py-6 pb-28 md:pb-8">

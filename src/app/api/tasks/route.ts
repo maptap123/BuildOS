@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { notify, getJobNotifyTargets } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -123,6 +124,13 @@ export async function PATCH(request: Request) {
   }
 
   const admin = createAdminClient()
+
+  const { data: existing } = await admin
+    .from('tasks')
+    .select('job_id, title, status, assigned_to')
+    .eq('id', id)
+    .single()
+
   const { data, error } = await admin
     .from('tasks')
     .update(updates)
@@ -131,6 +139,34 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (existing) {
+    if (
+      'assigned_to' in updates &&
+      updates.assigned_to &&
+      updates.assigned_to !== existing.assigned_to
+    ) {
+      await notify({
+        admin,
+        userIds: [updates.assigned_to as string],
+        type: 'task_assigned',
+        title: `You were assigned: ${data.title}`,
+        link: `/jobs/${data.job_id}/tasks`,
+      })
+    }
+
+    if (updates.status === 'blocked' && existing.status !== 'blocked') {
+      const targets = await getJobNotifyTargets(data.job_id, admin)
+      await notify({
+        admin,
+        userIds: targets,
+        type: 'task_blocked',
+        title: `Task blocked: ${data.title}`,
+        link: `/jobs/${data.job_id}/tasks`,
+      })
+    }
+  }
+
   return NextResponse.json(data)
 }
 

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { notify, getAdminUserIds } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -82,6 +83,17 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const adminIds = (await getAdminUserIds(admin)).filter((id) => id !== user.id)
+  await notify({
+    admin,
+    userIds: adminIds,
+    type: 'lead_created',
+    title: `New lead: ${data.title}`,
+    body: data.client_name ? `From ${data.client_name}` : undefined,
+    link: `/leads/${data.id}`,
+  })
+
   return NextResponse.json(data, { status: 201 })
 }
 

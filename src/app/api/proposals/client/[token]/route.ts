@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { convertAcceptedProposalToJob } from '@/lib/proposals/conversion'
+import { notify, getAdminUserIds } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
 
 // Public route - authenticated by estimates.public_token. No user session required.
@@ -158,6 +159,16 @@ export async function POST(
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
+      const adminIds = await getAdminUserIds(admin)
+      await notify({
+        admin,
+        userIds: adminIds,
+        type: 'proposal_accepted',
+        title: `${clientName} accepted "${data.title}"`,
+        body: clientResponseNote || undefined,
+        link: conversion.job?.id ? `/jobs/${conversion.job.id}` : undefined,
+      })
+
       return NextResponse.json({ ...data, conversion })
     } catch (conversionError) {
       return NextResponse.json(
@@ -187,6 +198,15 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const adminIds = await getAdminUserIds(admin)
+  await notify({
+    admin,
+    userIds: adminIds,
+    type: 'proposal_declined',
+    title: `${clientName} declined "${data.title}"`,
+    body: clientResponseNote || undefined,
+  })
 
   return NextResponse.json(data)
 }
