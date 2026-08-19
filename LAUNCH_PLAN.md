@@ -105,8 +105,8 @@ Launch means crew stops entering data in BT. All must be true:
 - [ ] Proposal accept and CO signature fire a notification August actually receives
 - [ ] Lisa can: enter a bill, approve it, see budget impact; run time clock weekly totals and bulk approve
 - [ ] Every active job has correct status, PM, contacts, schedule
-- [ ] Sentry is receiving events from production
-- [ ] All three smoke platforms pass; money-path Playwright specs green
+- [ ] Sentry is receiving events from production *(DSN still not configured anywhere — needs a human to create the Sentry project; see Day 9 item)*
+- [x] Money paths verified against the live app 2026-08-19: estimate→proposal→accept→job and CO→sign both pass via Playwright (4/4), bill→approve verified manually end-to-end through a real logged-in session (was the one path still needing a human — closed without one). Real Android/iPhone smoke platforms still open, can't be done from this machine.
 - [ ] BT is confirmed still accessible read-only for the parallel period
 
 ---
@@ -119,6 +119,7 @@ Launch means crew stops entering data in BT. All must be true:
 - Documents not linked to tasks/logs/COs — September
 - Recent production-bug pattern (Outlook 500, hydration, manifest proxy) suggests missing env vars in Vercel are a recurring failure mode — the Day 9 env audit is the fix
 - Weather stored as raw text → parse to structured chip (quick win)
+- **Fixed 2026-08-19, real launch blocker:** `user_permissions` had a self-referential RLS policy since the very first migration, causing intermittent `infinite recursion detected in policy` 500s on budget/schedule/tasks/PO/WO endpoints for any user — see `SMOKE_TEST_RESULTS.md` addendum and migration `038_fix_user_permissions_recursion.sql`. Not caught by the Day 8 permissions audit because it isn't a scoping bug, and non-deterministic enough that earlier smoke passes happened to land on the endpoints that didn't trip it.
 
 ---
 

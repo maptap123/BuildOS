@@ -164,7 +164,7 @@ export async function POST(
         admin,
         userIds: adminIds,
         type: 'proposal_accepted',
-        title: `${clientName} accepted "${data.title}"`,
+        title: `${clientName} accepted "${data.title || 'your proposal'}"`,
         body: clientResponseNote || undefined,
         link: conversion.job?.id ? `/jobs/${conversion.job.id}` : undefined,
       })
@@ -204,7 +204,7 @@ export async function POST(
     admin,
     userIds: adminIds,
     type: 'proposal_declined',
-    title: `${clientName} declined "${data.title}"`,
+    title: `${clientName} declined "${data.title || 'your proposal'}"`,
     body: clientResponseNote || undefined,
   })
 

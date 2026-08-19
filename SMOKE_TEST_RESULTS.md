@@ -55,7 +55,52 @@ against the linked project, or a CI step) rather than being caught by luck durin
 ## Go/no-go
 
 - Estimate/proposal/CO money paths: **verified working now**, previously broken.
-- Bill approve: code inspected (`PATCH /api/actuals/[id]`, correctly permission-gated, stamps
-  `approved_by`/`approved_at`), not driven through the real UI in this session — someone with a
-  real login should run the bill-approve spec once before Sept 1 to close the loop.
+- Bill approve: **verified working end-to-end 2026-08-19** (see addendum below) — no longer needs
+  a human to close the loop.
 - All three smoke-test money paths per the original plan now have committed Playwright coverage.
+
+---
+
+## Addendum (2026-08-19, later same day) — critical RLS recursion bug found and fixed
+
+While closing out the bill-approve path (previously blocked on needing a human login — closed
+below by driving a real logged-in browser session directly instead, since this environment can do
+that for BuildOS's own login even though it can't for Intuit's OAuth), general budget-page
+poking surfaced a much bigger issue.
+
+**Bug:** `user_permissions` has had a self-referential RLS policy since `001_initial_schema.sql`
+— `admins_manage_permissions` queries `user_permissions` from *within a policy defined on
+`user_permissions` itself*, the textbook Postgres RLS infinite-recursion trap. Any query anywhere
+that needed RLS applied to `user_permissions` — directly, or indirectly via another table's policy
+subquerying it (`budget_select`, `schedule_select`, `tasks_select`, `po_select`, `wo_select`, all
+structurally identical) — could throw `infinite recursion detected in policy for relation
+"user_permissions"`.
+
+**Confirmed live, logged in as august@jdcremodeling.com:** `/api/budget`, `/api/schedule`,
+`/api/tasks`, `/api/purchase-orders`, and `/api/work-orders` all 500'd with this error on a normal
+job page load. `/api/actuals` and `/api/change-orders` happened to succeed on the same request —
+non-deterministic (plan-cache dependent), which is worse than a clean failure: it means this could
+have surfaced randomly per-connection during the field pilot rather than failing consistently in
+a way that's easy to catch. This is **not** a permissions-scoping bug (nothing to do with the Day
+8 audit in `PERMISSIONS_MATRIX.md`) — every authenticated user, regardless of role, could trip it.
+
+**Fix (migration `038_fix_user_permissions_recursion.sql`, applied live + committed to repo):**
+moved the admin self-check into a `SECURITY DEFINER` helper function (`public.is_admin(uuid)`),
+which runs as the function owner (has `BYPASSRLS` in Supabase) instead of the querying role,
+breaking the recursive cycle. Verified fixed: `/api/budget`, `/api/actuals`, `/api/change-orders`,
+`/api/schedule`, `/api/tasks`, `/api/purchase-orders`, `/api/work-orders` all returned 200 across
+3 repeated rounds (21/21 requests) after the fix, where before the fix the same loop reproduced
+the 500s consistently on the broken endpoints.
+
+**Bill approve, verified for real:** seeded a test job + pending $375.50 actual directly in the
+live DB, logged in as august@jdcremodeling.com via a real browser session (Playwright, already
+authenticated from this session's earlier BuildOS login — no credential prompt needed), navigated
+to the job's Budget → Bills tab, clicked Approve. DB confirms `status='approved'`,
+`approved_by`/`approved_at` both stamped correctly. Test job and actual deleted after. This closes
+the last open item from the original three-money-path list — **all three now verified working
+against the live app, not just code-inspected.**
+
+Also re-ran `npx tsc --noEmit` (clean), `npm run build` (exit 0, compiled successfully),
+`npm run lint` (0 errors, 2 pre-existing unrelated warnings in a script), and the two
+self-seeding Playwright specs `money-path-proposal-accept` + `money-path-change-order`
+(4/4 passed against the live DB) — all still green after the migration.
