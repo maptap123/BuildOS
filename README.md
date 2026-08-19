@@ -74,19 +74,65 @@ npm install
 
 ### 2. Configure environment variables
 
-Create `.env.local` in the project root:
+Create `.env.local` in the project root. Every variable the app actually reads (verified by
+grepping `process.env.*` across `src/` and `scripts/` — this list is the source of truth, not
+the old shorter one below):
 
 ```env
+# Core — required for the app to boot at all
 NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
 SUPABASE_SERVICE_ROLE_KEY=<service role key — server-side only, never expose to client>
+
+# AI — Fixer chat, AI Log Mode, estimate assistance
 ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=<used by AI Log Mode's field-note summarizer>
+
+# Hermes (Discord bridge + VPS agent)
+DISCORD_BOT_TOKEN=<bot token, used for thread creation and the notifications-v1 Discord alerts>
+DISCORD_HERMES_CHANNEL_ID=<the shared #jdc-hermes channel id>
+DISCORD_HERMES_WEBHOOK_URL=<webhook for posting into that channel — NOT set in local .env.local today; confirm it exists in Vercel prod or Hermes thread creation will fail>
+DISCORD_ALERTS_CHANNEL_ID=<optional — separate channel for notifications-v1 alerts; falls back to DISCORD_HERMES_CHANNEL_ID if unset>
 HERMES_JDC_API_KEY=<long random bearer token for the VPS Hermes agent>
 HERMES_JDC_USER_ID=<public.users id Hermes should act as>
+
+# Notifications v1 cron (src/app/api/cron/log-check)
+CRON_SECRET=<random secret — Vercel Cron sends it as "Authorization: Bearer $CRON_SECRET"; without it the endpoint is unauthenticated>
+
+# QuickBooks Online
+QB_CLIENT_ID=
+QB_CLIENT_SECRET=
+QB_ENVIRONMENT=sandbox   # or production
+
+# Apify (material price intelligence — September scope, but the client reads this today)
+APIFY_API_TOKEN=
+
+# Microsoft / SharePoint (documents integration) — MISSING from local .env.local as of this
+# audit (2026-08-19); confirm whether Vercel production actually has these set, since the repo's
+# recurring "Outlook 500 error" bug pattern matches a missing-env-var failure mode
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=
+SHAREPOINT_SITE_URL=
+
+# Sentry (added Week 2 Day 9) — every field below is optional and no-ops safely if unset,
+# but without them launch-week errors won't be visible anywhere
+NEXT_PUBLIC_SENTRY_DSN=
+SENTRY_DSN=              # same DSN, read on the server; NEXT_PUBLIC_SENTRY_DSN is the browser copy
+SENTRY_ORG=
+SENTRY_PROJECT=
+SENTRY_AUTH_TOKEN=       # only needed for source map upload at build time, not at runtime
+
+# App URL (used to build absolute links in notification payloads posted to Discord)
+NEXT_PUBLIC_APP_URL=https://app.jdcplatform.com
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is used only in server-side API routes via the admin client. It bypasses Row Level Security so that permission enforcement can be done in application code.
 `HERMES_JDC_API_KEY` lets the external Hermes VPS call `POST /api/agent` without a browser session. `HERMES_JDC_USER_ID` must be an active JDC user with the module permissions Hermes is allowed to use.
+
+**Referenced in code comments but not yet actually read by any `process.env` call** (QuickBooks
+OAuth connect/callback are still stubbed — see Day 10 plan): `QB_REDIRECT_URI`,
+`QB_TOKEN_ENCRYPTION_KEY`, `PRICE_CACHE_TTL_HOURS`. Don't assume setting them does anything yet.
 
 ### 3. Run the dev server
 
@@ -159,23 +205,41 @@ src/
 | `documents` | Files attached to jobs, tasks, logs, or budget lines |
 | `user_permissions` | Per-user module permissions (see below) |
 | `integration_settings` | QuickBooks / Outlook / Google Calendar connection state |
+| `notifications` | In-app bell rows — see [Notifications](#notifications) below |
 
 ### Permission Modules
 
-Each user has one row per module in `user_permissions`:
+Each user has one row per module in `user_permissions`. The full current list (16 modules —
+`finance`/`profitability`/`estimates`/`photos`/`vendors` were added to the DB's module CHECK
+constraint by migration 026, which existed in this repo for a while but was only actually applied
+to the live database on 2026-08-19 during the Week 2 permissions audit):
 
 | Module | What it gates |
 |---|---|
-| `jobs` | View, create, edit, delete jobs |
-| `budget` | View and manage budget lines, actuals, change orders |
+| `jobs` | View, create, edit, delete jobs (contract value/margin additionally require `budget`) |
+| `leads` | Sales pipeline — office-only |
+| `contacts` | Job-site contacts; intentionally inherits `jobs.can_view` so crew keep tap-to-call/text |
+| `vendors` | Subcontractor/vendor directory — office-only |
+| `budget` | Budget lines, actuals, change orders, and the money fields on `jobs` |
+| `finance` | Finance dashboard |
+| `profitability` | Job profitability report |
+| `estimates` | Estimate builder, proposals |
 | `schedule` | View and manage schedule items |
 | `tasks` | View and manage tasks and comments |
 | `logs` | View and create daily logs and photos |
+| `photos` | Standalone job photo feed (outside daily logs) |
 | `documents` | View and upload documents |
-| `admin` | User management, permission management |
-| `ai` | Access to AI summary and agent endpoints |
+| `time_clock` | Clock in/out; `can_manage`-adjacent admin bypass covers shift approval — see [PERMISSIONS_MATRIX.md](./PERMISSIONS_MATRIX.md) for the default-allow exception here |
+| `admin` | User management, permission management — `can_manage=true` bypasses every other module gate everywhere, server-side |
+| `ai` | Fixer chat, AI Log Mode summarization, and `/api/agent` |
 
-All API routes enforce these flags server-side. The `SUPABASE_SERVICE_ROLE_KEY` admin client is used for permission lookups; all data reads/writes after the permission check also use the admin client.
+All API routes enforce these flags server-side via `src/lib/permissions/server.ts`'s
+`hasModulePermOrAdmin()` (or an inline equivalent) — never rely on the client-side
+`usePermissions()` hook alone, it only controls what the nav shows. See
+[PERMISSIONS_MATRIX.md](./PERMISSIONS_MATRIX.md) for the intended role bundles and a record of
+what was found broken in the Week 2 Day 8 audit. The `SUPABASE_SERVICE_ROLE_KEY` admin client is
+used for permission lookups; all data reads/writes after the permission check also use the admin
+client.
 
 ---
 
@@ -187,6 +251,10 @@ All API routes enforce these flags server-side. The `SUPABASE_SERVICE_ROLE_KEY` 
 | `npm run build` | Production build (runs TypeScript and lint checks) |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run bt:import` | Import Buildertrend time clock data from the live BT session (see `.bt-session/`) |
+| `npm run bt:import:dry` | Same, without writing — prints what would change |
+| `npm run bt:import:file` | Same import, from a saved `scripts/bt-shifts-raw.json` instead of a live session |
+| `npm run bt:import:file:dry` | Dry-run of the file-based import |
 
 ---
 
@@ -224,17 +292,46 @@ Both require the `ai` module `can_view` permission. `/api/agent` also accepts `A
 
 ---
 
+## Notifications
+
+`notifications` table + in-app bell (desktop header, mobile header) + a Discord post via the
+existing bot token — see `src/lib/notifications/`. Wired into: proposal accepted/declined, CO
+signed/rejected, new lead, task assigned, task flagged blocked, and a weekday 4pm America/New_York
+cron (`vercel.json` → `/api/cron/log-check`, requires `CRON_SECRET`) that flags any active job
+with no daily log yet today. Recipients default to the job's `project_manager_id`, falling back
+to every user with `admin.can_manage` if unset.
+
+---
+
+## Error Monitoring
+
+Sentry (`@sentry/nextjs`) is wired via Next.js 16's native `instrumentation.ts` /
+`instrumentation-client.ts` conventions (not the older `sentry.*.config.ts`-only pattern) —
+see `src/instrumentation.ts`, `src/instrumentation-client.ts`, `src/sentry.server.config.ts`,
+`src/sentry.edge.config.ts`, `src/app/global-error.tsx`, and the `withSentryConfig` wrap in
+`next.config.ts`. Everything no-ops safely when `NEXT_PUBLIC_SENTRY_DSN`/`SENTRY_DSN` are unset,
+which is the case in local dev and was the case everywhere until this was added — **a Sentry
+project still needs to be created and its DSN/org/project/auth-token set in Vercel** before
+launch-week errors actually show up anywhere; this can't be done from this environment (requires
+a Sentry account login).
+
+---
+
 ## Deployment
 
 Standard Next.js deployment. Recommended: Vercel.
 
 1. Push to GitHub and link the repo in Vercel
-2. Set environment variables in the Vercel dashboard:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `ANTHROPIC_API_KEY`
-3. Deploy
+2. Set every variable listed in [Configure environment variables](#2-configure-environment-variables) above in the Vercel dashboard (Project → Settings → Environment Variables) for the Production environment. That section is the authoritative list — it's generated from what the code actually reads, not maintained by hand here.
+3. Add the Vercel Cron entry (already committed in `vercel.json`) for `/api/cron/log-check`; set `CRON_SECRET` so the endpoint isn't publicly callable.
+4. Deploy
+
+As of this audit (2026-08-19) this repo's env-var parity between local `.env.local` and Vercel
+production has **not** been directly verified — this session's Vercel CLI session wasn't
+authenticated (`vercel login` requires an interactive browser flow this environment can't run).
+Before launch, someone with dashboard access should run `vercel env ls production` (or check the
+dashboard directly) and diff it against the list above — pay particular attention to the
+Microsoft/SharePoint and Sentry vars, which are the two groups most likely to be missing in prod.
 
 For a staging environment create a separate Supabase project and use its keys.
 
