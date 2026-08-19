@@ -1,0 +1,343 @@
+<title>Field Cheat Sheet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    /* fixed brand band — stays dark-navy in both themes, like the app's own mobile header */
+    --band-bg: #1b2a4a;
+    --band-ink: #ffffff;
+    --band-ink-soft: #b9c2d9;
+    --band-line: #4a5c85;
+
+    --heading: #1b2a4a;
+    --navy-700: #2c3f66;
+    --navy-050: #eef1f7;
+    --gold-500: #c99a34;
+    --gold-600: #a97e24;
+    --paper: #f7f5ef;
+    --card: #ffffff;
+    --ink: #23283a;
+    --ink-soft: #5b6178;
+    --line: #d8d3c4;
+    --font-display: 'Oswald', 'Arial Narrow', sans-serif;
+    --font-body: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --heading: #eef1f7;
+      --navy-700: #3a4d78;
+      --navy-050: #1a2540;
+      --gold-500: #e0b354;
+      --gold-600: #f0c46a;
+      --paper: #11141d;
+      --card: #171b28;
+      --ink: #e9ecf5;
+      --ink-soft: #9aa1bb;
+      --line: #313850;
+    }
+  }
+  :root[data-theme="dark"] {
+    --heading: #eef1f7;
+    --navy-700: #3a4d78;
+    --navy-050: #1a2540;
+    --gold-500: #e0b354;
+    --gold-600: #f0c46a;
+    --paper: #11141d;
+    --card: #171b28;
+    --ink: #e9ecf5;
+    --ink-soft: #9aa1bb;
+    --line: #313850;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px 56px;
+  }
+
+  .sheet {
+    width: 100%;
+    max-width: 780px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(20, 20, 30, 0.08);
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .header {
+    background: var(--band-bg);
+    color: var(--band-ink);
+    padding: 22px 28px 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 4px solid var(--gold-500);
+  }
+  .brand {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-500);
+    margin: 0 0 4px;
+  }
+  .title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 30px;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.05;
+  }
+  .name-field {
+    text-align: right;
+    font-size: 12px;
+    color: var(--band-ink-soft);
+  }
+  .name-field .line {
+    display: block;
+    margin-top: 10px;
+    width: 150px;
+    border-bottom: 1px solid var(--band-line);
+    height: 18px;
+  }
+
+  /* ── Panel grid ─────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+  }
+  .panel {
+    background: var(--card);
+    padding: 20px 22px 18px;
+  }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .panel-num {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--gold-600);
+    letter-spacing: 0.04em;
+    border: 1.5px solid var(--gold-500);
+    border-radius: 2px;
+    padding: 1px 6px;
+    line-height: 1.5;
+  }
+  .panel-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--heading);
+    margin: 0;
+  }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: step;
+  }
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 14.5px;
+    line-height: 1.4;
+    border-top: 1px dashed var(--line);
+  }
+  .steps li:first-child { border-top: none; }
+  .steps li::before {
+    content: counter(step);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: white;
+    background: var(--navy-700);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .steps b { color: var(--heading); font-weight: 600; }
+  .steps .sub {
+    display: block;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    margin-top: 2px;
+  }
+
+  /* ── Footer ─────────────────────────────────────────── */
+  .footer {
+    background: var(--navy-050);
+    border-top: 1px solid var(--line);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .fixer-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: var(--heading);
+  }
+  .fixer-mark {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    background: var(--gold-500);
+    color: var(--band-bg);
+    padding: 3px 9px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .support {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+  .support .line {
+    display: inline-block;
+    margin-left: 6px;
+    width: 130px;
+    border-bottom: 1px solid var(--line);
+    height: 14px;
+  }
+
+  /* ── Print ──────────────────────────────────────────── */
+  @media print {
+    :root {
+      --heading: #1b2a4a;
+      --navy-700: #2c3f66;
+      --navy-050: #eef1f7;
+      --gold-500: #c99a34;
+      --gold-600: #a97e24;
+      --paper: #ffffff;
+      --card: #ffffff;
+      --ink: #23283a;
+      --ink-soft: #5b6178;
+      --line: #cfcabb;
+    }
+    body { padding: 0; background: white; }
+    .sheet {
+      max-width: none;
+      width: 100%;
+      box-shadow: none;
+      border: none;
+    }
+    .panel { break-inside: avoid; }
+  }
+
+  @media (max-width: 620px) {
+    .grid { grid-template-columns: 1fr; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .name-field { text-align: left; }
+    .name-field .line { width: 100%; max-width: 220px; }
+  }
+</style>
+
+<div class="sheet">
+  <div class="header">
+    <div>
+      <p class="brand">BuildOS &middot; JDC Construction</p>
+      <h1 class="title">Field Cheat Sheet</h1>
+    </div>
+    <div class="name-field">
+      Crew member
+      <span class="line"></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">01</span>
+        <h2 class="panel-title">Clock In</h2>
+      </div>
+      <ol class="steps">
+        <li>Tap <b>Time Clock</b> in the bottom nav.</li>
+        <li>Confirm today's job — it's pre-filled from wherever you last were.</li>
+        <li>Tap <b>Clock In</b>. The timer starts and shows the job name.</li>
+        <li>End of shift: open Time Clock again, tap <b>Clock Out</b>.</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">02</span>
+        <h2 class="panel-title">Log a Day</h2>
+      </div>
+      <ol class="steps">
+        <li>From the job, tap <b>Log</b>, then <b>Add Log</b>.</li>
+        <li>Tap <b>Take Photo</b> — camera opens directly, no gallery digging.</li>
+        <li>Talk or type what happened. No signal? It saves on your phone and sends once you're back online.</li>
+        <li>Tap <b>Save</b>. Look for the synced checkmark later.</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">03</span>
+        <h2 class="panel-title">Find the Site</h2>
+      </div>
+      <ol class="steps">
+        <li>Open the job, tap the address at the top.</li>
+        <li>Opens turn-by-turn directions in Google Maps.</li>
+        <li>Need the homeowner? Tap their name to <b>call</b> or <b>text</b> — right from the job screen.</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">04</span>
+        <h2 class="panel-title">Ask Fixer</h2>
+      </div>
+      <ol class="steps">
+        <li>Fixer's icon floats on every screen — tap it any time.</li>
+        <li>Tap the <b>mic</b> and just talk, or type your question.</li>
+        <li>Quick taps for common asks: <span class="sub">"My tasks today" &middot; "What's overdue?" &middot; "Start a log" &middot; "Summarize this job"</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="fixer-note">
+      <span class="fixer-mark">Stuck?</span>
+      Flag a task as blocked (the flag icon) and your PM gets notified.
+    </div>
+    <div class="support">
+      Questions&nbsp;&mdash;&nbsp;call the office
+      <span class="line"></span>
+    </div>
+  </div>
+</div>
