@@ -30,10 +30,13 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isAuthRoute   = path.startsWith('/login')
   const isApiRoute    = path.startsWith('/api/')
-  const isPublicRoute = path.startsWith('/co/')
+  const isPublicRoute = path.startsWith('/co/') || path.startsWith('/proposals/')
 
   // API routes handle their own 401 — don't redirect them to /login
-  // /co/* routes are public (token-authenticated client approval pages)
+  // /co/* and /proposals/* are public (token-authenticated client approval pages) —
+  // found broken 2026-08-19: /proposals/ was missing here, so every homeowner clicking
+  // a proposal link got redirected to /login instead of seeing their proposal. The
+  // entire estimate → proposal → accept → job path was unreachable by real clients.
   if (!user && !isAuthRoute && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
