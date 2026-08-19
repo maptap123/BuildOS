@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notify, getAdminUserIds } from '@/lib/notifications'
+import { hasModulePermOrAdmin } from '@/lib/permissions/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -11,14 +12,8 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_view')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-
-  if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canView = await hasModulePermOrAdmin(createAdminClient(), user.id, 'leads', 'can_view')
+  if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   let query = supabase
     .from('leads')
@@ -37,13 +32,8 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_create')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_create) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canCreate = await hasModulePermOrAdmin(createAdminClient(), user.id, 'leads', 'can_create')
+  if (!canCreate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
   const {
@@ -102,13 +92,8 @@ export async function PATCH(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_edit')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canEdit = await hasModulePermOrAdmin(createAdminClient(), user.id, 'leads', 'can_edit')
+  if (!canEdit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
   const { id, ...updates } = body
@@ -142,13 +127,8 @@ export async function DELETE(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_delete')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_delete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canDelete = await hasModulePermOrAdmin(createAdminClient(), user.id, 'leads', 'can_delete')
+  if (!canDelete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

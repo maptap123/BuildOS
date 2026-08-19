@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { hasModulePermOrAdmin } from '@/lib/permissions/server'
 import { NextResponse } from 'next/server'
 import { summarizeDailyLog, estimateFromDescription, generateEstimateLines } from '@/lib/ai/claude'
 
@@ -7,6 +9,9 @@ export async function POST(request: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const canUseAi = await hasModulePermOrAdmin(createAdminClient(), user.id, 'ai', 'can_view')
+  if (!canUseAi) return NextResponse.json({ error: 'AI module access not granted' }, { status: 403 })
 
   const body = await request.json()
   const { action, text } = body

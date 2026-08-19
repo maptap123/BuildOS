@@ -20,12 +20,20 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  const { data: perm } = await admin
-    .from('user_permissions')
-    .select('can_view')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
+  const [{ data: perm }, { data: budgetPerm }] = await Promise.all([
+    admin
+      .from('user_permissions')
+      .select('can_view')
+      .eq('user_id', user.id)
+      .eq('module', 'jobs')
+      .single(),
+    admin
+      .from('user_permissions')
+      .select('can_view')
+      .eq('user_id', user.id)
+      .eq('module', 'budget')
+      .single(),
+  ])
 
   if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -36,6 +44,15 @@ export async function GET(
     .single()
 
   if (error || !job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Contract value / cost are budget-gated — strip for callers without budget.can_view,
+  // matching GET /api/jobs (list). A crew login only has jobs.can_view.
+  if (!budgetPerm?.can_view) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { contract_amount: _ca, estimated_cost: _ec, ...rest } = job
+    return NextResponse.json(rest)
+  }
+
   return NextResponse.json(job)
 }
 
@@ -49,21 +66,29 @@ export async function PATCH(
 
   const admin = createAdminClient()
 
-  const { data: perm } = await admin
-    .from('user_permissions')
-    .select('can_edit')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
+  const [{ data: perm }, { data: budgetPerm }] = await Promise.all([
+    admin
+      .from('user_permissions')
+      .select('can_edit')
+      .eq('user_id', user.id)
+      .eq('module', 'jobs')
+      .single(),
+    admin
+      .from('user_permissions')
+      .select('can_edit')
+      .eq('user_id', user.id)
+      .eq('module', 'budget')
+      .single(),
+  ])
 
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
 
-  // Whitelist editable fields
+  // Whitelist editable fields — contract_amount/estimated_cost additionally require budget.can_edit
   const allowed = [
     'name', 'description', 'status',
-    'contract_amount', 'estimated_cost',
+    ...(budgetPerm?.can_edit ? ['contract_amount', 'estimated_cost'] as const : []),
     'tags',
     'site_address', 'city', 'state', 'postal_code',
     'start_date', 'target_completion_date', 'actual_completion_date',
@@ -93,6 +118,13 @@ export async function PATCH(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (!budgetPerm?.can_edit) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { contract_amount: _ca, estimated_cost: _ec, ...rest } = data
+    return NextResponse.json(rest)
+  }
+
   return NextResponse.json(data)
 }
 

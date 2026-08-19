@@ -277,9 +277,13 @@ export async function executeTool(
           : 0
       const offset = Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0
 
+      const canSeeBudget = await hasPerm(admin, userId, 'budget', 'can_view')
       let q = admin
         .from('jobs')
-        .select('id, job_number, name, status, client_name, site_address, start_date, target_completion_date, contract_amount', { count: 'exact' })
+        .select(
+          `id, job_number, name, status, client_name, site_address, start_date, target_completion_date${canSeeBudget ? ', contract_amount' : ''}`,
+          { count: 'exact' },
+        )
         .order('created_at', { ascending: false })
       if (params.status) q = q.eq('status', params.status)
       if (params.search) q = q.or(`name.ilike.%${params.search}%,client_name.ilike.%${params.search}%,job_number.ilike.%${params.search}%`)
@@ -299,6 +303,11 @@ export async function executeTool(
       if (!await hasPerm(admin, userId, 'jobs', 'can_view')) return { error: 'Permission denied' }
       const { data, error } = await admin.from('jobs').select('*, pm:project_manager_id(full_name), super:superintendent_id(full_name)').eq('id', params.job_id).single()
       if (error || !data) return { error: 'Job not found' }
+      if (!await hasPerm(admin, userId, 'budget', 'can_view')) {
+        const { contract_amount: _ca, estimated_cost: _ec, ...rest } = data
+        void _ca; void _ec
+        return rest
+      }
       return data
     }
 

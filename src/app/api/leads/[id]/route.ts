@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { hasModulePermOrAdmin } from '@/lib/permissions/server'
 import { NextResponse } from 'next/server'
 
 type Params = { params: Promise<{ id: string }> }
@@ -11,13 +12,8 @@ export async function GET(_request: Request, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_view')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canView = await hasModulePermOrAdmin(createAdminClient(), user.id, 'leads', 'can_view')
+  if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
   const [{ data: lead, error: leadErr }, { data: activities }] = await Promise.all([
@@ -43,13 +39,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_edit')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canEdit = await hasModulePermOrAdmin(createAdminClient(), user.id, 'leads', 'can_edit')
+  if (!canEdit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const updates = await request.json()
 

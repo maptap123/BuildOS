@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { hasModulePermOrAdmin } from '@/lib/permissions/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -10,13 +11,8 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_view')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canView = await hasModulePermOrAdmin(createAdminClient(), user.id, 'vendors', 'can_view')
+  if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   let query = supabase
     .from('vendors')
@@ -38,13 +34,8 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: perm } = await createAdminClient()
-    .from('user_permissions')
-    .select('can_create')
-    .eq('user_id', user.id)
-    .eq('module', 'jobs')
-    .single()
-  if (!perm?.can_create) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const canCreate = await hasModulePermOrAdmin(createAdminClient(), user.id, 'vendors', 'can_create')
+  if (!canCreate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
   const {

@@ -83,9 +83,13 @@ export async function POST(request: Request) {
             : 0
         const offset = Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0
 
+        const canSeeBudget = await hasPerm('budget', 'can_view')
         let query = admin
           .from('jobs')
-          .select('id, job_number, name, status, client_name, site_address, start_date, target_completion_date, contract_amount', { count: 'exact' })
+          .select(
+            `id, job_number, name, status, client_name, site_address, start_date, target_completion_date${canSeeBudget ? ', contract_amount' : ''}`,
+            { count: 'exact' },
+          )
           .order('created_at', { ascending: false })
         if (params.status) query = query.eq('status', params.status)
         if (params.search) query = query.or(`name.ilike.%${params.search}%,client_name.ilike.%${params.search}%,job_number.ilike.%${params.search}%`)
@@ -109,6 +113,11 @@ export async function POST(request: Request) {
           .eq('id', params.job_id)
           .single()
         if (error || !data) return notFoundError('job')
+        if (!await hasPerm('budget', 'can_view')) {
+          const { contract_amount: _ca, estimated_cost: _ec, ...rest } = data
+          void _ca; void _ec
+          return ok(rest)
+        }
         return ok(data)
       }
 
