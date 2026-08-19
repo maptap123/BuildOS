@@ -67,6 +67,7 @@ const SELECT_JOB_LABELS: Record<string, string> = {
   tasks: 'Tasks',
   logs: 'Logs',
   profitability: 'Profitability',
+  estimates: 'Estimates',
 }
 
 function TaskRow({ task, router }: { task: AgendaTask; router: ReturnType<typeof useRouter> }) {

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -9,6 +10,9 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useActiveJob } from '@/contexts/ActiveJobContext'
+import { JobPickerSheet } from '@/components/jobs'
+import type { Job } from '@/types'
 
 const SECTIONS = [
   {
@@ -41,9 +45,16 @@ const SECTIONS = [
   },
 ]
 
+// These tools live under /jobs/[id]/… and need a job before they can open.
+// Tapping one uses the persisted active job, or opens the job picker with
+// destination intent — same flow as the bottom-nav Jobs tab.
+const JOB_SCOPED_TOOLS = new Set(['budget', 'profitability', 'estimates', 'logs', 'schedule'])
+
 export default function MorePage() {
   const router = useRouter()
   const { can, isAdmin } = usePermissions()
+  const { activeJobId, setActiveJob } = useActiveJob()
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
 
   const canManageOffice = isAdmin() || can('jobs', 'create') || can('jobs', 'edit')
   const canViewBudget = isAdmin() || can('budget', 'view')
@@ -76,6 +87,27 @@ export default function MorePage() {
     .map(section => ({ ...section, items: section.items.filter(item => canUseItem(item.key)) }))
     .filter(section => section.items.length > 0)
 
+  function openJobTool(tab: string) {
+    if (activeJobId) {
+      router.push(`/jobs/${activeJobId}/${tab}`)
+    } else {
+      setPickerFor(tab)
+    }
+  }
+
+  function handlePickerSelect(job: Job) {
+    setActiveJob({
+      id: job.id,
+      name: job.name,
+      job_number: job.job_number ?? '',
+      status: job.status,
+      client_name: job.client_name ?? null,
+    })
+    const tab = pickerFor
+    setPickerFor(null)
+    if (tab) router.push(`/jobs/${job.id}/${tab}`)
+  }
+
   async function signOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -96,25 +128,42 @@ export default function MorePage() {
               className="rounded-2xl overflow-hidden bg-white"
               style={{ border: '1px solid #e2ddd6', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
             >
-              {section.items.map((item, idx) => (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={`flex items-center gap-4 px-4 py-3.5 transition-colors active:bg-[#f0ede8] hover:bg-[#f8f7f4] ${idx < section.items.length - 1 ? 'border-b border-[#e2ddd6]' : ''}`}
-                >
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #1b2b4a, #2e4168)' }}
-                  >
-                    <item.icon size={17} className="text-[#d4a83c]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#1b2b4a] text-sm">{item.label}</p>
-                    <p className="text-xs text-[#4d6a9a]">{item.description}</p>
-                  </div>
-                  <ChevronRight size={16} className="text-[#4d6a9a] shrink-0" />
-                </Link>
-              ))}
+              {section.items.map((item, idx) => {
+                const rowClass = `flex items-center gap-4 px-4 py-3.5 transition-colors active:bg-[#f0ede8] hover:bg-[#f8f7f4] ${idx < section.items.length - 1 ? 'border-b border-[#e2ddd6]' : ''}`
+                const rowContent = (
+                  <>
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #1b2b4a, #2e4168)' }}
+                    >
+                      <item.icon size={17} className="text-[#d4a83c]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[#1b2b4a] text-sm">{item.label}</p>
+                      <p className="text-xs text-[#4d6a9a]">{item.description}</p>
+                    </div>
+                    <ChevronRight size={16} className="text-[#4d6a9a] shrink-0" />
+                  </>
+                )
+
+                if (JOB_SCOPED_TOOLS.has(item.key)) {
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => openJobTool(item.key)}
+                      className={`w-full text-left ${rowClass}`}
+                    >
+                      {rowContent}
+                    </button>
+                  )
+                }
+
+                return (
+                  <Link key={item.key} href={item.href} className={rowClass}>
+                    {rowContent}
+                  </Link>
+                )
+              })}
             </div>
           </div>
         ))}
@@ -137,6 +186,15 @@ export default function MorePage() {
           </div>
         </div>
       </div>
+
+      {/* Job picker — opens when a job-scoped tool is tapped with no active job */}
+      {pickerFor && (
+        <JobPickerSheet
+          onClose={() => setPickerFor(null)}
+          currentJobId={activeJobId}
+          onSelect={handlePickerSelect}
+        />
+      )}
     </div>
   )
 }
