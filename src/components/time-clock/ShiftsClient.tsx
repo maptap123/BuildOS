@@ -2,7 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle, XCircle, Filter, MapPin, Clock, AlertCircle } from 'lucide-react'
+import {
+  ArrowLeft, CheckCircle, XCircle, Filter, MapPin, Clock, AlertCircle,
+  Download, Users, CheckSquare, Square, Timer, X,
+} from 'lucide-react'
 import Link from 'next/link'
 import type { TimeEntry } from '@/types'
 import type { ShiftRange } from '@/app/(dashboard)/time-clock/shifts/page'
@@ -77,6 +80,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 // --- Component ----------------------------------------------------------------
 
+type ManagerView = 'shifts' | 'employees'
+
 export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Props) {
   const router = useRouter()
   const [entries, setEntries] = useState<EntryRow[]>(initialEntries)
@@ -85,6 +90,10 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
   const [filterJob, setFilterJob] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<ManagerView>('shifts')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   // -- Global stats (all loaded entries) ---------------------------------------
   const stats = useMemo(() => ({
@@ -112,6 +121,123 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
     laborCost:     filtered.reduce((s, e) => s + (e.labor_cost ?? 0), 0),
   }), [filtered])
 
+  // -- Clocked in right now (independent of date/status filters) ---------------
+  const clockedInNow = useMemo(
+    () => entries.filter((e) => !e.clock_out).sort((a, b) => a.clock_in.localeCompare(b.clock_in)),
+    [entries],
+  )
+
+  // -- Per-employee weekly rollup (respects current filters/date range) --------
+  const employeeRollup = useMemo(() => {
+    const byUser = new Map<string, {
+      userId: string
+      name: string
+      shiftCount: number
+      regularHours: number
+      overtimeHours: number
+      laborCost: number
+      openNow: boolean
+    }>()
+
+    for (const e of filtered) {
+      const key = e.user_id
+      const row = byUser.get(key) ?? {
+        userId: key,
+        name: e.user?.full_name ?? 'Unknown',
+        shiftCount: 0,
+        regularHours: 0,
+        overtimeHours: 0,
+        laborCost: 0,
+        openNow: false,
+      }
+      row.shiftCount += 1
+      row.regularHours += e.regular_hours ?? 0
+      row.overtimeHours += e.overtime_hours ?? 0
+      row.laborCost += e.labor_cost ?? 0
+      if (!e.clock_out) row.openNow = true
+      byUser.set(key, row)
+    }
+
+    return Array.from(byUser.values()).sort((a, b) => b.regularHours + b.overtimeHours - (a.regularHours + a.overtimeHours))
+  }, [filtered])
+
+  // -- Bulk selection: only completed, pending entries are selectable ----------
+  const selectablePendingIds = useMemo(
+    () => filtered.filter((e) => e.clock_out && e.approval_status === 'pending').map((e) => e.id),
+    [filtered],
+  )
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllPending() {
+    setSelectedIds((prev) =>
+      prev.size === selectablePendingIds.length ? new Set() : new Set(selectablePendingIds),
+    )
+  }
+
+  async function bulkApprove(status: 'approved' | 'rejected') {
+    if (selectedIds.size === 0) return
+    setBulkLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/time-entries/bulk-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), status }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Bulk update failed')
+      setEntries((prev) =>
+        prev.map((e) => (selectedIds.has(e.id) ? { ...e, approval_status: status } : e)),
+      )
+      setSelectedIds(new Set())
+      setSelectMode(false)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Bulk update failed')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  // -- CSV export for payroll (current filtered set) ---------------------------
+  function exportCSV() {
+    const header = [
+      'Employee', 'Job', 'Date', 'Clock In', 'Clock Out',
+      'Regular Hours', 'Overtime Hours', 'Cost Code', 'Labor Cost', 'Status',
+    ]
+    const rows = filtered.map((e) => [
+      e.user?.full_name ?? 'Unknown',
+      e.job?.name ?? '',
+      formatDate(e.clock_in),
+      formatTime(e.clock_in),
+      e.clock_out ? formatTime(e.clock_out) : '',
+      (e.regular_hours ?? 0).toFixed(2),
+      (e.overtime_hours ?? 0).toFixed(2),
+      e.cost_code ?? '',
+      (e.labor_cost ?? 0).toFixed(2),
+      e.clock_out ? e.approval_status : 'active',
+    ])
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\r\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `buildos-timeclock-${currentRange}-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   // -- Approve / Reject --------------------------------------------------------
   async function updateApproval(id: string, status: 'approved' | 'rejected') {
     setLoadingId(id)
@@ -138,25 +264,62 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
     <div className="space-y-5">
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/time-clock" className="text-gray-400 hover:text-navy-900 transition-colors p-1">
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="font-display text-xl font-bold text-navy-900">Shift Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {filtered.length} shifts &middot; {summary.totalHours.toFixed(1)}h
-            {summary.overtimeHours > 0 && (
-              <span className="text-amber-600"> ({summary.overtimeHours.toFixed(1)}h OT)</span>
-            )}
-            {summary.laborCost > 0 && (
-              <span>
-                {' '}&middot; ${summary.laborCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} labor
-              </span>
-            )}
-          </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/time-clock" className="text-gray-400 hover:text-navy-900 transition-colors p-1">
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="font-display text-xl font-bold text-navy-900">Shift Management</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {filtered.length} shifts &middot; {summary.totalHours.toFixed(1)}h
+              {summary.overtimeHours > 0 && (
+                <span className="text-amber-600"> ({summary.overtimeHours.toFixed(1)}h OT)</span>
+              )}
+              {summary.laborCost > 0 && (
+                <span>
+                  {' '}&middot; ${summary.laborCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} labor
+                </span>
+              )}
+            </p>
+          </div>
         </div>
+
+        <button
+          onClick={exportCSV}
+          disabled={filtered.length === 0}
+          className="flex items-center gap-1.5 text-xs font-semibold text-navy-700 bg-white border border-gray-200 hover:border-navy-300 px-3 py-2 rounded-lg transition-colors disabled:opacity-40 shrink-0"
+        >
+          <Download size={13} />
+          Export CSV
+        </button>
       </div>
+
+      {/* Clocked in now */}
+      {clockedInNow.length > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 mb-2.5">
+            <Timer size={13} />
+            Clocked in now &middot; {clockedInNow.length}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {clockedInNow.map((e) => (
+              <div
+                key={e.id}
+                className="flex items-center gap-2 bg-white border border-green-200 rounded-lg pl-2.5 pr-3 py-1.5"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-navy-900 leading-tight">{e.user?.full_name ?? 'Unknown'}</p>
+                  <p className="text-[10px] text-gray-500 leading-tight truncate max-w-[160px]">
+                    {e.job?.name ?? '—'} &middot; since {formatTime(e.clock_in)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -165,6 +328,32 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
           <span>{error}</span>
         </div>
       )}
+
+      {/* View toggle */}
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => setView('shifts')}
+          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+            view === 'shifts'
+              ? 'bg-navy-900 text-white border-navy-900'
+              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+          }`}
+        >
+          <Clock size={12} />
+          Shifts
+        </button>
+        <button
+          onClick={() => setView('employees')}
+          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+            view === 'employees'
+              ? 'bg-navy-900 text-white border-navy-900'
+              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+          }`}
+        >
+          <Users size={12} />
+          By Employee
+        </button>
+      </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-2">
@@ -195,9 +384,24 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
 
       {/* Filters */}
       <div className="bg-white border border-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold">
-          <Filter size={11} />
-          Filters
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold">
+            <Filter size={11} />
+            Filters
+          </div>
+          {view === 'shifts' && selectablePendingIds.length > 0 && (
+            <button
+              onClick={() => { setSelectMode((v) => !v); setSelectedIds(new Set()) }}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                selectMode
+                  ? 'bg-navy-900 text-white border-navy-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              {selectMode ? <X size={12} /> : <CheckSquare size={12} />}
+              {selectMode ? 'Cancel' : 'Select'}
+            </button>
+          )}
         </div>
 
         {/* Date range — drives server re-fetch via URL param */}
@@ -263,8 +467,70 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
         </div>
       </div>
 
+      {/* Employee weekly rollup */}
+      {view === 'employees' && (
+        <div className="bg-white border border-border rounded-xl overflow-hidden">
+          {employeeRollup.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              No shifts match these filters.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                    <th className="px-4 py-2.5">Employee</th>
+                    <th className="px-4 py-2.5 text-right">Shifts</th>
+                    <th className="px-4 py-2.5 text-right">Regular</th>
+                    <th className="px-4 py-2.5 text-right">OT</th>
+                    <th className="px-4 py-2.5 text-right">Total</th>
+                    <th className="px-4 py-2.5 text-right">Labor Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employeeRollup.map((row) => (
+                    <tr key={row.userId} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-navy-900">
+                        <div className="flex items-center gap-2">
+                          {row.openNow && <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" title="Clocked in now" />}
+                          {row.name}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-500">{row.shiftCount}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{row.regularHours.toFixed(1)}h</td>
+                      <td className="px-4 py-3 text-right">
+                        {row.overtimeHours > 0
+                          ? <span className="text-amber-600 font-medium">{row.overtimeHours.toFixed(1)}h</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-navy-900">
+                        {(row.regularHours + row.overtimeHours).toFixed(1)}h
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-700">
+                        {row.laborCost > 0 ? `$${row.laborCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 font-semibold text-navy-900">
+                    <td className="px-4 py-3">Total</td>
+                    <td className="px-4 py-3 text-right">{filtered.length}</td>
+                    <td className="px-4 py-3 text-right">{employeeRollup.reduce((s, r) => s + r.regularHours, 0).toFixed(1)}h</td>
+                    <td className="px-4 py-3 text-right text-amber-700">{employeeRollup.reduce((s, r) => s + r.overtimeHours, 0).toFixed(1)}h</td>
+                    <td className="px-4 py-3 text-right">{summary.totalHours.toFixed(1)}h</td>
+                    <td className="px-4 py-3 text-right">${summary.laborCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Shift cards */}
-      <div className="space-y-2">
+      {view === 'shifts' && (
+      <div className="space-y-2 pb-16">
         {filtered.length === 0 && (
           <div className="text-center py-12 text-gray-400 text-sm">
             No shifts match these filters.
@@ -278,15 +544,29 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
           const hasOT = (entry.overtime_hours ?? 0) > 0
           const hasClockInLoc = entry.clock_in_latitude != null
           const hasClockOutLoc = entry.clock_out_latitude != null
+          const isSelectable = entry.clock_out && entry.approval_status === 'pending'
+          const isSelected = selectedIds.has(entry.id)
 
           return (
             <div
               key={entry.id}
+              onClick={() => selectMode && isSelectable && toggleSelected(entry.id)}
               className={`bg-white border rounded-xl px-4 py-3.5 ${
                 isOpen ? 'border-green-300 bg-green-50/30' : 'border-border'
-              }`}
+              } ${selectMode && isSelectable ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-navy-400' : ''}`}
             >
               <div className="flex items-start justify-between gap-3">
+                {selectMode && (
+                  <div className="shrink-0 pt-0.5">
+                    {isSelectable ? (
+                      isSelected
+                        ? <CheckSquare size={18} className="text-navy-700" />
+                        : <Square size={18} className="text-gray-300" />
+                    ) : (
+                      <Square size={18} className="text-gray-100" />
+                    )}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
 
                   {/* Name + status badges */}
@@ -379,8 +659,8 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
                 </div>
               </div>
 
-              {/* Approve / Reject — only for completed pending entries */}
-              {!isOpen && entry.approval_status === 'pending' && (
+              {/* Approve / Reject — only for completed pending entries, hidden in bulk-select mode */}
+              {!isOpen && !selectMode && entry.approval_status === 'pending' && (
                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
                   <button
                     onClick={() => updateApproval(entry.id, 'approved')}
@@ -404,6 +684,36 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
           )
         })}
       </div>
+      )}
+
+      {/* Sticky bulk action bar */}
+      {selectMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-navy-900 text-white rounded-xl shadow-lg px-4 py-3">
+          <button
+            onClick={toggleSelectAllPending}
+            className="text-xs font-semibold text-white/80 hover:text-white underline underline-offset-2"
+          >
+            {selectedIds.size === selectablePendingIds.length ? 'Deselect all' : `Select all (${selectablePendingIds.length})`}
+          </button>
+          <span className="text-xs text-white/60">{selectedIds.size} selected</span>
+          <button
+            onClick={() => bulkApprove('approved')}
+            disabled={selectedIds.size === 0 || bulkLoading}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-green-500 hover:bg-green-400 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+          >
+            <CheckCircle size={13} />
+            Approve
+          </button>
+          <button
+            onClick={() => bulkApprove('rejected')}
+            disabled={selectedIds.size === 0 || bulkLoading}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-red-500 hover:bg-red-400 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+          >
+            <XCircle size={13} />
+            Reject
+          </button>
+        </div>
+      )}
     </div>
   )
 }
