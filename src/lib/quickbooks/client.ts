@@ -72,6 +72,69 @@ function baseUrl(realmId: string): string {
 }
 
 const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
+const AUTHORIZE_URL = 'https://appcenter.intuit.com/connect/oauth2'
+const SCOPE = 'com.intuit.quickbooks.accounting'
+
+// ─── OAuth 2.0 authorization-code flow ────────────────────────────────────────
+
+/**
+ * Builds the Intuit authorization URL the user is redirected to in order to
+ * grant BuildOS access to their QuickBooks company. `state` should be a
+ * random value the caller stores (e.g. an httpOnly cookie) and verifies on
+ * the callback, to prevent CSRF.
+ */
+export function getAuthUrl(state: string): string {
+  const params = new URLSearchParams({
+    client_id: process.env.QB_CLIENT_ID!,
+    redirect_uri: process.env.QB_REDIRECT_URI!,
+    response_type: 'code',
+    scope: SCOPE,
+    state,
+  })
+  return `${AUTHORIZE_URL}?${params.toString()}`
+}
+
+export interface QBExchangeResult {
+  access_token: string
+  refresh_token: string
+  expires_at: string
+}
+
+/**
+ * Exchanges the authorization `code` Intuit sent to the callback for an
+ * access/refresh token pair.
+ */
+export async function exchangeCodeForTokens(code: string): Promise<QBExchangeResult> {
+  const clientId = process.env.QB_CLIENT_ID!
+  const clientSecret = process.env.QB_CLIENT_SECRET!
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: process.env.QB_REDIRECT_URI!,
+    }).toString(),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`QB token exchange failed (${res.status}): ${text}`)
+  }
+
+  const data = await res.json() as { access_token: string; refresh_token: string; expires_in: number }
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
+  }
+}
 
 // ─── Token refresh ───────────────────────────────────────────────────────────
 
