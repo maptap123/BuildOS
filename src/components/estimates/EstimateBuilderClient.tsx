@@ -25,7 +25,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { CostCatalogSearch } from './CostCatalogSearch'
-import { EstimateLineRow } from './EstimateLineRow'
+import { EstimateLineRow, EstimateLineCard } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
 import type { AISuggestedLine } from '@/lib/ai/claude'
@@ -644,14 +644,14 @@ export function EstimateBuilderClient({
           <ArrowLeft size={15} />
           Back to Lead
         </button>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
           <div>
             <h1 className="font-display font-bold text-navy-900 text-2xl leading-tight">
               Estimate Builder
             </h1>
             <p className="text-sm text-gray-500 mt-1">{lead.title}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 md:shrink-0 md:justify-end">
             {permissions.can_create && (
               <button
                 onClick={createEstimate}
@@ -771,24 +771,24 @@ export function EstimateBuilderClient({
 
       {/* Profit summary bar */}
       {activeEstimate && lines.length > 0 && (
-        <div className="bg-navy-900 rounded-xl px-6 py-4 flex items-center gap-8">
+        <div className="bg-navy-900 rounded-xl px-4 md:px-6 py-4 flex flex-wrap items-center gap-3 md:gap-8">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold text-navy-400 uppercase tracking-wide mb-0.5">Builder Cost</p>
-            <p className="text-xl font-bold text-white tabular-nums">{fmt(totalBuilderCost)}</p>
+            <p className="text-lg md:text-xl font-bold text-white tabular-nums">{fmt(totalBuilderCost)}</p>
           </div>
-          <span className="text-navy-500 text-xl font-light select-none">+</span>
+          <span className="hidden md:inline text-navy-500 text-xl font-light select-none">+</span>
           <div className="min-w-0">
             <p className="text-[10px] font-semibold text-navy-400 uppercase tracking-wide mb-0.5">
               Profit <span className="text-gold-400">({marginPct.toFixed(1)}% margin)</span>
             </p>
-            <p className="text-xl font-bold text-gold-400 tabular-nums">{fmt(totalProfit)}</p>
+            <p className="text-lg md:text-xl font-bold text-gold-400 tabular-nums">{fmt(totalProfit)}</p>
           </div>
-          <span className="text-navy-500 text-xl font-light select-none">=</span>
+          <span className="hidden md:inline text-navy-500 text-xl font-light select-none">=</span>
           <div className="min-w-0">
             <p className="text-[10px] font-semibold text-navy-400 uppercase tracking-wide mb-0.5">Client Total</p>
-            <p className="text-2xl font-bold text-white tabular-nums">{fmt(grandTotal)}</p>
+            <p className="text-xl md:text-2xl font-bold text-white tabular-nums">{fmt(grandTotal)}</p>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto hidden md:flex items-center gap-2">
             <TrendingUp size={14} className="text-navy-500" />
             <span className="text-xs text-navy-400">
               {lines.length} line{lines.length !== 1 ? 's' : ''}
@@ -1042,7 +1042,9 @@ export function EstimateBuilderClient({
                   )}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 text-[10px] text-gray-400 font-medium uppercase tracking-wide">
@@ -1131,6 +1133,58 @@ export function EstimateBuilderClient({
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Mobile card list — no sideways scrolling */}
+                <div className="md:hidden">
+                  {Array.from(groupedLines.entries()).map(([phase, phaseLines]) => {
+                    const phaseTotal  = phaseLines.reduce((s, l) => s + lineTotal(l), 0)
+                    const isCollapsed = collapsedPhases.has(phase)
+                    return (
+                      <div key={phase}>
+                        <button
+                          onClick={() => togglePhase(phase)}
+                          className="w-full flex items-center gap-2 bg-gray-50 hover:bg-gray-100 transition-colors px-4 py-2.5 border-y border-gray-100 text-left"
+                        >
+                          {isCollapsed
+                            ? <ChevronRight size={12} className="text-gray-400 shrink-0" />
+                            : <ChevronDown  size={12} className="text-gray-400 shrink-0" />
+                          }
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide truncate">
+                            {phase}
+                          </span>
+                          <span className="text-[10px] text-gray-400 shrink-0">
+                            {phaseLines.length} item{phaseLines.length !== 1 ? 's' : ''}
+                          </span>
+                          <span className="ml-auto text-xs font-semibold text-navy-700 tabular-nums shrink-0">
+                            {fmt(phaseTotal)}
+                          </span>
+                        </button>
+
+                        {!isCollapsed && (
+                          <div className="divide-y divide-gray-50">
+                            {phaseLines.map(line => (
+                              <EstimateLineCard
+                                key={line.id}
+                                line={line}
+                                canEdit={permissions.can_edit && !activeEstimate.is_locked}
+                                canDelete={permissions.can_delete && !activeEstimate.is_locked}
+                                onChange={handleLineChange}
+                                onDelete={deleteLine}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t-2 border-gray-200">
+                    <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Grand Total</span>
+                    <span className="text-xs text-gray-400 tabular-nums">cost {fmt(totalBuilderCost)}</span>
+                    <span className="font-bold text-navy-900 tabular-nums">{fmt(grandTotal)}</span>
+                  </div>
+                </div>
+                </>
               )}
 
               {/* Footer action bar */}

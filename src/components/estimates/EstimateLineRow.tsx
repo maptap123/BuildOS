@@ -51,22 +51,12 @@ async function persistVisibility(id: string, client_visible: boolean) {
   })
 }
 
-export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }: Props) {
-  const [expanded, setExpanded]           = useState(false)
+// ── Retail price lookup (shared by desktop row + mobile card) ──────────────
+function PriceLookupSection({ line, onChange }: Pick<Props, 'line' | 'onChange'>) {
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupResults, setLookupResults] = useState<PriceLookupResult[] | null>(null)
   const [lookupSource, setLookupSource]   = useState<PriceLookupResponse['source'] | null>(null)
   const [lookupMsg, setLookupMsg]         = useState<string | null>(null)
-
-  const builderCost = lineBuilderCost(line)
-  const total       = lineTotal(line)
-  const isHidden    = line.client_visible === false
-
-  function toggleVisibility() {
-    const next = !line.client_visible
-    onChange(line.id, 'client_visible', next)
-    persistVisibility(line.id, next)
-  }
 
   async function handleLookup() {
     if (!line.description) return
@@ -90,6 +80,81 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
     onChange(line.id, 'unit_cost', priceCents / 100)
     setLookupResults(null)
     setLookupSource(null)
+  }
+
+  return (
+    <div className="pt-1 border-t border-gray-200 mt-2">
+      <div className="flex items-center gap-2 mb-2">
+        <button
+          onClick={handleLookup}
+          disabled={lookupLoading || !line.description}
+          className="flex items-center gap-1.5 text-xs text-navy-600 hover:text-navy-800 font-medium transition-colors disabled:opacity-40"
+        >
+          {lookupLoading
+            ? <Loader2 size={12} className="animate-spin" />
+            : <Search size={12} />
+          }
+          {lookupLoading ? 'Searching…' : 'Look up price'}
+        </button>
+        {lookupSource === 'cache' && (
+          <span className="text-[10px] text-gray-400">cached</span>
+        )}
+      </div>
+
+      {lookupMsg && (
+        <p className="text-xs text-gray-400 italic">{lookupMsg}</p>
+      )}
+
+      {lookupResults && lookupResults.length === 0 && !lookupMsg && (
+        <p className="text-xs text-gray-400 italic">No prices found for this item.</p>
+      )}
+
+      {lookupResults && lookupResults.length > 0 && (
+        <div className="space-y-1">
+          {lookupResults.map((r, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-3 py-1.5"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-semibold bg-navy-100 text-navy-700 px-1.5 py-0.5 rounded mr-2">
+                  {RETAILER_LABELS[r.retailer] ?? r.retailer}
+                </span>
+                <span className="text-xs text-gray-700 truncate">{r.product_name}</span>
+                {r.sku && (
+                  <span className="text-[10px] text-gray-400 font-mono ml-2">#{r.sku}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-semibold text-navy-900 tabular-nums">
+                  {fmt(r.price_cents / 100)}
+                </span>
+                <button
+                  onClick={() => applyPrice(r.price_cents)}
+                  className="text-[10px] font-semibold text-gold-700 hover:text-gold-800 bg-gold-50 hover:bg-gold-100 px-2 py-0.5 rounded transition-colors"
+                >
+                  Use
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }: Props) {
+  const [expanded, setExpanded] = useState(false)
+
+  const builderCost = lineBuilderCost(line)
+  const total       = lineTotal(line)
+  const isHidden    = line.client_visible === false
+
+  function toggleVisibility() {
+    const next = !line.client_visible
+    onChange(line.id, 'client_visible', next)
+    persistVisibility(line.id, next)
   }
 
   return (
@@ -263,70 +328,169 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
               </>
             )}
 
-            {/* Price Lookup */}
-            {canEdit && (
-              <div className="pt-1 border-t border-gray-200 mt-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    onClick={handleLookup}
-                    disabled={lookupLoading || !line.description}
-                    className="flex items-center gap-1.5 text-xs text-navy-600 hover:text-navy-800 font-medium transition-colors disabled:opacity-40"
-                  >
-                    {lookupLoading
-                      ? <Loader2 size={12} className="animate-spin" />
-                      : <Search size={12} />
-                    }
-                    {lookupLoading ? 'Searching…' : 'Look up price'}
-                  </button>
-                  {lookupSource === 'cache' && (
-                    <span className="text-[10px] text-gray-400">cached</span>
-                  )}
-                </div>
-
-                {lookupMsg && (
-                  <p className="text-xs text-gray-400 italic">{lookupMsg}</p>
-                )}
-
-                {lookupResults && lookupResults.length === 0 && !lookupMsg && (
-                  <p className="text-xs text-gray-400 italic">No prices found for this item.</p>
-                )}
-
-                {lookupResults && lookupResults.length > 0 && (
-                  <div className="space-y-1">
-                    {lookupResults.map((r, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-3 py-1.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] font-semibold bg-navy-100 text-navy-700 px-1.5 py-0.5 rounded mr-2">
-                            {RETAILER_LABELS[r.retailer] ?? r.retailer}
-                          </span>
-                          <span className="text-xs text-gray-700 truncate">{r.product_name}</span>
-                          {r.sku && (
-                            <span className="text-[10px] text-gray-400 font-mono ml-2">#{r.sku}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-semibold text-navy-900 tabular-nums">
-                            {fmt(r.price_cents / 100)}
-                          </span>
-                          <button
-                            onClick={() => applyPrice(r.price_cents)}
-                            className="text-[10px] font-semibold text-gold-700 hover:text-gold-800 bg-gold-50 hover:bg-gold-100 px-2 py-0.5 rounded transition-colors"
-                          >
-                            Use
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            {canEdit && <PriceLookupSection line={line} onChange={onChange} />}
           </td>
         </tr>
       )}
     </>
+  )
+}
+
+// ── Mobile card — same data as the table row, no horizontal scrolling ──────
+export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete }: Props) {
+  const [expanded, setExpanded] = useState(false)
+
+  const builderCost = lineBuilderCost(line)
+  const total       = lineTotal(line)
+  const isHidden    = line.client_visible === false
+
+  function toggleVisibility() {
+    const next = !line.client_visible
+    onChange(line.id, 'client_visible', next)
+    persistVisibility(line.id, next)
+  }
+
+  return (
+    <div className={`px-4 py-3${isHidden ? ' bg-gray-50/60' : ''}`}>
+      {/* Description + actions */}
+      <div className="flex items-start gap-2">
+        <div className={`flex-1 min-w-0${isHidden ? ' opacity-50' : ''}`}>
+          {canEdit ? (
+            <input
+              value={line.description}
+              onChange={e => onChange(line.id, 'description', e.target.value)}
+              placeholder="Line description…"
+              className="w-full text-sm text-navy-800 bg-transparent border-0 border-b border-transparent focus:border-gold-400 focus:outline-none py-0.5"
+            />
+          ) : (
+            <span className="text-sm text-navy-800">{line.description}</span>
+          )}
+          <div className="flex items-center gap-2 mt-0.5">
+            {line.cost_code && (
+              <span className="text-[10px] text-gray-400 font-mono">{line.cost_code}</span>
+            )}
+            {isHidden && (
+              <span className="text-[10px] font-semibold bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">
+                Internal only
+              </span>
+            )}
+          </div>
+        </div>
+        {canEdit && (
+          <button
+            onClick={toggleVisibility}
+            title={isHidden ? 'Hidden from client — tap to show' : 'Visible to client — tap to hide'}
+            className="shrink-0 p-1 text-gray-300 hover:text-gray-500 transition-colors"
+          >
+            {isHidden ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        )}
+        {canDelete && (
+          <button
+            onClick={() => onDelete(line.id)}
+            className="shrink-0 p-1 text-gray-300 hover:text-red-500 transition-colors"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
+
+      {/* Qty / Unit cost / Markup */}
+      <div className={`grid grid-cols-3 gap-2 mt-2${isHidden ? ' opacity-50' : ''}`}>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+            Qty{line.uom ? ` (${line.uom})` : ''}
+          </span>
+          {canEdit ? (
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={line.quantity}
+              onChange={e => onChange(line.id, 'quantity', e.target.value)}
+              className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums"
+            />
+          ) : (
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">{line.quantity}</span>
+          )}
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Unit $</span>
+          {canEdit ? (
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={line.unit_cost}
+              onChange={e => onChange(line.id, 'unit_cost', e.target.value)}
+              className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums"
+            />
+          ) : (
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">{fmt(line.unit_cost)}</span>
+          )}
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Markup %</span>
+          {canEdit ? (
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={line.markup_pct}
+              onChange={e => onChange(line.id, 'markup_pct', e.target.value)}
+              className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums"
+            />
+          ) : (
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">{line.markup_pct}%</span>
+          )}
+        </label>
+      </div>
+
+      {/* Totals + notes toggle */}
+      <div className="flex items-center justify-between mt-2">
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          Notes
+        </button>
+        <p className={`text-xs tabular-nums${isHidden ? ' opacity-50' : ''}`}>
+          <span className="text-gray-400">cost {fmt(builderCost)} → </span>
+          <span className="text-sm font-semibold text-navy-900">{fmt(total)}</span>
+        </p>
+      </div>
+
+      {/* Expanded notes + price lookup */}
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {canEdit ? (
+            <>
+              <input
+                value={line.notes ?? ''}
+                onChange={e => onChange(line.id, 'notes', e.target.value)}
+                placeholder="Add notes for this line…"
+                className="w-full text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-400"
+              />
+              <input
+                value={line.internal_note ?? ''}
+                onChange={e => onChange(line.id, 'internal_note', e.target.value)}
+                placeholder="Internal note (not shown to client)…"
+                className="w-full text-xs text-gray-400 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-400"
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-gray-400 italic">{line.notes || 'No notes'}</p>
+              {line.internal_note && (
+                <p className="text-xs text-amber-700 italic">Internal: {line.internal_note}</p>
+              )}
+            </>
+          )}
+
+          {canEdit && <PriceLookupSection line={line} onChange={onChange} />}
+        </div>
+      )}
+    </div>
   )
 }

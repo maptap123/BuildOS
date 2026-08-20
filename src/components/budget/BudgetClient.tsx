@@ -218,11 +218,11 @@ export function BudgetClient({
 
       <BudgetSummary job={job} lines={lines} approvedCOTotal={approvedCOTotal} actualsTotal={actualsTotal} />
 
-      {/* Tab switcher */}
-      <div className="flex gap-1">
+      {/* Tab switcher — swipeable on mobile so it never widens the page */}
+      <div className="flex gap-1 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
         <button
           onClick={() => setTab('budget')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'budget' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
@@ -231,7 +231,7 @@ export function BudgetClient({
         </button>
         <button
           onClick={() => setTab('change_orders')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'change_orders' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
@@ -240,7 +240,7 @@ export function BudgetClient({
         </button>
         <button
           onClick={() => setTab('bills')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'bills' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
@@ -249,7 +249,7 @@ export function BudgetClient({
         </button>
         <button
           onClick={() => setTab('purchase_orders')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'purchase_orders' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
@@ -258,7 +258,7 @@ export function BudgetClient({
         </button>
         <button
           onClick={() => setTab('work_orders')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'work_orders' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
@@ -267,7 +267,7 @@ export function BudgetClient({
         </button>
         <button
           onClick={() => setTab('billing')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'billing' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
