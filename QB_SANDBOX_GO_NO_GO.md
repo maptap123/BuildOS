@@ -63,3 +63,23 @@ access should read like a sandbox company, not "JDC Remodeling, LLC").
 | Full OAuth handshake run through a real login | ❌ Needs a human, interactive |
 | Token storage RLS | ✅ Correct |
 | **Blocks Sept 1 launch** | **No — plan already scopes QB out; Lisa continues manual entry until confirmed** |
+
+## Update 2026-08-20 — production env fixed, connect verified to the Intuit boundary
+
+The four QB env vars are now set on Vercel **production** (they previously existed there only as
+May-era entries with no `QB_REDIRECT_URI` at all, so the connect route would have 501'd in prod):
+
+- `QB_CLIENT_ID` / `QB_CLIENT_SECRET` — the real sandbox app credentials (same as `.env.local`)
+- `QB_ENVIRONMENT=sandbox`
+- `QB_REDIRECT_URI=https://build-os-eight.vercel.app/api/integrations/quickbooks/callback`
+
+Production was redeployed and verified live: logged in as august@jdcremodeling.com and hit
+`/api/integrations/quickbooks/connect` — it now issues the CSRF state cookie and redirects to
+Intuit's authorization page with the correct `client_id` and the production `redirect_uri`.
+
+**Remaining human steps (unchanged in kind, now smaller):**
+1. In the Intuit Developer portal → your app → Keys & credentials (Development), make sure
+   `https://build-os-eight.vercel.app/api/integrations/quickbooks/callback` is listed as a
+   Redirect URI. Intuit rejects the handshake after login if it isn't registered.
+2. From `/admin`, click Connect and log into the **sandbox** company. Confirm the success banner
+   and that the company name shown is a sandbox company, not "JDC Remodeling, LLC".
