@@ -83,3 +83,28 @@ Intuit's authorization page with the correct `client_id` and the production `red
    Redirect URI. Intuit rejects the handshake after login if it isn't registered.
 2. From `/admin`, click Connect and log into the **sandbox** company. Confirm the success banner
    and that the company name shown is a sandbox company, not "JDC Remodeling, LLC".
+
+## Decision 2026-08-20 — skip sandbox, connect production directly
+
+User decision: no sandbox pass; BuildOS connects straight to the real "JDC Remodeling, LLC"
+company. Safety review done before the switch:
+
+- **Nothing writes to QuickBooks automatically.** The only write path is the explicit sync button
+  in the Budget screen (`POST /api/integrations/quickbooks/sync`), gated behind budget-edit
+  permission, one entity (job/estimate/bill) at a time. The `triggerQBSync` call on job creation
+  only sets `qb_sync_status='pending'` — its QB API body was never implemented.
+- `baseUrl()` in `src/lib/quickbooks/client.ts` correctly routes to
+  `https://quickbooks.api.intuit.com` for any `QB_ENVIRONMENT` other than `sandbox`.
+- Recommended first real sync: ONE job → verify the created Customer in QB → then estimate → then
+  one bill. Not bulk.
+
+Cutover steps (Vercel env changes happen together, then redeploy):
+1. Human: Intuit portal → app → Keys & credentials → **Production** section → copy Production
+   Client ID/Secret, and add `https://build-os-eight.vercel.app/api/integrations/quickbooks/callback`
+   as a redirect URI THERE (the Development-section URI list does not apply). Intuit may require
+   completing the production-requirements questionnaire first.
+2. Claude: set `QB_CLIENT_ID` + `QB_CLIENT_SECRET` (production values), `QB_ENVIRONMENT=production`
+   on Vercel production; redeploy. (Until then, prod stays on the working sandbox config — flipping
+   the environment flag alone would break connect.)
+3. Human: `/admin` → Connect → log in with the real Intuit account → confirm "QuickBooks connected
+   successfully" and that the company shown is JDC Remodeling, LLC.
