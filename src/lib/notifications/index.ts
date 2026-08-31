@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { postDiscordAlert } from './discord'
+import { sendSms } from '@/lib/twilio/client'
+import { absoluteUrl } from '@/lib/appUrl'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -16,6 +17,18 @@ export type NotificationType =
   | 'schedule_declined'
   | 'schedule_question'
 
+/**
+ * Types that get a text as well as the in-app bell: something is stuck and the
+ * office needs to act today, not whenever they next open BuildOS. Everything
+ * else waits in the notification list.
+ */
+const URGENT_TYPES = new Set<NotificationType>([
+  'schedule_question',  // a sub asked something Fixer wouldn't answer
+  'schedule_declined',  // a sub dropped off a phase — the day needs re-covering
+  'task_blocked',
+  'co_rejected',
+])
+
 interface NotifyOptions {
   admin?: AdminClient
   userIds: string[]
@@ -23,12 +36,13 @@ interface NotifyOptions {
   title: string
   body?: string | null
   link?: string | null
-  discord?: boolean
+  /** Overrides the per-type default for whether recipients also get a text. */
+  urgent?: boolean
 }
 
-// Writes one notification row per recipient and (optionally) posts a single summary
-// message to Discord. Never throws — a failure here must not break the caller's request.
-export async function notify({ admin, userIds, type, title, body, link, discord = true }: NotifyOptions): Promise<void> {
+// Writes one notification row per recipient, and texts the urgent ones. Never
+// throws — a failure here must not break the caller's request.
+export async function notify({ admin, userIds, type, title, body, link, urgent }: NotifyOptions): Promise<void> {
   const ids = Array.from(new Set(userIds.filter(Boolean)))
   if (ids.length === 0) return
 
@@ -49,11 +63,47 @@ export async function notify({ admin, userIds, type, title, body, link, discord 
     console.error('[notifications] insert threw', err)
   }
 
-  if (discord) {
-    const lines = [`**${title}**`]
-    if (body) lines.push(body)
-    if (link) lines.push(link.startsWith('http') ? link : `${process.env.NEXT_PUBLIC_APP_URL ?? ''}${link}`)
-    await postDiscordAlert(lines.join('\n'))
+  if (urgent ?? URGENT_TYPES.has(type)) {
+    await textRecipients(client, ids, { title, body, link })
+  }
+}
+
+/**
+ * Texts each recipient who has a mobile number on file. Silently skips anyone
+ * without one — a missing phone is a data gap, not a reason to fail the request
+ * that triggered the alert.
+ */
+async function textRecipients(
+  client: AdminClient,
+  userIds: string[],
+  alert: { title: string; body?: string | null; link?: string | null },
+): Promise<void> {
+  try {
+    const { data: recipients } = await client
+      .from('users')
+      .select('id, phone')
+      .in('id', userIds)
+      .eq('is_active', true)
+
+    const withPhones = (recipients ?? []).filter(
+      (r): r is { id: string; phone: string } => Boolean(r.phone?.trim()),
+    )
+    if (withPhones.length === 0) return
+
+    const link = alert.link ? absoluteUrl(alert.link) : ''
+    const message = [`JDC: ${alert.title}`, alert.body, link]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 320)
+
+    await Promise.all(
+      withPhones.map(async (r) => {
+        const result = await sendSms(r.phone, message)
+        if (!result.ok) console.error(`[notifications] alert text to ${r.id} failed: ${result.error}`)
+      }),
+    )
+  } catch (err) {
+    console.error('[notifications] alert texts threw', err)
   }
 }
 

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notify, getJobNotifyTargets } from '@/lib/notifications'
 import { sendSms } from '@/lib/twilio/client'
+import { appUrl } from '@/lib/appUrl'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -58,22 +59,6 @@ const ASSIGNMENT_SELECT = `
   contact_name, phone, status, token, invited_at, responded_at, response_note,
   reminder_count, last_outbound_at, last_inbound_at, needs_attention, created_at
 `
-
-/**
- * Absolute base URL for links we text out. A relative URL is useless in an SMS,
- * so this falls back to Vercel's injected domain and returns '' only when there
- * is genuinely nothing to build a link from — callers drop the link in that case.
- */
-export function appUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL
-  if (configured) return configured.replace(/\/$/, '')
-
-  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
-  if (vercelHost) return `https://${vercelHost.replace(/\/$/, '')}`
-
-  console.warn('[schedule-assignments] NEXT_PUBLIC_APP_URL is unset — texted links will be omitted')
-  return ''
-}
 
 export function confirmPageUrl(token: string): string {
   const base = appUrl()
