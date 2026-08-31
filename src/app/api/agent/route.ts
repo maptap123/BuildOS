@@ -1,6 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notify, getJobNotifyTargets } from '@/lib/notifications'
+import { normalizePhone } from '@/lib/twilio/client'
+import {
+  confirmPageUrl,
+  flagForHuman,
+  formatDateRange,
+  googleCalendarUrl,
+  jobAddress,
+  loadAssignmentById,
+  logMessage,
+  recordResponse,
+  type AssignmentContext,
+} from '@/lib/schedule/assignments'
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
 
@@ -23,6 +35,13 @@ import { timingSafeEqual } from 'crypto'
  *   update_task            { task_id, ...fields }
  *   list_schedule          { job_id, status? }
  *   update_schedule_item   { item_id, ...fields }
+ *
+ * Schedule invite tools — used when a sub texts the JDC number. Fixer owns that
+ * conversation; these read its context and record what was said back into BuildOS:
+ *   list_schedule_invites       { phone }
+ *   respond_to_schedule_invite  { invite_id, from_phone, answer, note? }
+ *   log_schedule_invite_message { invite_id, from_phone, direction, body }
+ *   flag_schedule_invite        { invite_id, from_phone, reason }
  *   list_budget            { job_id }
  *   list_change_orders     { job_id, status? }
  *   create_change_order    { job_id, title, type, amount, reason? }
@@ -202,6 +221,129 @@ export async function POST(request: Request) {
         return ok({ item: data, message: 'Schedule item updated' })
       }
 
+      // ─── SCHEDULE INVITES (Fixer's SMS conversation with subs) ──────────
+      // Every tool here is bound to the phone number that texted in. Knowing an
+      // invite_id is not enough — the caller must also present the matching
+      // number. Inbound SMS text is untrusted input reaching this agent, so a
+      // sub cannot talk Fixer into answering for anyone but themselves.
+
+      case 'list_schedule_invites': {
+        if (!await hasPerm('schedule', 'can_view')) return permError()
+        const phone = normalizePhone(params.phone as string)
+        if (!phone) return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 })
+
+        const { data: rows } = await admin
+          .from('schedule_assignments')
+          .select('id')
+          .eq('phone', phone)
+          .in('status', ['sent', 'confirmed', 'declined'])
+          .order('last_outbound_at', { ascending: false, nullsFirst: false })
+          .limit(5)
+
+        const invites = []
+        for (const row of rows ?? []) {
+          const ctx = await loadAssignmentById(admin, row.id)
+          if (!ctx) continue
+
+          const { data: msgs } = await admin
+            .from('schedule_assignment_messages')
+            .select('direction, body, created_at')
+            .eq('assignment_id', row.id)
+            .order('created_at', { ascending: false })
+            .limit(10)
+
+          invites.push({
+            ...inviteFacts(ctx),
+            recent_messages: (msgs ?? []).reverse(),
+          })
+        }
+
+        return ok({
+          invites,
+          count: invites.length,
+          unknown_facts: [
+            'arrival time of day', 'gate or lockbox codes', 'who else is on site',
+            'pay, invoicing, or terms', 'who supplies materials', 'parking',
+          ],
+        })
+      }
+
+      case 'respond_to_schedule_invite': {
+        if (!await hasPerm('schedule', 'can_edit')) return permError()
+        const answer = params.answer === 'confirmed' || params.answer === 'declined'
+          ? params.answer
+          : null
+        if (!answer) {
+          return NextResponse.json({ error: 'answer must be "confirmed" or "declined"' }, { status: 400 })
+        }
+
+        const ctx = await loadInviteForPhone(admin, params.invite_id, params.from_phone)
+        if (!ctx) return inviteAuthError()
+        if (ctx.assignment.status === 'cancelled') {
+          return NextResponse.json({ error: 'This phase is no longer scheduled' }, { status: 409 })
+        }
+
+        const note = typeof params.note === 'string' ? params.note.trim() || null : null
+        const updated = await recordResponse(admin, ctx, answer, { note, source: 'sms' })
+
+        return ok({
+          message: `Recorded ${updated.assignment.contact_name} as ${answer}. The project manager has been notified.`,
+          // Text these to the sub after a confirmation.
+          calendar_page_url: confirmPageUrl(updated.assignment.token),
+          google_calendar_url: googleCalendarUrl(updated),
+          ...inviteFacts(updated),
+        })
+      }
+
+      case 'log_schedule_invite_message': {
+        if (!await hasPerm('schedule', 'can_edit')) return permError()
+        const direction = params.direction === 'inbound' || params.direction === 'outbound'
+          ? params.direction
+          : null
+        const body = typeof params.body === 'string' ? params.body.trim() : ''
+        if (!direction || !body) {
+          return NextResponse.json(
+            { error: 'direction ("inbound" or "outbound") and body are required' },
+            { status: 400 }
+          )
+        }
+
+        const ctx = await loadInviteForPhone(admin, params.invite_id, params.from_phone)
+        if (!ctx) return inviteAuthError()
+
+        await logMessage(admin, {
+          assignmentId: ctx.assignment.id,
+          direction,
+          body,
+          fromNumber: direction === 'inbound' ? ctx.assignment.phone : null,
+          toNumber: direction === 'outbound' ? ctx.assignment.phone : null,
+          // Anything Fixer says on this channel is the agent talking, not BuildOS.
+          aiGenerated: direction === 'outbound',
+        })
+
+        const timestampField = direction === 'inbound' ? 'last_inbound_at' : 'last_outbound_at'
+        await admin
+          .from('schedule_assignments')
+          .update({ [timestampField]: new Date().toISOString() })
+          .eq('id', ctx.assignment.id)
+
+        return ok({ message: 'Added to the thread the office sees' })
+      }
+
+      case 'flag_schedule_invite': {
+        if (!await hasPerm('schedule', 'can_edit')) return permError()
+        const reason = typeof params.reason === 'string' ? params.reason.trim() : ''
+        if (!reason) return NextResponse.json({ error: 'reason required' }, { status: 400 })
+
+        const ctx = await loadInviteForPhone(admin, params.invite_id, params.from_phone)
+        if (!ctx) return inviteAuthError()
+
+        await flagForHuman(admin, ctx, reason)
+        return ok({
+          message: `Flagged for the project manager, who has been notified. Tell ${ctx.assignment.contact_name} someone will follow up.`,
+        })
+      }
+
       // ─── BUDGET ─────────────────────────────────────────────────────────
       case 'list_budget': {
         if (!await hasPerm('budget', 'can_view')) return permError()
@@ -349,6 +491,7 @@ export async function POST(request: Request) {
             'list_jobs','get_job','update_job_status',
             'list_tasks','create_task','update_task',
             'list_schedule','update_schedule_item',
+            'list_schedule_invites','respond_to_schedule_invite','log_schedule_invite_message','flag_schedule_invite',
             'list_budget','get_budget_summary','list_change_orders','create_change_order','list_actuals',
             'list_daily_logs','create_daily_log',
             'search_across_jobs',
@@ -367,6 +510,50 @@ function ok(data: unknown) {
 
 function permError() {
   return NextResponse.json({ error: 'Permission denied for this operation' }, { status: 403 })
+}
+
+/**
+ * Loads a schedule invite only if the given phone number is the one it was sent
+ * to. This is the authorization boundary for the invite tools: the sub's own
+ * text is what reaches the agent, so possession of an invite_id must never be
+ * enough on its own to answer for someone else.
+ */
+async function loadInviteForPhone(
+  admin: ReturnType<typeof createAdminClient>,
+  inviteId: unknown,
+  fromPhone: unknown
+): Promise<AssignmentContext | null> {
+  if (typeof inviteId !== 'string' || !inviteId) return null
+  const phone = normalizePhone(fromPhone as string)
+  if (!phone) return null
+
+  const ctx = await loadAssignmentById(admin, inviteId)
+  if (!ctx || ctx.assignment.phone !== phone) return null
+  return ctx
+}
+
+function inviteAuthError() {
+  return NextResponse.json(
+    { error: 'No schedule invite matches that invite_id and phone number.' },
+    { status: 403 }
+  )
+}
+
+/** The appointment facts Fixer is allowed to state to a sub. */
+function inviteFacts(ctx: AssignmentContext) {
+  return {
+    invite_id: ctx.assignment.id,
+    contact_name: ctx.assignment.contact_name,
+    status: ctx.assignment.status,
+    work: ctx.item.title,
+    trade: ctx.item.trade,
+    dates: formatDateRange(ctx.item.start_date, ctx.item.end_date),
+    start_date: ctx.item.start_date,
+    end_date: ctx.item.end_date,
+    job: `${ctx.job.job_number} - ${ctx.job.name}`,
+    site_address: jobAddress(ctx.job),
+    scope_notes: ctx.item.description,
+  }
 }
 
 function notFoundError(resource: string) {

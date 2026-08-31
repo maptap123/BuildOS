@@ -64,3 +64,6 @@ screenshots/
 # tool data
 ruvector.db
 .claude-flow/
+
+# Supabase CLI local scratch (can contain pooler connection strings)
+supabase/.temp/
