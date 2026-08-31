@@ -278,6 +278,55 @@ export interface ScheduleItem {
   updated_at: string;
 }
 
+// ─── Schedule crew assignments (Fixer SMS confirmation loop) ──────────────────
+
+export type ScheduleAssignmentStatus = 'pending' | 'sent' | 'confirmed' | 'declined' | 'cancelled';
+export type ScheduleAssigneeType = 'vendor' | 'user' | 'contact';
+
+export interface ScheduleAssignmentMessage {
+  id: string;
+  assignment_id: string;
+  direction: 'inbound' | 'outbound';
+  body: string;
+  intent: string | null;
+  ai_generated: boolean;
+  created_at: string;
+}
+
+export interface ScheduleAssignment {
+  id: string;
+  schedule_item_id: string;
+  job_id: string;
+  assignee_type: ScheduleAssigneeType;
+  vendor_id: string | null;
+  user_id: string | null;
+  contact_id: string | null;
+  contact_name: string;
+  phone: string | null;
+  status: ScheduleAssignmentStatus;
+  token: string;
+  invited_at: string | null;
+  responded_at: string | null;
+  response_note: string | null;
+  reminder_count: number;
+  last_outbound_at: string | null;
+  last_inbound_at: string | null;
+  needs_attention: boolean;
+  created_at: string;
+  updated_at: string;
+  messages?: ScheduleAssignmentMessage[];
+}
+
+/** Per-phase roll-up of crew confirmations, for the schedule views. */
+export interface ScheduleCrewSummary {
+  total: number;
+  confirmed: number;
+  declined: number;
+  awaiting: number;
+  needs_attention: boolean;
+  names: string[];
+}
+
 export interface Task {
   id: string;
   job_id: string;

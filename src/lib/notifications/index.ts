@@ -12,6 +12,9 @@ export type NotificationType =
   | 'task_assigned'
   | 'task_blocked'
   | 'log_missing'
+  | 'schedule_confirmed'
+  | 'schedule_declined'
+  | 'schedule_question'
 
 interface NotifyOptions {
   admin?: AdminClient

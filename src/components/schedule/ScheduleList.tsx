@@ -3,9 +3,11 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   Plus, Calendar, List, BarChart2, CalendarDays, CalendarRange,
-  Search, X, ChevronLeft, ChevronRight, SlidersHorizontal,
+  Search, X, ChevronLeft, ChevronRight, SlidersHorizontal, Users,
 } from 'lucide-react'
-import type { ScheduleItem, ScheduleItemStatus, PredecessorType } from '@/types'
+import type { ScheduleItem, ScheduleItemStatus, PredecessorType, ScheduleCrewSummary } from '@/types'
+
+type CrewMap = Map<string, ScheduleCrewSummary>
 
 // â”€â”€â”€ Predecessor types (local, trimmed from SchedulePredecessor for Gantt) â”€â”€â”€â”€
 
@@ -95,6 +97,34 @@ function StatusBadge({ status }: { status: ScheduleItemStatus }) {
   )
 }
 
+/**
+ * Confirmation state of the crew texted for a phase. Amber means someone replied
+ * with something Fixer handed back to a human, so it reads as "look at this".
+ */
+function CrewBadge({ crew, compact = false }: { crew: ScheduleCrewSummary | undefined; compact?: boolean }) {
+  if (!crew || crew.total === 0) return null
+
+  const allConfirmed = crew.confirmed === crew.total
+  const cls = crew.needs_attention
+    ? 'bg-amber-50 text-amber-700'
+    : crew.declined > 0
+      ? 'bg-red-50 text-red-600'
+      : allConfirmed
+        ? 'bg-green-50 text-green-700'
+        : 'bg-gray-100 text-gray-500'
+
+  return (
+    <span
+      title={crew.names.join(', ')}
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${cls}`}
+    >
+      <Users size={9} />
+      {crew.confirmed}/{crew.total}
+      {!compact && crew.needs_attention && ' · needs you'}
+    </span>
+  )
+}
+
 function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -165,7 +195,7 @@ function InlineDateInput({ itemId, field, value, onSaved }: InlineDateInputProps
 
 // â”€â”€â”€ LIST VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void; onRefresh: () => void }) {
+function ListView({ items, crewByItem, onEdit, onRefresh }: { items: ScheduleItem[]; crewByItem?: CrewMap; onEdit: (i: ScheduleItem) => void; onRefresh: () => void }) {
   return (
     <>
       {/* Desktop table */}
@@ -173,7 +203,7 @@ function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit:
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['#', 'Phase / Task', 'Trade', 'Start', 'End', 'Dur', 'Status', 'Progress'].map(h => (
+              {['#', 'Phase / Task', 'Crew', 'Trade', 'Start', 'End', 'Dur', 'Status', 'Progress'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap first:w-10"
@@ -210,6 +240,9 @@ function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit:
                         )}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <CrewBadge crew={crewByItem?.get(item.id)} />
                   </td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{item.trade ?? 'â€”'}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -268,7 +301,10 @@ function ListView({ items, onEdit, onRefresh }: { items: ScheduleItem[]; onEdit:
                   : <StatusBadge status={item.status} />
                 }
               </div>
-              <p className="text-xs text-gray-400 mb-2">{fmtRange(item.start_date, item.end_date)}</p>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-xs text-gray-400">{fmtRange(item.start_date, item.end_date)}</p>
+                <CrewBadge crew={crewByItem?.get(item.id)} compact />
+              </div>
               {!isMilestone && item.percent_complete > 0 && (
                 <ProgressBar pct={item.percent_complete} color={color} />
               )}
@@ -290,10 +326,11 @@ const RULER_H    = 32  // px â€” height of the month ruler (h-8)
 interface GanttViewProps {
   items: ScheduleItem[]
   jobId: string
+  crewByItem?: CrewMap
   onEdit: (i: ScheduleItem) => void
 }
 
-function GanttView({ items, jobId, onEdit }: GanttViewProps) {
+function GanttView({ items, jobId, crewByItem, onEdit }: GanttViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [predecessors, setPredecessors] = useState<GanttPredecessor[]>([])
 
@@ -473,6 +510,7 @@ function GanttView({ items, jobId, onEdit }: GanttViewProps) {
                   <p className="text-sm text-navy-800 font-medium truncate group-hover:text-navy-900">{item.title}</p>
                   {item.trade && <p className="text-[10px] text-gray-400 truncate">{item.trade}</p>}
                 </div>
+                <CrewBadge crew={crewByItem?.get(item.id)} compact />
               </div>
             )
           })}
@@ -1098,12 +1136,13 @@ interface Props {
   items: ScheduleItem[]
   jobId: string
   canCreate: boolean
+  crewByItem?: CrewMap
   onAdd: () => void
   onEdit: (item: ScheduleItem) => void
   onRefresh?: () => void
 }
 
-export function ScheduleList({ items, jobId, canCreate, onAdd, onEdit, onRefresh }: Props) {
+export function ScheduleList({ items, jobId, canCreate, crewByItem, onAdd, onEdit, onRefresh }: Props) {
   const [view, setView] = useState<ScheduleView>('gantt')
   const [filters, setFilters] = useState<Filters>({ search: '', statuses: [], trades: [] })
   const [showFilters, setShowFilters] = useState(false)
@@ -1340,8 +1379,8 @@ export function ScheduleList({ items, jobId, canCreate, onAdd, onEdit, onRefresh
         </div>
       ) : (
         <>
-          {view === 'list'  && <ListView  items={filteredItems} onEdit={onEdit} onRefresh={onRefresh ?? (() => {})} />}
-          {view === 'gantt' && <GanttView items={filteredItems} jobId={jobId} onEdit={onEdit} />}
+          {view === 'list'  && <ListView  items={filteredItems} crewByItem={crewByItem} onEdit={onEdit} onRefresh={onRefresh ?? (() => {})} />}
+          {view === 'gantt' && <GanttView items={filteredItems} jobId={jobId} crewByItem={crewByItem} onEdit={onEdit} />}
           {view === 'week'  && <WeekView  items={filteredItems} onEdit={onEdit} />}
           {view === 'month' && <MonthView items={filteredItems} onEdit={onEdit} />}
           {view === 'year'  && <YearView  items={filteredItems} onEdit={onEdit} />}

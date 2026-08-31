@@ -26,18 +26,37 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const includePredecessors = searchParams.get('include_predecessors') === 'true'
-  if (!includePredecessors || !jobId) {
+  const includeAssignments = searchParams.get('include_assignments') === 'true'
+  if ((!includePredecessors && !includeAssignments) || !jobId) {
     return NextResponse.json(data ?? [])
   }
 
   const admin = createAdminClient()
-  const { data: predecessors, error: predError } = await admin
-    .from('schedule_item_predecessors')
-    .select('id, item_id, predecessor_id, type, lag_days')
-    .eq('job_id', jobId)
 
-  if (predError) return NextResponse.json({ error: predError.message }, { status: 500 })
-  return NextResponse.json({ items: data ?? [], predecessors: predecessors ?? [] })
+  const [predResult, assignResult] = await Promise.all([
+    includePredecessors
+      ? admin
+          .from('schedule_item_predecessors')
+          .select('id, item_id, predecessor_id, type, lag_days')
+          .eq('job_id', jobId)
+      : Promise.resolve({ data: [], error: null }),
+    includeAssignments
+      ? admin
+          .from('schedule_assignments')
+          .select('id, schedule_item_id, contact_name, status, needs_attention, phone')
+          .eq('job_id', jobId)
+          .neq('status', 'cancelled')
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (predResult.error) return NextResponse.json({ error: predResult.error.message }, { status: 500 })
+  if (assignResult.error) return NextResponse.json({ error: assignResult.error.message }, { status: 500 })
+
+  return NextResponse.json({
+    items: data ?? [],
+    predecessors: predResult.data ?? [],
+    assignments: assignResult.data ?? [],
+  })
 }
 
 export async function POST(request: Request) {

@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { AlertCircle, Download, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertCircle, Download, RefreshCw, CheckCircle2, AlertTriangle, Users } from 'lucide-react'
 import { useSchedule } from '@/hooks/useSchedule'
 import { ScheduleList } from './ScheduleList'
 import { AddScheduleItemModal } from './AddScheduleItemModal'
-import type { ScheduleItem, OutlookSyncStatus } from '@/types'
+import type { ScheduleItem, OutlookSyncStatus, ScheduleCrewSummary } from '@/types'
+
+interface CrewRow {
+  schedule_item_id: string
+  contact_name: string
+  status: 'pending' | 'sent' | 'confirmed' | 'declined' | 'cancelled'
+  needs_attention: boolean
+}
 
 interface Permissions {
   can_create: boolean
@@ -33,6 +40,48 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
   const [editItem, setEditItem] = useState<ScheduleItem | null>(null)
   const [syncing, setSyncing]   = useState(false)
   const [syncMsg, setSyncMsg]   = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [crewRows, setCrewRows] = useState<CrewRow[]>([])
+
+  const loadCrew = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/schedule?job_id=${jobId}&include_assignments=true`)
+      if (!res.ok) return
+      const data = await res.json() as { assignments?: CrewRow[] }
+      setCrewRows(data.assignments ?? [])
+    } catch {
+      /* non-fatal — the schedule still renders without confirmation badges */
+    }
+  }, [jobId])
+
+  useEffect(() => { void loadCrew() }, [loadCrew])
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refresh(), loadCrew()])
+  }, [refresh, loadCrew])
+
+  const crewByItem = useMemo(() => {
+    const map = new Map<string, ScheduleCrewSummary>()
+    for (const row of crewRows) {
+      const entry = map.get(row.schedule_item_id) ?? {
+        total: 0, confirmed: 0, declined: 0, awaiting: 0, needs_attention: false, names: [],
+      }
+      entry.total += 1
+      if (row.status === 'confirmed') entry.confirmed += 1
+      else if (row.status === 'declined') entry.declined += 1
+      else entry.awaiting += 1
+      if (row.needs_attention) entry.needs_attention = true
+      entry.names.push(row.contact_name)
+      map.set(row.schedule_item_id, entry)
+    }
+    return map
+  }, [crewRows])
+
+  const crewTotals = useMemo(() => ({
+    total: crewRows.length,
+    confirmed: crewRows.filter(r => r.status === 'confirmed').length,
+    declined: crewRows.filter(r => r.status === 'declined').length,
+    needsAttention: crewRows.filter(r => r.needs_attention).length,
+  }), [crewRows])
 
   function handleEdit(item: ScheduleItem) {
     if (permissions.can_edit) setEditItem(item)
@@ -73,7 +122,23 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
 
       {/* Outlook sync toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {crewTotals.total > 0 && (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+              <Users size={12} className="text-gray-400" />
+              <span>
+                {crewTotals.confirmed}/{crewTotals.total} crew confirmed
+              </span>
+              {crewTotals.declined > 0 && (
+                <span className="text-red-500">· {crewTotals.declined} declined</span>
+              )}
+              {crewTotals.needsAttention > 0 && (
+                <span className="text-amber-600 font-semibold">
+                  · {crewTotals.needsAttention} need{crewTotals.needsAttention === 1 ? 's' : ''} you
+                </span>
+              )}
+            </div>
+          )}
           {outlookConnected && totalItems > 0 && (
             <div className={`flex items-center gap-1.5 text-xs font-medium ${OUTLOOK_STATUS['synced'].color}`}>
               {OUTLOOK_STATUS['synced'].icon}
@@ -131,9 +196,10 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
           items={items}
           jobId={jobId}
           canCreate={permissions.can_create}
+          crewByItem={crewByItem}
           onAdd={() => setShowAdd(true)}
           onEdit={handleEdit}
-          onRefresh={refresh}
+          onRefresh={refreshAll}
         />
       )}
 
@@ -142,7 +208,7 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
           jobId={jobId}
           allItems={items}
           onClose={() => setShowAdd(false)}
-          onSaved={() => { setShowAdd(false); refresh() }}
+          onSaved={() => { setShowAdd(false); void refreshAll() }}
         />
       )}
 
@@ -152,8 +218,8 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
           item={editItem}
           allItems={items}
           canDelete={permissions.can_delete}
-          onClose={() => setEditItem(null)}
-          onSaved={() => { setEditItem(null); refresh() }}
+          onClose={() => { setEditItem(null); void loadCrew() }}
+          onSaved={() => { setEditItem(null); void refreshAll() }}
         />
       )}
     </div>

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Plus, Trash2, Link2 } from 'lucide-react'
+import { X, Plus, Trash2, Link2, Users } from 'lucide-react'
+import { ScheduleCrewTab, type PendingAssignee } from './ScheduleCrewTab'
 import type { ScheduleItem, ScheduleItemStatus, ScheduleItemType, PredecessorType } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ interface PredRow {
   lag_days: number
 }
 
-type ModalTab = 'details' | 'predecessors'
+type ModalTab = 'details' | 'crew' | 'predecessors'
 
 interface Props {
   jobId: string
@@ -93,6 +94,10 @@ export function AddScheduleItemModal({
 
   const [preds, setPreds]           = useState<PredRow[]>([])
   const [predsLoading, setPredsLoading] = useState(false)
+
+  // Crew picked before a new phase exists gets assigned right after it saves.
+  const [pendingCrew, setPendingCrew] = useState<PendingAssignee[]>([])
+  const [crewCount, setCrewCount]     = useState(0)
 
   // Load existing predecessors on edit open
   useEffect(() => {
@@ -188,6 +193,17 @@ export function AddScheduleItemModal({
         body: JSON.stringify(validPreds),
       })
 
+      // Crew queued while the phase didn't exist yet — assign and text them now.
+      if (pendingCrew.length > 0) {
+        await fetch(`/api/schedule/${itemId}/assignments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignees: pendingCrew.map(p => ({ type: p.type, id: p.id })),
+          }),
+        })
+      }
+
       onSaved()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
@@ -234,6 +250,7 @@ export function AddScheduleItemModal({
         <div className="flex border-b border-gray-100 shrink-0 px-6">
           {([
             { id: 'details',      label: 'Details'      },
+            { id: 'crew',         label: 'Crew',         badge: crewCount || null },
             { id: 'predecessors', label: 'Predecessors', badge: preds.filter(p => p.predecessor_id).length || null },
           ] as { id: ModalTab; label: string; badge?: number | null }[]).map(t => (
             <button
@@ -246,6 +263,7 @@ export function AddScheduleItemModal({
                   : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
+              {t.id === 'crew' && <Users size={13} />}
               {t.id === 'predecessors' && <Link2 size={13} />}
               {t.label}
               {t.badge ? (
@@ -428,6 +446,16 @@ export function AddScheduleItemModal({
                 />
               </div>
             </div>
+          )}
+
+          {/* ── CREW TAB ── */}
+          {tab === 'crew' && (
+            <ScheduleCrewTab
+              itemId={item?.id}
+              pending={pendingCrew}
+              onPendingChange={setPendingCrew}
+              onCountChange={setCrewCount}
+            />
           )}
 
           {/* ── PREDECESSORS TAB ── */}
