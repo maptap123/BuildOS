@@ -29,8 +29,11 @@ Admin → Users → Invite user
   ├─ generateLink({ type: 'invite' })      ← Supabase mints a token, sends nothing
   │    └─ already registered? retry as 'recovery' so re-invites work
   │
-  ├─ BuildOS sends its own branded email (Resend)
+  ├─ accept URL built here, against NEXT_PUBLIC_APP_URL
   │    └─ https://<app>/auth/confirm?token_hash=…&type=invite&next=/welcome
+  │
+  ├─ RESEND_API_KEY set? → branded email from JDC's domain
+  │                  else → the link comes back in the modal to copy and send
   │
   ├─ GET /auth/confirm  → verifyOtp() server-side, sets the session cookie
   │
@@ -46,13 +49,23 @@ below, but the normal path never produces it.
 be: the invitee has no session yet, and a bounce to `/login` would also drop the URL
 fragment, since fragments are never sent to the server.
 
+### Why not `inviteUserByEmail` as a fallback
+
+Deliberately gone, not just bypassed. That call re-reads the project's Site URL and
+**silently ignores a `redirectTo` that isn't in the allow-list** — which is exactly how
+the original bug shipped, and it fails invisibly: the invite sends, looks fine, and
+points at localhost.
+
+`generateLink` reads neither setting. Nothing in the invite path depends on the
+Supabase dashboard any more, so an invite cannot point at localhost again no matter
+what those fields say.
+
 ### Without `RESEND_API_KEY`
 
-The route falls back to `inviteUserByEmail()` — Supabase's mailer, so the message
-still arrives as "Supabase Auth" — **but with an explicit `redirectTo`**, which is the
-part that was actually broken. For that fallback to work, the redirect URL must be
-allow-listed (step 2 below); Supabase silently ignores a `redirectTo` that isn't, and
-falls back to Site URL again.
+The account and the link are still created — the modal shows the link with a **Copy**
+button, and the office sends it however they normally reach that person. Same link,
+same 24-hour single-use token; only the delivery is manual. That makes invites work
+with no external setup at all, which is the fastest way to get someone in today.
 
 ## Configuration
 
@@ -61,30 +74,27 @@ falls back to Site URL again.
 | Variable | Where | Notes |
 | --- | --- | --- |
 | `NEXT_PUBLIC_APP_URL` | Vercel | Already used for SMS links. Every invite link is built from it — if it is unset and Vercel injects nothing, the route now returns a clear error instead of mailing a dead link. |
-| `RESEND_API_KEY` | Vercel | Turns on BuildOS-sent mail. Unset = Supabase fallback above. |
+| `RESEND_API_KEY` | Vercel | Turns on automatic sending. Unset = copy the link by hand, as above. |
 | `EMAIL_FROM` | Vercel | Defaults to `BuildOS — JDC Construction <noreply@jdcremodeling.com>`. Must be a domain verified in Resend. |
 | `EMAIL_REPLY_TO` | Vercel | Optional. Point replies at a real inbox, e.g. `office@jdcremodeling.com`. |
 
-### 2. Supabase dashboard — Authentication → URL Configuration
+### 2. Supabase dashboard — Authentication → URL Configuration (optional)
 
-Both fields still say `http://localhost:3000`. Fix them regardless of which mail path
-you use; the allow-list is what makes the fallback path work at all.
+Both fields still say `http://localhost:3000`. **Nothing in the invite flow reads them
+any more**, so this is hygiene rather than a fix — worth doing before anyone adds a
+"forgot password" link to the sign-in page, since that flow *would* read them.
 
 - **Site URL** → `https://app.jdcplatform.com` (whatever `NEXT_PUBLIC_APP_URL` is)
 - **Redirect URLs** → add `https://app.jdcplatform.com/**`
 
-### 3. Resend
+### 3. Resend (optional — only for automatic sending)
 
 1. Create an account and add `jdcremodeling.com` under **Domains**.
 2. Add the DKIM/SPF/return-path DNS records it gives you and wait for **Verified**.
 3. Create an API key, set it as `RESEND_API_KEY` in Vercel, and redeploy.
 
 Until the domain verifies, leave `RESEND_API_KEY` unset — a half-configured key sends
-nothing, whereas the Supabase fallback still delivers.
-
-Worth doing on its own: Supabase's built-in mailer is capped at roughly two messages
-an hour and is explicitly not meant for production, so onboarding a crew of five in
-one sitting silently drops most of the invites.
+nothing, whereas the copy-link path always works.
 
 ## Re-inviting someone
 
@@ -98,6 +108,6 @@ and just needs a working link.
 
 ## If delivery fails
 
-The account and the link both survive a send failure — the route returns the accept
-URL and the admin screen shows it under **Send this link yourself**, so a new account
-is never stranded unreachable. The link is single-use and good for 24 hours.
+A send failure is treated the same as having no provider: the account and link survive,
+and the modal shows the link plus the reason the email didn't go. A new account is
+never left unreachable.
