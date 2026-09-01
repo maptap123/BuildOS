@@ -89,6 +89,7 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -146,6 +147,7 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
     setInviting(true)
     setInviteError(null)
     setInviteSuccess(null)
+    setInviteLink(null)
     try {
       const res = await fetch('/api/admin/users/invite', {
         method: 'POST',
@@ -153,12 +155,18 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
         body: JSON.stringify({ email: inviteEmail.trim(), full_name: inviteName.trim() }),
       })
       const body = await res.json()
-      if (!res.ok) throw new Error(body.error ?? 'Invite failed')
+      if (!res.ok) {
+        // A send failure still leaves a usable account and link behind — show it
+        // rather than stranding someone who now exists but can't be reached.
+        if (body.accept_url) setInviteLink(body.accept_url)
+        throw new Error(body.error ?? 'Invite failed')
+      }
       setInviteSuccess(`Invite sent to ${inviteEmail.trim()}`)
       setInviteEmail('')
       setInviteName('')
-      // Optimistically add to list
-      setUsers(prev => [...prev, {
+      // Optimistically add to list — re-inviting someone who never finished
+      // signing up returns their existing id, so don't list them twice.
+      setUsers(prev => prev.some(u => u.id === body.id) ? prev : [...prev, {
         id: body.id,
         email: body.email,
         full_name: inviteName.trim() || null,
@@ -248,6 +256,12 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
               )}
               {inviteSuccess && (
                 <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{inviteSuccess}</p>
+              )}
+              {inviteLink && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">Send this link yourself</p>
+                  <p className="text-xs text-amber-900 break-all font-mono">{inviteLink}</p>
+                </div>
               )}
               <div className="flex gap-3 pt-1">
                 <button
