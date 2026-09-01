@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ShieldCheck, Users, Save, RefreshCw, Search, UserPlus, X, Copy, Check } from 'lucide-react'
+import { ShieldCheck, Users, Save, RefreshCw, Search, UserPlus, X, Copy, Check, UserMinus, RotateCcw } from 'lucide-react'
 import type { PermissionModule, User, UserPermission } from '@/types'
 
 type PermissionFlag = 'can_view' | 'can_create' | 'can_edit' | 'can_delete' | 'can_export' | 'can_manage'
@@ -91,18 +91,26 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [showRemoved, setShowRemoved] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  const removedCount = useMemo(() => users.filter(u => !u.is_active).length, [users])
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return users
-    return users.filter(user =>
-      user.email.toLowerCase().includes(q) ||
-      (user.full_name ?? '').toLowerCase().includes(q) ||
-      (user.company_name ?? '').toLowerCase().includes(q)
-    )
-  }, [search, users])
+    return users.filter(user => {
+      if (!user.is_active && !showRemoved) return false
+      if (!q) return true
+      return (
+        user.email.toLowerCase().includes(q) ||
+        (user.full_name ?? '').toLowerCase().includes(q) ||
+        (user.company_name ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [search, users, showRemoved])
 
-  const selectedUser = users.find(user => user.id === selectedUserId) ?? users[0]
+  const selectedUser =
+    filteredUsers.find(user => user.id === selectedUserId) ?? filteredUsers[0] ?? users[0]
 
   function getPermission(userId: string, module: PermissionModule) {
     return permissions[permissionKey(userId, module)] ?? { ...EMPTY_PERMISSION }
@@ -139,6 +147,29 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
       setError(e instanceof Error ? e.message : 'Permission update failed')
     } finally {
       setSavingKey(null)
+    }
+  }
+
+  async function setUserActive(target: User, isActive: boolean) {
+    if (!isActive && !window.confirm(
+      `Remove ${userLabel(target)} from BuildOS?\n\nThey lose access immediately. Their name stays on past logs, time entries and tasks, and you can put them back from "Show removed".`
+    )) return
+
+    setRemovingId(target.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: isActive }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error ?? 'Could not update that user')
+      setUsers(prev => prev.map(u => u.id === target.id ? { ...u, is_active: isActive } : u))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update that user')
+    } finally {
+      setRemovingId(null)
     }
   }
 
@@ -331,6 +362,15 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
                 className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-navy-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-navy-300"
               />
             </div>
+            {removedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRemoved(v => !v)}
+                className="mt-2 text-xs font-semibold text-gray-500 hover:text-navy-900 transition-colors"
+              >
+                {showRemoved ? 'Hide' : 'Show'} removed ({removedCount})
+              </button>
+            )}
           </div>
           <div className="divide-y divide-gray-100 max-h-[620px] overflow-y-auto">
             {filteredUsers.map(user => {
@@ -354,7 +394,7 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
                   </div>
                   <p className="text-xs text-gray-400 truncate">{user.email}</p>
                   {!user.is_active && (
-                    <p className="text-[10px] text-red-500 font-semibold mt-1">Inactive</p>
+                    <p className="text-[10px] text-red-500 font-semibold mt-1">Removed</p>
                   )}
                 </button>
               )
@@ -369,9 +409,34 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
                 <h2 className="font-display font-semibold text-navy-900 text-lg">{userLabel(selectedUser)}</h2>
                 <p className="text-sm text-gray-400">{selectedUser.email}</p>
               </div>
-              <p className="text-xs text-gray-400">
-                Created {new Date(selectedUser.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-gray-400">
+                  Created {new Date(selectedUser.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+                {selectedUser.id !== currentUserId && (
+                  selectedUser.is_active ? (
+                    <button
+                      type="button"
+                      onClick={() => setUserActive(selectedUser, false)}
+                      disabled={removingId === selectedUser.id}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-2.5 py-1.5 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    >
+                      <UserMinus size={13} />
+                      {removingId === selectedUser.id ? 'Removing…' : 'Remove'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setUserActive(selectedUser, true)}
+                      disabled={removingId === selectedUser.id}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-navy-900 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    >
+                      <RotateCcw size={13} />
+                      {removingId === selectedUser.id ? 'Restoring…' : 'Restore'}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           </div>
 

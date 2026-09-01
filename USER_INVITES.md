@@ -111,3 +111,22 @@ and just needs a working link.
 A send failure is treated the same as having no provider: the account and link survive,
 and the modal shows the link plus the reason the email didn't go. A new account is
 never left unreachable.
+
+## Removing someone
+
+Admin → Users → pick them → **Remove**. They lose access immediately and drop out
+of the list; **Show removed** brings them back with a **Restore** button.
+
+It is not a delete, on purpose. Crew members are referenced across daily logs, time
+entries, task assignments and change orders, so deleting the row would blank out who
+did what on jobs that have already been billed. A removed user keeps their name on
+past work and simply loses access.
+
+Two things change together, and both are needed. `is_active` is what the assignee
+pickers and notification queries filter on — but **nothing reads it at sign-in**, so on
+its own it would hide someone from the app while leaving them able to log straight
+back in. The account is also banned at the auth level, which is what actually shuts
+the door. Restoring reverses both.
+
+You cannot remove yourself, and you cannot remove the last admin — either would leave
+nobody able to undo it.
