@@ -130,3 +130,9 @@ the door. Restoring reverses both.
 
 You cannot remove yourself, and you cannot remove the last admin — either would leave
 nobody able to undo it.
+
+**Re-inviting someone who was removed puts them back.** It has to: the ban is checked
+when a token is *verified*, not when it is generated, so without this the invite sends
+cleanly and then dies on their phone as "user is banned" — and re-sending produces
+another link that fails the same way. Inviting someone is the act of granting access,
+so the invite lifts the removal and says so in the confirmation.

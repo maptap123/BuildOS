@@ -105,10 +105,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Supabase did not return an invite token' }, { status: 502 })
   }
 
-  if (fullName && linkType === 'recovery') {
-    await admin.auth.admin.updateUserById(invitedUser.id, {
-      user_metadata: { ...invitedUser.user_metadata, full_name: fullName },
-    })
+  // Re-inviting someone who was removed has to lift the removal, or the link
+  // we just minted can never be redeemed: the ban is checked when the token is
+  // verified, not when it is generated, so the invite looks like it sent fine
+  // and then dies on their phone as "user is banned". Inviting someone *is* the
+  // act of granting access, so treat it as one.
+  let reactivated = false
+  if (linkType === 'recovery') {
+    const { data: existing } = await admin
+      .from('users')
+      .select('is_active')
+      .eq('id', invitedUser.id)
+      .maybeSingle()
+
+    const wasBanned = Boolean(invitedUser.banned_until)
+    reactivated = wasBanned || existing?.is_active === false
+
+    if (reactivated) {
+      await admin.auth.admin.updateUserById(invitedUser.id, { ban_duration: 'none' })
+      await admin.from('users').update({ is_active: true }).eq('id', invitedUser.id)
+    }
+
+    if (fullName) {
+      await admin.auth.admin.updateUserById(invitedUser.id, {
+        user_metadata: { ...invitedUser.user_metadata, full_name: fullName },
+      })
+    }
   }
 
   await upsertProfile(admin, invitedUser.id, invitedUser.email ?? email, fullName)
@@ -122,6 +144,7 @@ export async function POST(request: Request) {
     email: invitedUser.email,
     accept_url: acceptUrl,
     expires_in: LINK_TTL,
+    reactivated,
   }
 
   // No mail provider yet — the account and link are real, so hand them back
