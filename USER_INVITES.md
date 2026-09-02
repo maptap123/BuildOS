@@ -35,10 +35,30 @@ Admin → Users → Invite user
   ├─ RESEND_API_KEY set? → branded email from JDC's domain
   │                  else → the link comes back in the modal to copy and send
   │
-  ├─ GET /auth/confirm  → verifyOtp() server-side, sets the session cookie
+  ├─ GET  /auth/confirm        → "Continue" page, spends nothing
+  ├─ POST /auth/confirm/verify → verifyOtp(), sets the session cookie
   │
-  └─ /welcome           → "Set your password" → /jobs
+  └─ /welcome                  → "Set your password" → /jobs
 ```
+
+### Why the accept link asks for a tap
+
+Supabase tokens are single-use, and **anything that fetches a URL spends one**.
+Messaging apps fetch links to build previews, mail providers scan them for malware,
+chat clients unfurl them. When `/auth/confirm` verified inside its GET handler, the
+preview fetcher redeemed the invite and the person it was sent to got "this link has
+already been used".
+
+Seen twice in production, most clearly on 2026-09-02: a link minted at 15:19:31 was
+spent at 15:19:38 — seven seconds, well before anyone could have opened it by hand.
+
+A preview fetcher issues a GET and stops; it does not submit forms. So `/auth/confirm`
+is now a plain page with a **Continue** button, and only the POST behind it redeems
+the token. No client JavaScript on that page, nothing that auto-submits — anything
+that redeems without a person deciding to would put the bug straight back.
+
+This is the reason invite links seemed to arrive "already used" no matter how many
+times they were re-sent.
 
 Verifying server-side with `token_hash` is what keeps the token out of the URL
 fragment. Supabase's default link returns the session as `#access_token=…`, which the
