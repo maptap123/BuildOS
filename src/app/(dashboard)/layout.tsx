@@ -107,6 +107,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerFor, setPickerFor] = useState<string | null>(null)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [groupAnchor, setGroupAnchor] = useState<{ left: number; top: number } | null>(null)
   const navRef = useRef<HTMLElement>(null)
 
   // Active job context (persisted, shared across all mobile components)
@@ -138,15 +139,23 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlJobId, job?.id])
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click, or whenever its anchor could have moved
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
         setOpenGroup(null)
       }
     }
+    function close() { setOpenGroup(null) }
+    const nav = navRef.current
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    window.addEventListener('resize', close)
+    nav?.addEventListener('scroll', close)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('resize', close)
+      nav?.removeEventListener('scroll', close)
+    }
   }, [])
 
   // Close dropdown on route change
@@ -281,7 +290,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               return (
                 <div key={item.key} className="relative">
                   <button
-                    onClick={() => setOpenGroup(isOpen ? null : item.key)}
+                    onClick={(e) => {
+                      if (isOpen) { setOpenGroup(null); return }
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      setGroupAnchor({ left: rect.left, top: rect.bottom })
+                      setOpenGroup(item.key)
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={isOpen}
                     className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
                       groupActive || isOpen
                         ? 'border-gold-500 text-navy-900'
@@ -296,8 +312,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     />
                   </button>
 
-                  {isOpen && (
-                    <div className="absolute top-full left-0 z-50 mt-0 w-44 bg-white border border-border rounded-b-lg shadow-lg py-1">
+                  {/* Anchored with position:fixed, not absolute — the nav is a
+                      horizontal scroll container and would clip the menu. */}
+                  {isOpen && groupAnchor && (
+                    <div
+                      className="fixed z-50 w-44 bg-white border border-border rounded-b-lg shadow-lg py-1"
+                      style={{ left: groupAnchor.left, top: groupAnchor.top }}
+                    >
                       {visibleChildren.map(child => {
                         const ChildIcon = child.icon
                         const childActive = isActiveDesktop(child.key)
