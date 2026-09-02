@@ -8,20 +8,44 @@ type Stage = 'checking' | 'ready' | 'saving' | 'expired'
 
 const MIN_PASSWORD = 8
 
+interface Problem {
+  title: string
+  detail: string
+  hint: string
+}
+
 /**
  * Turns Supabase's error codes into something a framer reads once and acts on.
- * Everything here means the same thing in practice — get a fresh invite — so the
- * copy says that rather than quoting the code.
+ *
+ * A banned account has to be split out from a stale link. Both arrive here as a
+ * failed verification, but "ask for a new link" is useless advice when the
+ * account has been removed — a fresh link fails exactly the same way, and the
+ * office ends up re-sending links that could never work.
  */
-function friendlyError(raw: string | null): string {
+function friendlyError(raw: string | null): Problem {
   const text = (raw ?? '').toLowerCase()
+
+  if (text.includes('banned') || text.includes('user_banned')) {
+    return {
+      title: 'This account has been removed',
+      detail: 'Your BuildOS access was turned off, so this link cannot sign you in.',
+      hint: 'Ask the JDC office to restore your account in Admin → Users, then open this link again. A new link will not help until they do.',
+    }
+  }
+
   if (text.includes('expired') || text.includes('otp_expired')) {
-    return 'That invite link has already been used or has expired.'
+    return {
+      title: 'This link has already been used',
+      detail: 'Invite links work once and time out after 24 hours.',
+      hint: 'Ask the JDC office to send you a new one, then open it on this device.',
+    }
   }
-  if (text.includes('access_denied') || text.includes('invalid')) {
-    return 'That invite link is no longer valid.'
+
+  return {
+    title: 'This link is no longer valid',
+    detail: raw?.trim() || 'We could not verify that invite link.',
+    hint: 'Ask the JDC office to send you a new one, then open it on this device.',
   }
-  return raw?.trim() || 'We could not verify that invite link.'
 }
 
 export function WelcomeClient() {
@@ -39,7 +63,7 @@ export function WelcomeClient() {
 
   const [stage, setStage] = useState<Stage>('checking')
   const [email, setEmail] = useState<string | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<Problem | null>(null)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
@@ -152,12 +176,9 @@ export function WelcomeClient() {
 
           {stage === 'expired' && (
             <>
-              <h2 className="font-display text-xl font-bold text-navy-900 mb-1">This invite link expired</h2>
-              <p className="text-sm text-gray-500 mb-4">{problem}</p>
-              <p className="text-sm text-gray-500 mb-6">
-                Invite links work once and time out after 24 hours. Ask the JDC office to send you a
-                new one, then open it on this device.
-              </p>
+              <h2 className="font-display text-xl font-bold text-navy-900 mb-1">{problem?.title}</h2>
+              <p className="text-sm text-gray-500 mb-4">{problem?.detail}</p>
+              <p className="text-sm text-gray-500 mb-6">{problem?.hint}</p>
               <a
                 href="/login"
                 className="block text-center w-full bg-navy-900 hover:bg-navy-800 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"

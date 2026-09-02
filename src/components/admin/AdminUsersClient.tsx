@@ -197,17 +197,20 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
         // either way, so hand the link over instead of stranding someone who
         // now exists but can't be reached.
         setInviteLink(body.accept_url)
+        const restored = body.reactivated ? ' Their access was turned back on.' : ''
         setInviteSuccess(
           body.send_error
-            ? `Account created, but the email didn't send (${body.send_error}). Send this link to ${inviteEmail.trim()} yourself.`
-            : `Account created for ${inviteEmail.trim()}. Send them this link — it works once and expires in ${body.expires_in ?? '24 hours'}.`
+            ? `Account created, but the email didn't send (${body.send_error}). Send this link to ${inviteEmail.trim()} yourself.${restored}`
+            : `Account created for ${inviteEmail.trim()}. Send them this link — it works once and expires in ${body.expires_in ?? '24 hours'}.${restored}`
         )
       }
       setInviteEmail('')
       setInviteName('')
       // Optimistically add to list — re-inviting someone who never finished
       // signing up returns their existing id, so don't list them twice.
-      setUsers(prev => prev.some(u => u.id === body.id) ? prev : [...prev, {
+      setUsers(prev => prev.some(u => u.id === body.id)
+        ? prev.map(u => u.id === body.id ? { ...u, is_active: true } : u)
+        : [...prev, {
         id: body.id,
         email: body.email,
         full_name: inviteName.trim() || null,
