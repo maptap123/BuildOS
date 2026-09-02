@@ -123,8 +123,16 @@ SENTRY_ORG=
 SENTRY_PROJECT=
 SENTRY_AUTH_TOKEN=       # only needed for source map upload at build time, not at runtime
 
-# App URL (used to build absolute links in notification payloads posted to Discord)
+# App URL (used to build absolute links in notification payloads posted to Discord,
+# and for every account-invite link — see USER_INVITES.md)
 NEXT_PUBLIC_APP_URL=https://app.jdcplatform.com
+
+# Outbound email (account invites). Unset = the admin copies the invite link from the
+# modal and sends it by hand; the account and link are created either way.
+# See USER_INVITES.md
+RESEND_API_KEY=
+EMAIL_FROM=BuildOS — JDC Construction <noreply@jdcremodeling.com>
+EMAIL_REPLY_TO=      # optional; where replies to an invite should land
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is used only in server-side API routes via the admin client. It bypasses Row Level Security so that permission enforcement can be done in application code.

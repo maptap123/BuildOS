@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ShieldCheck, Users, Save, RefreshCw, Search, UserPlus, X } from 'lucide-react'
+import { ShieldCheck, Users, Save, RefreshCw, Search, UserPlus, X, Copy, Check, UserMinus, RotateCcw } from 'lucide-react'
 import type { PermissionModule, User, UserPermission } from '@/types'
 
 type PermissionFlag = 'can_view' | 'can_create' | 'can_edit' | 'can_delete' | 'can_export' | 'can_manage'
@@ -89,18 +89,28 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [showRemoved, setShowRemoved] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  const removedCount = useMemo(() => users.filter(u => !u.is_active).length, [users])
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return users
-    return users.filter(user =>
-      user.email.toLowerCase().includes(q) ||
-      (user.full_name ?? '').toLowerCase().includes(q) ||
-      (user.company_name ?? '').toLowerCase().includes(q)
-    )
-  }, [search, users])
+    return users.filter(user => {
+      if (!user.is_active && !showRemoved) return false
+      if (!q) return true
+      return (
+        user.email.toLowerCase().includes(q) ||
+        (user.full_name ?? '').toLowerCase().includes(q) ||
+        (user.company_name ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [search, users, showRemoved])
 
-  const selectedUser = users.find(user => user.id === selectedUserId) ?? users[0]
+  const selectedUser =
+    filteredUsers.find(user => user.id === selectedUserId) ?? filteredUsers[0] ?? users[0]
 
   function getPermission(userId: string, module: PermissionModule) {
     return permissions[permissionKey(userId, module)] ?? { ...EMPTY_PERMISSION }
@@ -140,12 +150,37 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
     }
   }
 
+  async function setUserActive(target: User, isActive: boolean) {
+    if (!isActive && !window.confirm(
+      `Remove ${userLabel(target)} from BuildOS?\n\nThey lose access immediately. Their name stays on past logs, time entries and tasks, and you can put them back from "Show removed".`
+    )) return
+
+    setRemovingId(target.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: isActive }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error ?? 'Could not update that user')
+      setUsers(prev => prev.map(u => u.id === target.id ? { ...u, is_active: isActive } : u))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update that user')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
     if (!inviteEmail.trim()) return
     setInviting(true)
     setInviteError(null)
     setInviteSuccess(null)
+    setInviteLink(null)
+    setLinkCopied(false)
     try {
       const res = await fetch('/api/admin/users/invite', {
         method: 'POST',
@@ -154,11 +189,25 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error ?? 'Invite failed')
-      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}`)
+
+      if (body.sent_via === 'email') {
+        setInviteSuccess(`Invite emailed to ${inviteEmail.trim()}`)
+      } else {
+        // No mail provider, or the send failed — the account and link are real
+        // either way, so hand the link over instead of stranding someone who
+        // now exists but can't be reached.
+        setInviteLink(body.accept_url)
+        setInviteSuccess(
+          body.send_error
+            ? `Account created, but the email didn't send (${body.send_error}). Send this link to ${inviteEmail.trim()} yourself.`
+            : `Account created for ${inviteEmail.trim()}. Send them this link — it works once and expires in ${body.expires_in ?? '24 hours'}.`
+        )
+      }
       setInviteEmail('')
       setInviteName('')
-      // Optimistically add to list
-      setUsers(prev => [...prev, {
+      // Optimistically add to list — re-inviting someone who never finished
+      // signing up returns their existing id, so don't list them twice.
+      setUsers(prev => prev.some(u => u.id === body.id) ? prev : [...prev, {
         id: body.id,
         email: body.email,
         full_name: inviteName.trim() || null,
@@ -249,6 +298,31 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
               {inviteSuccess && (
                 <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{inviteSuccess}</p>
               )}
+              {inviteLink && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Invite link</p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(inviteLink)
+                          setLinkCopied(true)
+                        } catch {
+                          // Clipboard is blocked outside HTTPS and in some mobile
+                          // browsers — the link is on screen to select by hand.
+                          setLinkCopied(false)
+                        }
+                      }}
+                      className="flex items-center gap-1 shrink-0 text-xs font-semibold text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100 transition-colors"
+                    >
+                      {linkCopied ? <Check size={12} /> : <Copy size={12} />}
+                      {linkCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-900 break-all font-mono select-all">{inviteLink}</p>
+                </div>
+              )}
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
@@ -288,6 +362,15 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
                 className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-navy-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-navy-300"
               />
             </div>
+            {removedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRemoved(v => !v)}
+                className="mt-2 text-xs font-semibold text-gray-500 hover:text-navy-900 transition-colors"
+              >
+                {showRemoved ? 'Hide' : 'Show'} removed ({removedCount})
+              </button>
+            )}
           </div>
           <div className="divide-y divide-gray-100 max-h-[620px] overflow-y-auto">
             {filteredUsers.map(user => {
@@ -311,7 +394,7 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
                   </div>
                   <p className="text-xs text-gray-400 truncate">{user.email}</p>
                   {!user.is_active && (
-                    <p className="text-[10px] text-red-500 font-semibold mt-1">Inactive</p>
+                    <p className="text-[10px] text-red-500 font-semibold mt-1">Removed</p>
                   )}
                 </button>
               )
@@ -326,9 +409,34 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
                 <h2 className="font-display font-semibold text-navy-900 text-lg">{userLabel(selectedUser)}</h2>
                 <p className="text-sm text-gray-400">{selectedUser.email}</p>
               </div>
-              <p className="text-xs text-gray-400">
-                Created {new Date(selectedUser.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-gray-400">
+                  Created {new Date(selectedUser.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+                {selectedUser.id !== currentUserId && (
+                  selectedUser.is_active ? (
+                    <button
+                      type="button"
+                      onClick={() => setUserActive(selectedUser, false)}
+                      disabled={removingId === selectedUser.id}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-2.5 py-1.5 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    >
+                      <UserMinus size={13} />
+                      {removingId === selectedUser.id ? 'Removing…' : 'Remove'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setUserActive(selectedUser, true)}
+                      disabled={removingId === selectedUser.id}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-navy-900 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    >
+                      <RotateCcw size={13} />
+                      {removingId === selectedUser.id ? 'Restoring…' : 'Restore'}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           </div>
 
