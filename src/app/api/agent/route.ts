@@ -42,6 +42,11 @@ import { timingSafeEqual } from 'crypto'
  *   respond_to_schedule_invite  { invite_id, from_phone, answer, note? }
  *   log_schedule_invite_message { invite_id, from_phone, direction, body }
  *   flag_schedule_invite        { invite_id, from_phone, reason }
+ *
+ * SMS gate — call check_sms_sender on every inbound text before doing anything else:
+ *   check_sms_sender            { phone, message? }
+ *   approve_sms_sender          { phone, decided_by_phone, allow, note? }
+ *   list_pending_sms_senders    { }
  *   list_budget            { job_id }
  *   list_change_orders     { job_id, status? }
  *   create_change_order    { job_id, title, type, amount, reason? }
@@ -344,6 +349,173 @@ export async function POST(request: Request) {
         })
       }
 
+      // ─── WHO MAY TEXT FIXER ─────────────────────────────────────────────
+      // Replaces a fixed allowlist. Unknown numbers are let in but held to the
+      // schedule-invite tools until August approves them; an approval sticks so
+      // he is asked once per number, never again.
+
+      case 'check_sms_sender': {
+        if (!await hasPerm('ai', 'can_view')) return permError()
+        const phone = normalizePhone(params.phone as string)
+        if (!phone) return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 })
+
+        const message = typeof params.message === 'string' ? params.message.trim() : ''
+        const { data: existing } = await admin
+          .from('sms_senders')
+          .select('*')
+          .eq('phone', phone)
+          .maybeSingle()
+
+        // A block is absolute — it outranks even an open invite.
+        if (existing?.status === 'blocked') {
+          await touchSender(admin, phone, message)
+          return ok({ tier: 'blocked', phone, access: 'none', ask_owner: false })
+        }
+
+        // 1. One of the crew: Fixer acts with that person's own permissions.
+        const { data: crew } = await admin
+          .from('users')
+          .select('id, full_name, email')
+          .eq('phone', phone)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        if (crew) {
+          await admin.from('sms_senders').upsert(
+            {
+              phone,
+              status: 'allowed',
+              label: crew.full_name || crew.email,
+              resolved_user_id: crew.id,
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: 'phone' }
+          )
+          return ok({
+            tier: 'crew', phone, access: 'full', ask_owner: false,
+            user: { id: crew.id, full_name: crew.full_name || crew.email },
+          })
+        }
+
+        // 2. Already approved by August.
+        if (existing?.status === 'allowed') {
+          await touchSender(admin, phone, message)
+          return ok({ tier: 'allowed', phone, access: 'full', label: existing.label, ask_owner: false })
+        }
+
+        // 3. Has an open schedule invite — the confirmation conversation only.
+        const { data: invites } = await admin
+          .from('schedule_assignments')
+          .select('id, contact_name')
+          .eq('phone', phone)
+          .in('status', ['sent', 'confirmed', 'declined'])
+          .limit(5)
+
+        if (invites && invites.length > 0) {
+          await touchSender(admin, phone, message, invites[0].contact_name)
+          return ok({
+            tier: 'invite', phone, access: 'schedule_invite_only',
+            label: invites[0].contact_name, open_invites: invites.length, ask_owner: false,
+          })
+        }
+
+        // 4. Nobody we know. Hold them and ask.
+        const guess = await guessSenderName(admin, phone)
+        await touchSender(admin, phone, message, guess)
+
+        return ok({
+          tier: 'unknown', phone, access: 'none', label: guess, ask_owner: true,
+          approval_prompt:
+            `New number texting JDC: ${phone}${guess ? ` (looks like ${guess})` : ''}. ` +
+            `They said: "${message.slice(0, 120)}". Reply ALLOW to let them talk to me from now on, or BLOCK to ignore them.`,
+        })
+      }
+
+      case 'approve_sms_sender': {
+        if (!await hasPerm('ai', 'can_view')) return permError()
+        const phone = normalizePhone(params.phone as string)
+        const deciderPhone = normalizePhone(params.decided_by_phone as string)
+        if (!phone || !deciderPhone) {
+          return NextResponse.json({ error: 'phone and decided_by_phone are required' }, { status: 400 })
+        }
+        if (typeof params.allow !== 'boolean') {
+          return NextResponse.json({ error: 'allow must be true or false' }, { status: 400 })
+        }
+
+        // Only someone who can administer BuildOS may open the gate, and only
+        // from their own number — the decision arrives as an SMS, so the phone
+        // is the whole proof of who sent it.
+        const { data: decider } = await admin
+          .from('users')
+          .select('id, full_name')
+          .eq('phone', deciderPhone)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        const canDecide = decider
+          ? await hasModulePermOrAdminLocal(admin, decider.id)
+          : false
+
+        if (!decider || !canDecide) {
+          return NextResponse.json(
+            { error: 'That number is not allowed to approve senders. It must belong to a BuildOS admin.' },
+            { status: 403 }
+          )
+        }
+
+        const { data: updated, error } = await admin
+          .from('sms_senders')
+          .update({
+            status: params.allow ? 'allowed' : 'blocked',
+            approved_by: decider.id,
+            approved_at: new Date().toISOString(),
+            decided_note: typeof params.note === 'string' ? params.note.trim() || null : null,
+          })
+          .eq('phone', phone)
+          .select('phone, status, label')
+          .maybeSingle()
+
+        if (error) throw error
+        if (!updated) return NextResponse.json({ error: 'That number has not texted in.' }, { status: 404 })
+
+        return ok({
+          ...updated,
+          message: params.allow
+            ? `${updated.label ?? phone} can talk to Fixer from now on. You won't be asked again.`
+            : `${updated.label ?? phone} is blocked and will be ignored.`,
+        })
+      }
+
+      case 'list_pending_sms_senders': {
+        if (!await hasPerm('ai', 'can_view')) return permError()
+        const { data } = await admin
+          .from('sms_senders')
+          .select('phone, label, first_message, first_seen_at, last_seen_at, message_count')
+          .eq('status', 'pending')
+          .order('last_seen_at', { ascending: false })
+          .limit(25)
+
+        // A sub with an open invite is already being handled — say so, rather
+        // than presenting them as somebody waiting on a decision.
+        const phones = (data ?? []).map(row => row.phone)
+        const { data: invited } = phones.length
+          ? await admin
+              .from('schedule_assignments')
+              .select('phone')
+              .in('phone', phones)
+              .in('status', ['sent', 'confirmed', 'declined'])
+          : { data: [] }
+        const invitedPhones = new Set((invited ?? []).map(row => row.phone))
+
+        return ok({
+          pending: (data ?? []).map(row => ({
+            ...row,
+            has_open_invite: invitedPhones.has(row.phone),
+          })),
+          count: data?.length ?? 0,
+        })
+      }
+
       // ─── BUDGET ─────────────────────────────────────────────────────────
       case 'list_budget': {
         if (!await hasPerm('budget', 'can_view')) return permError()
@@ -492,6 +664,7 @@ export async function POST(request: Request) {
             'list_tasks','create_task','update_task',
             'list_schedule','update_schedule_item',
             'list_schedule_invites','respond_to_schedule_invite','log_schedule_invite_message','flag_schedule_invite',
+            'check_sms_sender','approve_sms_sender','list_pending_sms_senders',
             'list_budget','get_budget_summary','list_change_orders','create_change_order','list_actuals',
             'list_daily_logs','create_daily_log',
             'search_across_jobs',
@@ -530,6 +703,78 @@ async function loadInviteForPhone(
   const ctx = await loadAssignmentById(admin, inviteId)
   if (!ctx || ctx.assignment.phone !== phone) return null
   return ctx
+}
+
+type Admin = ReturnType<typeof createAdminClient>
+
+/** Records that a number texted in, without changing whether it's allowed. */
+async function touchSender(
+  admin: Admin,
+  phone: string,
+  message: string,
+  label?: string | null
+): Promise<void> {
+  const { data: existing } = await admin
+    .from('sms_senders')
+    .select('id, message_count, first_message, label')
+    .eq('phone', phone)
+    .maybeSingle()
+
+  if (existing) {
+    await admin
+      .from('sms_senders')
+      .update({
+        last_seen_at: new Date().toISOString(),
+        message_count: existing.message_count + 1,
+        label: existing.label ?? label ?? null,
+      })
+      .eq('id', existing.id)
+    return
+  }
+
+  await admin.from('sms_senders').insert({
+    phone,
+    status: 'pending',
+    label: label ?? null,
+    first_message: message || null,
+  })
+}
+
+/**
+ * Best-effort name for an unrecognised number, so the approval question says
+ * "looks like Bob's Plumbing" instead of just a bare number. Matched on the
+ * last 7 digits because stored numbers are hand-entered in mixed formats.
+ */
+async function guessSenderName(admin: Admin, phone: string): Promise<string | null> {
+  const tail = phone.replace(/\D/g, '').slice(-7)
+  if (tail.length < 7) return null
+
+  const { data: vendor } = await admin
+    .from('vendors')
+    .select('name, contact_name')
+    .ilike('phone', `%${tail}%`)
+    .limit(1)
+    .maybeSingle()
+  if (vendor) return vendor.contact_name || vendor.name
+
+  const { data: contact } = await admin
+    .from('contacts')
+    .select('full_name')
+    .ilike('phone', `%${tail}%`)
+    .limit(1)
+    .maybeSingle()
+  return contact?.full_name ?? null
+}
+
+/** True if the user may administer BuildOS — the bar for opening the SMS gate. */
+async function hasModulePermOrAdminLocal(admin: Admin, userId: string): Promise<boolean> {
+  const { data } = await admin
+    .from('user_permissions')
+    .select('can_manage')
+    .eq('user_id', userId)
+    .eq('module', 'admin')
+    .maybeSingle()
+  return Boolean(data?.can_manage)
 }
 
 function inviteAuthError() {
