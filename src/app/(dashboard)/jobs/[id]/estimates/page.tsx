@@ -4,6 +4,7 @@ import { FileText, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ImportEstimateButton } from '@/components/budget/ImportEstimateButton'
+import { StartEstimateButton } from '@/components/estimates'
 import type { Estimate, EstimateLine } from '@/types'
 
 const fmtCurrency = (n: number) =>
@@ -50,22 +51,14 @@ export default async function JobEstimatesPage({
 
   if (!job) notFound()
 
-  if (!job.lead_id) {
-    return (
-      <div className="bg-white rounded-xl border border-border p-8 text-center space-y-2">
-        <FileText size={32} className="mx-auto text-gray-300" />
-        <p className="text-sm font-medium text-navy-800">No linked lead</p>
-        <p className="text-xs text-gray-400">Estimates are created from leads. This job has no linked lead.</p>
-      </div>
-    )
-  }
-
-  // Load estimates for this lead
-  const { data: estimates } = await admin
-    .from('estimates')
-    .select('*')
-    .eq('lead_id', job.lead_id)
-    .order('version', { ascending: false })
+  // Load estimates for this job's lead — a job with no lead has none yet
+  const { data: estimates } = job.lead_id
+    ? await admin
+        .from('estimates')
+        .select('*')
+        .eq('lead_id', job.lead_id)
+        .order('version', { ascending: false })
+    : { data: [] }
 
   // Load line counts + totals per estimate
   const estimateIds = (estimates ?? []).map((e: Estimate) => e.id)
@@ -81,33 +74,44 @@ export default async function JobEstimatesPage({
   }
 
   const estimateList = (estimates ?? []) as Estimate[]
+  const canCreate = budgetPerm?.can_create ?? false
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-display font-semibold text-navy-900 text-base">Estimates</h3>
-          <p className="text-xs text-gray-400 mt-0.5">From linked lead</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {estimateList.length > 0 ? 'From linked lead' : 'None for this job yet'}
+          </p>
         </div>
-        <Link
-          href={`/leads/${job.lead_id}/estimate`}
-          className="flex items-center gap-1.5 text-xs text-gold-600 hover:text-gold-700 font-medium"
-        >
-          Open in Estimate Builder
-          <ArrowRight size={13} />
-        </Link>
+        {job.lead_id && (
+          <Link
+            href={`/leads/${job.lead_id}/estimate`}
+            className="flex items-center gap-1.5 text-xs text-gold-600 hover:text-gold-700 font-medium"
+          >
+            Open in Estimate Builder
+            <ArrowRight size={13} />
+          </Link>
+        )}
       </div>
 
       {estimateList.length === 0 ? (
-        <div className="bg-white rounded-xl border border-border p-8 text-center space-y-2">
-          <FileText size={32} className="mx-auto text-gray-300" />
-          <p className="text-sm font-medium text-navy-800">No estimates yet</p>
-          <p className="text-xs text-gray-400">
-            <Link href={`/leads/${job.lead_id}/estimate`} className="text-gold-600 hover:underline">
-              Create an estimate
-            </Link>{' '}
-            from the linked lead.
-          </p>
+        <div className="bg-white rounded-xl border border-border p-8 text-center flex flex-col items-center gap-3">
+          <FileText size={32} className="text-gray-300" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-navy-800">No estimates yet</p>
+            <p className="text-xs text-gray-400">
+              Build one for {job.name} in the estimate builder.
+            </p>
+          </div>
+          {canCreate ? (
+            <StartEstimateButton jobId={id} leadId={job.lead_id} />
+          ) : (
+            <p className="text-xs text-gray-400">
+              You don&apos;t have permission to create estimates.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
