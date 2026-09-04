@@ -159,13 +159,86 @@ CREATE POLICY "historical_estimate_lines_select" ON public.historical_estimate_l
 );
 
 -- ─────────────────────────────────────────────
--- Scope → comparable past estimates
+-- Search vectors for scope → comparable matching
 --
--- Scoring blends two signals because neither is sufficient alone:
---   ts_rank_cd      — good when the scope shares vocabulary with the line items
---                     ("tile", "vanity", "shower"), but scores 0 on no lexeme overlap.
---   word_similarity — fuzzy containment of the query's words inside the document,
---                     which still ranks sensibly for typos and unusual phrasing.
+-- Two vectors, not one. A single combined vector ranked badly: a 111-line addition
+-- estimate's line descriptions swamped its topic, and length normalisation over the
+-- combined text then penalised exactly the big jobs that should win on a big scope.
+--
+--   topic_vector — what kind of job this was and which rooms it touched (weight A),
+--                  plus the divisions involved (weight B). Divisions sit at B on
+--                  purpose: they are generic trade words ("Wall Framing", "Plumbing")
+--                  that appear in almost any scope, and at top weight they made every
+--                  estimate look like a match for everything.
+--   lines_vector — the individual line descriptions.
+--
+-- Maintained by trigger rather than as generated columns because array_to_string is
+-- only STABLE, which a generated column will not accept.
+-- ─────────────────────────────────────────────
+ALTER TABLE public.historical_estimates
+  ADD COLUMN IF NOT EXISTS topic_vector  tsvector,
+  ADD COLUMN IF NOT EXISTS lines_vector  tsvector,
+  ADD COLUMN IF NOT EXISTS search_vector tsvector,
+  -- Short, high-signal text for the fuzzy fallback; trigram containment against a long
+  -- document is noise.
+  ADD COLUMN IF NOT EXISTS match_summary TEXT;
+
+CREATE OR REPLACE FUNCTION public.historical_estimates_build_search()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  topic_text TEXT;
+BEGIN
+  NEW.match_summary :=
+    coalesce(NEW.display_name, '') || ' ' ||
+    coalesce(array_to_string(NEW.areas, ' '), '');
+
+  topic_text := NEW.match_summary;
+
+  -- Words shared by nearly every job describe none of them. Without this, a job titled
+  -- "White Overall Remodel 2025" outranked dedicated bathroom and deck estimates on
+  -- their own scopes. They stay searchable in the line vector.
+  topic_text := regexp_replace(
+    topic_text,
+    '\y(remodel|remodels|remodeling|remodelling|renovation|renovations|reno|revised|revision|overall|complete|existing|new|job|estimate|project|20\d{2})\y',
+    ' ', 'gi');
+
+  -- "bath" and "bathroom" are different lexemes to the English stemmer, so an area named
+  -- "Bath 1" never matched a scope saying "bathroom" — and areas in this data are
+  -- consistently terse. Same for master/primary. Emit both forms so either phrasing hits.
+  IF topic_text ~* '\ybath\y'    THEN topic_text := topic_text || ' bathroom'; END IF;
+  IF topic_text ~* '\ybathroom'  THEN topic_text := topic_text || ' bath';     END IF;
+  IF topic_text ~* '\ymaster\y'  THEN topic_text := topic_text || ' primary';  END IF;
+  IF topic_text ~* '\yprimary\y' THEN topic_text := topic_text || ' master';   END IF;
+
+  NEW.topic_vector :=
+    setweight(to_tsvector('english', topic_text), 'A')
+    || setweight(to_tsvector('english', coalesce(array_to_string(NEW.divisions, ' '), '')), 'B');
+
+  NEW.lines_vector  := to_tsvector('english', coalesce(NEW.fingerprint, ''));
+  NEW.search_vector := NEW.topic_vector || setweight(NEW.lines_vector, 'D');
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS historical_estimates_search ON public.historical_estimates;
+CREATE TRIGGER historical_estimates_search
+  BEFORE INSERT OR UPDATE OF display_name, areas, divisions, fingerprint
+  ON public.historical_estimates
+  FOR EACH ROW EXECUTE FUNCTION public.historical_estimates_build_search();
+
+CREATE INDEX IF NOT EXISTS idx_historical_estimates_topic_vector
+  ON public.historical_estimates USING gin (topic_vector);
+CREATE INDEX IF NOT EXISTS idx_historical_estimates_lines_vector
+  ON public.historical_estimates USING gin (lines_vector);
+CREATE INDEX IF NOT EXISTS idx_historical_estimates_match_summary_trgm
+  ON public.historical_estimates USING gin (match_summary gin_trgm_ops);
+
+-- ─────────────────────────────────────────────
+-- Scope → comparable past estimates
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.match_historical_estimates(
   scope_text  TEXT,
@@ -175,12 +248,14 @@ RETURNS TABLE (
   historical_estimate_id UUID,
   job_id                 UUID,
   job_name               TEXT,
+  client_name            TEXT,
   file_name              TEXT,
   web_url                TEXT,
   source_year            TEXT,
   city                   TEXT,
   line_count             INT,
   total_cost             NUMERIC,
+  total_price            NUMERIC,
   areas                  TEXT[],
   divisions              TEXT[],
   score                  REAL
@@ -192,24 +267,51 @@ SET search_path = public, pg_temp
 AS $$
   WITH q AS (
     SELECT
-      websearch_to_tsquery('english', COALESCE(scope_text, '')) AS tsq,
-      COALESCE(scope_text, '')                                  AS raw
+      -- OR semantics, not AND. plainto_tsquery joins every term with '&', so a scope of
+      -- any real length matched nothing at all: no past estimate contains every word of
+      -- a paragraph. Swapping the operator asks the question actually wanted — how much
+      -- vocabulary does this estimate share with the scope — and lets ts_rank do the
+      -- discriminating. Going through plainto_tsquery first means the user's text is
+      -- already sanitised into lexemes before the swap.
+      NULLIF(replace(plainto_tsquery('english', COALESCE(scope_text, ''))::text, ' & ', ' | '), '')::tsquery AS tsq,
+      COALESCE(scope_text, '') AS raw
   )
   SELECT
-    h.id, h.job_id, j.name, h.file_name, h.web_url, h.source_year, j.city,
-    h.line_count, h.total_cost, h.areas, h.divisions,
+    h.id,
+    h.job_id,
+    -- Prefer the linked job, then the estimate's own title, then the filename, so an
+    -- estimate that could not be matched to a job is still usable as a comparable.
+    COALESCE(j.name, h.display_name, h.file_name) AS job_name,
+    h.client_name,
+    h.file_name,
+    h.web_url,
+    COALESCE(h.source_year, to_char(h.date_started, 'YYYY')) AS source_year,
+    j.city,
+    h.line_count,
+    h.total_cost,
+    h.total_price,
+    h.areas,
+    h.divisions,
     (
-      0.7 * LEAST(ts_rank_cd(to_tsvector('english', h.fingerprint), q.tsq), 1.0)
-      + 0.3 * word_similarity(q.raw, h.fingerprint)
+      -- What kind of job this was. Short text, so no length normalisation: a job titled
+      -- "Vetter Addition" should win an addition scope.
+      0.55 * ts_rank('{0.0, 0.0, 0.35, 1.0}'::float4[], h.topic_vector, q.tsq, 0)
+      -- Shared line-item vocabulary, normalised by length (flag 1, divide by
+      -- 1 + log(length)) so a 111-line estimate cannot win on breadth alone.
+      + 0.30 * ts_rank(h.lines_vector, q.tsq, 1)
+      -- Fuzzy containment, for wording the dictionary stems differently.
+      + 0.15 * word_similarity(q.raw, h.match_summary)
     )::real AS score
   FROM public.historical_estimates h
   JOIN q ON TRUE
   LEFT JOIN public.jobs j ON j.id = h.job_id
   WHERE h.parse_status = 'ok'
     AND h.line_count > 0
+    AND q.tsq IS NOT NULL
     AND (
-      to_tsvector('english', h.fingerprint) @@ q.tsq
-      OR word_similarity(q.raw, h.fingerprint) > 0.15
+      h.topic_vector @@ q.tsq
+      OR h.lines_vector @@ q.tsq
+      OR word_similarity(q.raw, h.match_summary) > 0.25
     )
   ORDER BY score DESC, h.total_cost DESC
   LIMIT GREATEST(LEAST(match_limit, 25), 1);

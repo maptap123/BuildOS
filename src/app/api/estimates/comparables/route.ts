@@ -13,12 +13,14 @@ export interface ComparableJob {
   historical_estimate_id: string
   job_id:      string | null
   job_name:    string
+  client_name: string | null
   file_name:   string
   web_url:     string | null
   source_year: string | null
   city:        string | null
   line_count:  number
   total_cost:  number
+  total_price: number
   areas:       string[]
   divisions:   string[]
   score:       number
@@ -75,6 +77,7 @@ export async function POST(request: Request) {
     return {
       ...r,
       total_cost:     Number(r.total_cost),
+      total_price:    Number(r.total_price),
       score,
       match_strength: i === 0 ? 'best' : relative >= 0.6 ? 'strong' : 'possible',
       top_divisions:  byDivision.get(r.historical_estimate_id) ?? [],
