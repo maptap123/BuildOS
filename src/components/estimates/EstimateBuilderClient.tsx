@@ -23,12 +23,15 @@ import {
   Lock,
   Unlock,
   TrendingUp,
+  History,
+  Search,
 } from 'lucide-react'
 import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow, EstimateLineCard } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
-import type { AISuggestedLine } from '@/lib/ai/claude'
+import type { GeneratedLine } from '@/lib/ai/claude'
+import type { ComparableJob } from '@/app/api/estimates/comparables/route'
 
 interface Permissions {
   can_create: boolean
@@ -214,16 +217,26 @@ export function EstimateBuilderClient({
     return () => clearTimeout(t)
   }, [dirtyLines, saveLinesSilently])
 
-  // AI Generate modal
+  // AI Generate modal — a three step flow:
+  //   scope  → describe the job
+  //   comps  → pick which past jobs to price from
+  //   review → check the generated lines before they land in the estimate
   const [showAIGenerate, setShowAIGenerate]         = useState(false)
+  const [aiStep, setAIStep]                         = useState<'scope' | 'comps' | 'review'>('scope')
   const [aiScope, setAIScope]                       = useState('')
   const [aiProjectType, setAIProjectType]           = useState('')
   const [aiSqFt, setAISqFt]                         = useState('')
+  const [aiFinding, setAIFinding]                   = useState(false)
+  const [aiComparables, setAIComparables]           = useState<ComparableJob[]>([])
+  const [aiSelectedComps, setAISelectedComps]       = useState<Set<string>>(new Set())
   const [aiGenerating, setAIGenerating]             = useState(false)
-  const [aiSuggestedLines, setAISuggestedLines]     = useState<AISuggestedLine[]>([])
+  const [aiSuggestedLines, setAISuggestedLines]     = useState<GeneratedLine[]>([])
   const [aiSelectedLines, setAISelectedLines]       = useState<Set<number>>(new Set())
   const [aiError, setAIError]                       = useState<string | null>(null)
   const [aiAdding, setAIAdding]                     = useState(false)
+
+  /** The model is sent the full line detail of each comp, so the selection is capped. */
+  const MAX_COMPS = 5
 
   // ── Create a new estimate ──────────────────────────────────────
   async function createEstimate() {
@@ -350,6 +363,7 @@ export function EstimateBuilderClient({
               unit_cost:   al.unit_cost,
               markup_pct:  al.markup_pct,
               sort_order:  lines.length + i,
+              source:      'assembly',
             }),
           }).then(async r => {
               if (!r.ok) throw new Error(`Line POST failed: ${r.status}`)
@@ -535,18 +549,47 @@ export function EstimateBuilderClient({
 
   // ── Open AI Generate modal ─────────────────────────────────────
   function openAIGenerate() {
+    setAIStep('scope')
     setAIScope(scopeText ?? '')
     setAIProjectType('')
     setAISqFt('')
+    setAIComparables([])
+    setAISelectedComps(new Set())
     setAISuggestedLines([])
     setAISelectedLines(new Set())
     setAIError(null)
     setShowAIGenerate(true)
   }
 
-  // ── Call Claude to generate lines ──────────────────────────────
-  async function runAIGenerate() {
+  // ── Step 1 → 2: find past jobs with a similar scope ────────────
+  async function findComparables() {
     if (!aiScope.trim()) { setAIError('Please enter a project scope.'); return }
+    setAIFinding(true)
+    setAIError(null)
+    try {
+      const res = await fetch('/api/estimates/comparables', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ scope: aiScope.trim(), limit: 8 }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to find similar jobs')
+
+      const found: ComparableJob[] = json.comparables ?? []
+      setAIComparables(found)
+      // Pre-select the strongest matches, up to the prompt cap, so the common case is one click.
+      setAISelectedComps(new Set(found.slice(0, 3).map(c => c.historical_estimate_id)))
+      setAIStep('comps')
+    } catch (e) {
+      setAIError(e instanceof Error ? e.message : 'Failed to find similar jobs')
+    } finally {
+      setAIFinding(false)
+    }
+  }
+
+  // ── Step 2 → 3: build a draft estimate from the chosen comps ───
+  async function runAIGenerate() {
+    if (aiSelectedComps.size === 0) { setAIError('Select at least one similar job.'); return }
     setAIGenerating(true)
     setAIError(null)
     setAISuggestedLines([])
@@ -555,22 +598,36 @@ export function EstimateBuilderClient({
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          action:        'generate_estimate_lines',
-          scope:         aiScope.trim(),
-          project_type:  aiProjectType || undefined,
+          action:         'generate_from_comps',
+          scope:          aiScope.trim(),
+          comp_ids:       [...aiSelectedComps],
+          project_type:   aiProjectType || undefined,
           square_footage: aiSqFt ? Number(aiSqFt) : undefined,
         }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'AI request failed')
-      const suggested: AISuggestedLine[] = json.result ?? []
+
+      const suggested: GeneratedLine[] = json.result ?? []
+      if (suggested.length === 0) throw new Error('The model returned no usable lines. Try different comps.')
       setAISuggestedLines(suggested)
       setAISelectedLines(new Set(suggested.map((_, i) => i)))
+      setAIStep('review')
     } catch (e) {
       setAIError(e instanceof Error ? e.message : 'Failed to generate estimate')
     } finally {
       setAIGenerating(false)
     }
+  }
+
+  // ── Toggle one comparable job, respecting the prompt-size cap ──
+  function toggleComp(id: string) {
+    setAISelectedComps(prev => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id)
+      else if (s.size < MAX_COMPS) s.add(id)
+      return s
+    })
   }
 
   // ── Add selected AI lines to estimate ─────────────────────────
@@ -580,6 +637,12 @@ export function EstimateBuilderClient({
     setAIError(null)
     try {
       const selected = aiSuggestedLines.filter((_, i) => aiSelectedLines.has(i))
+      // The model cites comps by name; map those back to job ids for the stored link.
+      const compJobIdByName = new Map(
+        aiComparables
+          .filter(c => c.job_id)
+          .map(c => [c.job_name, c.job_id as string])
+      )
       const results = await Promise.allSettled(
         selected.map((al, i) =>
           fetch('/api/estimate-lines', {
@@ -596,6 +659,10 @@ export function EstimateBuilderClient({
               unit_cost:   al.unit_cost,
               markup_pct:  al.markup_pct,
               sort_order:  lines.length + i,
+              // Provenance: which lines came from real past jobs vs. the model's own pricing.
+              source:      al.source === 'comp' ? 'ai_comp' : 'ai_market',
+              comp_job_id: compJobIdByName.get(al.comp_job_name ?? '') ?? null,
+              ai_rationale: al.rationale ?? null,
             }),
           }).then(async r => {
             if (!r.ok) throw new Error(`POST failed: ${r.status}`)
@@ -607,6 +674,15 @@ export function EstimateBuilderClient({
         .filter((r): r is PromiseFulfilledResult<EstimateLine> => r.status === 'fulfilled')
         .map(r => r.value)
       setLines(prev => [...prev, ...added])
+
+      // A partial add used to look identical to a complete one; say so instead.
+      const failed = results.length - added.length
+      if (failed > 0) {
+        setAIError(`Added ${added.length} of ${results.length} lines — ${failed} failed to save.`)
+        setAISuggestedLines(prev => prev.filter((_, i) => !aiSelectedLines.has(i)))
+        setAISelectedLines(new Set())
+        return
+      }
       setShowAIGenerate(false)
     } catch (e) {
       setAIError(e instanceof Error ? e.message : 'Failed to add lines')
@@ -1278,17 +1354,20 @@ export function EstimateBuilderClient({
         </div>
       )}
 
-      {/* AI Generate modal */}
+      {/* AI Generate modal — scope → pick similar jobs → review draft */}
       {showAIGenerate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles size={18} className="text-purple-500" />
                 <div>
                   <h2 className="font-display font-bold text-navy-900 text-lg">AI Estimate Generator</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Describe the project scope and Claude will suggest line items</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Built from what you actually charged on similar jobs
+                  </p>
                 </div>
               </div>
               <button
@@ -1299,57 +1378,38 @@ export function EstimateBuilderClient({
               </button>
             </div>
 
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 shrink-0 bg-gray-50/60">
+              {([
+                { key: 'scope',  label: '1. Scope' },
+                { key: 'comps',  label: '2. Similar jobs' },
+                { key: 'review', label: '3. Review' },
+              ] as const).map((s, i) => {
+                const order = ['scope', 'comps', 'review']
+                const current = order.indexOf(aiStep)
+                const isDone   = i < current
+                const isActive = i === current
+                return (
+                  <Fragment key={s.key}>
+                    {i > 0 && <div className={`h-px flex-1 ${isDone || isActive ? 'bg-purple-300' : 'bg-gray-200'}`} />}
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                        isActive ? 'bg-purple-100 text-purple-700'
+                        : isDone  ? 'text-purple-600'
+                        : 'text-gray-400'
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                  </Fragment>
+                )
+              })}
+            </div>
+
             {/* Modal body */}
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
-              {/* Scope textarea */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Project Scope
-                </label>
-                <textarea
-                  value={aiScope}
-                  onChange={e => setAIScope(e.target.value)}
-                  placeholder="Describe the work to be done in detail. E.g.: Full kitchen remodel including demo of existing cabinets, new custom cabinetry, quartz countertops, tile backsplash, appliance hookups, and painting…"
-                  rows={5}
-                  className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-purple-400 resize-none"
-                />
-              </div>
 
-              {/* Optional context fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Project Type (optional)
-                  </label>
-                  <select
-                    value={aiProjectType}
-                    onChange={e => setAIProjectType(e.target.value)}
-                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400"
-                  >
-                    <option value="">Select type…</option>
-                    <option value="Residential Remodel">Residential Remodel</option>
-                    <option value="New Construction">New Construction</option>
-                    <option value="Commercial">Commercial</option>
-                    <option value="Addition">Addition</option>
-                    <option value="Repair/Maintenance">Repair / Maintenance</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Square Footage (optional)
-                  </label>
-                  <input
-                    type="number"
-                    value={aiSqFt}
-                    onChange={e => setAISqFt(e.target.value)}
-                    placeholder="e.g. 1200"
-                    min={1}
-                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400"
-                  />
-                </div>
-              </div>
-
-              {/* Error */}
+              {/* Error — shown on every step */}
               {aiError && (
                 <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
                   <AlertCircle size={15} className="shrink-0" />
@@ -1357,21 +1417,189 @@ export function EstimateBuilderClient({
                 </div>
               )}
 
-              {/* Loading state */}
-              {aiGenerating && (
-                <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
-                  <Loader2 size={28} className="animate-spin text-purple-400" />
-                  <p className="text-sm font-medium">Claude is building your estimate…</p>
-                  <p className="text-xs text-gray-300">This may take 10–20 seconds</p>
+              {/* ── Step 1: scope ─────────────────────────────── */}
+              {aiStep === 'scope' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Project Scope
+                    </label>
+                    <textarea
+                      value={aiScope}
+                      onChange={e => setAIScope(e.target.value)}
+                      placeholder="Describe the work in detail. E.g.: Full hall bath remodel — demo existing tub and vanity, new tile shower with glass door, new vanity and toilet, tile floor, paint…"
+                      rows={6}
+                      className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-purple-400 resize-none"
+                    />
+                    <p className="text-[11px] text-gray-400">
+                      The more specific the scope, the better the job matching.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Project Type (optional)
+                      </label>
+                      <select
+                        value={aiProjectType}
+                        onChange={e => setAIProjectType(e.target.value)}
+                        className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400"
+                      >
+                        <option value="">Select type…</option>
+                        <option value="Residential Remodel">Residential Remodel</option>
+                        <option value="New Construction">New Construction</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Addition">Addition</option>
+                        <option value="Repair/Maintenance">Repair / Maintenance</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Square Footage (optional)
+                      </label>
+                      <input
+                        type="number"
+                        value={aiSqFt}
+                        onChange={e => setAISqFt(e.target.value)}
+                        placeholder="e.g. 1200"
+                        min={1}
+                        className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── Step 2: pick comparable jobs ──────────────── */}
+              {aiStep === 'comps' && (
+                <div className="space-y-3">
+                  {aiComparables.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+                      <History size={26} className="text-gray-300" />
+                      <p className="text-sm font-medium text-gray-500">No past estimates matched this scope</p>
+                      <p className="text-xs text-gray-400 max-w-sm">
+                        Either the wording is too different from past jobs, or these estimates
+                        have not been imported from SharePoint yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          {aiComparables.length} similar job{aiComparables.length !== 1 ? 's' : ''} found
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {aiSelectedComps.size} of {MAX_COMPS} selected
+                        </p>
+                      </div>
+
+                      {aiComparables.map(c => {
+                        const isChecked = aiSelectedComps.has(c.historical_estimate_id)
+                        const atCap = !isChecked && aiSelectedComps.size >= MAX_COMPS
+                        return (
+                          <label
+                            key={c.historical_estimate_id}
+                            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-colors ${
+                              isChecked ? 'border-purple-200 bg-purple-50/40'
+                              : atCap   ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
+                                        : 'border-gray-200 bg-white hover:border-gray-300 cursor-pointer'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={atCap}
+                              onChange={() => toggleComp(c.historical_estimate_id)}
+                              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 shrink-0 disabled:cursor-not-allowed"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-navy-800">{c.job_name}</p>
+                                {c.source_year && (
+                                  <span className="text-[10px] font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                    {c.source_year}
+                                  </span>
+                                )}
+                                {c.city && <span className="text-[11px] text-gray-400">{c.city}</span>}
+                              </div>
+
+                              {c.areas.length > 0 && (
+                                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                                  {c.areas.slice(0, 6).map(a => (
+                                    <span key={a} className="text-[10px] font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                                      {a}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {c.top_divisions.length > 0 && (
+                                <p className="text-[11px] text-gray-400 mt-1.5 truncate">
+                                  {c.top_divisions.map(d => `${d.division} ${fmt(d.total)}`).join(' · ')}
+                                </p>
+                              )}
+
+                              <p className="text-[11px] text-gray-400 mt-1">
+                                {c.line_count} line{c.line_count !== 1 ? 's' : ''}
+                                {c.web_url && (
+                                  <>
+                                    {' · '}
+                                    <a
+                                      href={c.web_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={e => e.stopPropagation()}
+                                      className="text-purple-600 hover:underline"
+                                    >
+                                      open source file
+                                    </a>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="shrink-0 text-right">
+                              <p className="text-sm font-semibold text-navy-800 tabular-nums">{fmt(c.total_cost)}</p>
+                              <p
+                                className={`text-[10px] mt-0.5 font-medium ${
+                                  c.match_strength === 'best'   ? 'text-green-600'
+                                  : c.match_strength === 'strong' ? 'text-gray-500'
+                                  : 'text-gray-400'
+                                }`}
+                              >
+                                {c.match_strength === 'best'   ? 'Best match'
+                                 : c.match_strength === 'strong' ? 'Strong match'
+                                 : 'Possible match'}
+                              </p>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* Suggested lines list */}
-              {!aiGenerating && aiSuggestedLines.length > 0 && (
+              {/* Generating spinner */}
+              {aiGenerating && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
+                  <Loader2 size={28} className="animate-spin text-purple-400" />
+                  <p className="text-sm font-medium">Building your estimate from {aiSelectedComps.size} past job{aiSelectedComps.size !== 1 ? 's' : ''}…</p>
+                  <p className="text-xs text-gray-300">This may take 15–30 seconds</p>
+                </div>
+              )}
+
+              {/* ── Step 3: review generated lines ────────────── */}
+              {aiStep === 'review' && !aiGenerating && aiSuggestedLines.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       {aiSuggestedLines.length} suggested lines
+                      <span className="ml-2 font-normal normal-case text-gray-400">
+                        {aiSuggestedLines.filter(l => l.source === 'comp').length} from past jobs,{' '}
+                        {aiSuggestedLines.filter(l => l.source === 'market').length} estimated
+                      </span>
                     </p>
                     <div className="flex gap-3 text-xs text-gray-400">
                       <button
@@ -1392,6 +1620,7 @@ export function EstimateBuilderClient({
                   {aiSuggestedLines.map((al, idx) => {
                     const total = al.quantity * al.unit_cost * (1 + al.markup_pct / 100)
                     const isChecked = aiSelectedLines.has(idx)
+                    const fromComp = al.source === 'comp'
                     return (
                       <label
                         key={idx}
@@ -1413,14 +1642,22 @@ export function EstimateBuilderClient({
                             <span className="text-[10px] font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
                               {al.phase}
                             </span>
+                            {/* Grounded vs. inferred is the thing a reviewer most needs to see. */}
+                            <span
+                              className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                fromComp ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {fromComp ? (al.comp_job_name ?? 'past job') : 'market estimate'}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
                             <span>{al.quantity} {al.uom}</span>
                             <span>@{fmt(al.unit_cost)}/{al.uom}</span>
                             <span className="text-gray-400">{al.markup_pct}% markup</span>
-                            {al.cost_code && (
-                              <span className="text-gray-400">{al.cost_code}</span>
-                            )}
+                            {al.cost_code && <span className="text-gray-400">{al.cost_code}</span>}
+                            {al.cost_type && <span className="text-gray-400">{al.cost_type}</span>}
+                            {al.area && <span className="text-gray-400">{al.area}</span>}
                           </div>
                           {al.rationale && (
                             <p className="text-[11px] text-gray-400 mt-1 italic">{al.rationale}</p>
@@ -1439,26 +1676,40 @@ export function EstimateBuilderClient({
             {/* Modal footer */}
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
               <button
-                onClick={() => setShowAIGenerate(false)}
+                onClick={() => {
+                  if (aiStep === 'comps')       { setAIStep('scope'); setAIError(null) }
+                  else if (aiStep === 'review') { setAIStep('comps'); setAIError(null) }
+                  else setShowAIGenerate(false)
+                }}
                 className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
               >
-                Cancel
+                {aiStep === 'scope' ? 'Cancel' : 'Back'}
               </button>
+
               <div className="flex items-center gap-2">
-                {aiSuggestedLines.length === 0 ? (
+                {aiStep === 'scope' && (
                   <button
-                    onClick={runAIGenerate}
-                    disabled={aiGenerating || !aiScope.trim()}
+                    onClick={findComparables}
+                    disabled={aiFinding || !aiScope.trim()}
                     className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
                   >
-                    {aiGenerating ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={14} />
-                    )}
-                    {aiGenerating ? 'Generating…' : 'Generate Estimate'}
+                    {aiFinding ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                    {aiFinding ? 'Searching…' : 'Find Similar Jobs'}
                   </button>
-                ) : (
+                )}
+
+                {aiStep === 'comps' && (
+                  <button
+                    onClick={runAIGenerate}
+                    disabled={aiGenerating || aiSelectedComps.size === 0}
+                    className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {aiGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                    {aiGenerating ? 'Generating…' : 'Build Estimate'}
+                  </button>
+                )}
+
+                {aiStep === 'review' && (
                   <>
                     <button
                       onClick={runAIGenerate}
@@ -1473,11 +1724,7 @@ export function EstimateBuilderClient({
                       disabled={aiAdding || aiSelectedLines.size === 0}
                       className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
                     >
-                      {aiAdding ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Plus size={14} />
-                      )}
+                      {aiAdding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                       {aiAdding ? 'Adding…' : `Add ${aiSelectedLines.size} Line${aiSelectedLines.size !== 1 ? 's' : ''}`}
                     </button>
                   </>
