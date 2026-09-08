@@ -151,10 +151,14 @@ export async function PUT(
           { status: 400 }
         )
       }
+      // Only live accounts can hold a number. Someone removed keeps their name on
+      // past work but shouldn't reserve a phone — otherwise replacing a duplicate
+      // account leaves its number permanently unusable by the person it belongs to.
       const { data: clash } = await admin
         .from('users')
         .select('id, full_name')
         .eq('phone', normalized)
+        .eq('is_active', true)
         .neq('id', id)
         .maybeSingle()
       if (clash) {
@@ -163,6 +167,16 @@ export async function PUT(
           { status: 400 }
         )
       }
+
+      // Take it off any removed account still holding it, so restoring that one
+      // later cannot resurrect a duplicate.
+      await admin
+        .from('users')
+        .update({ phone: null })
+        .eq('phone', normalized)
+        .eq('is_active', false)
+        .neq('id', id)
+
       updates.phone = normalized
     }
   }
