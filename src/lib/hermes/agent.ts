@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { askFixer, fixerApiConfigured } from './fixerApi'
 
 const WEBHOOK_URL = process.env.DISCORD_HERMES_WEBHOOK_URL ?? ''
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? ''
@@ -116,16 +117,50 @@ export async function* hermesStream(
     convId = conv?.id
   }
 
-  // Get or create this user's dedicated Discord thread
+  const content = jobId ? `${userMessage} [job:${jobId}]` : userMessage
+
+  // Preferred transport: Hermes' own HTTP API. The Discord relay below is the
+  // fallback for as long as HERMES_API_URL is unset — once the gateway is
+  // reachable, everything from here to the end of the polling loop goes away.
+  let reply = ''
+  if (fixerApiConfigured()) {
+    try {
+      reply = await askFixer(
+        content,
+        history.map(m => ({ role: m.role, content: m.content })),
+      )
+    } catch (e) {
+      yield { type: 'error', message: (e as Error).message }
+      return
+    }
+  } else {
+    reply = yield* askFixerOverDiscord(userId, userName, content, admin)
+    if (!reply) return
+  }
+
+  yield* finishTurn(admin, userId, convId!, userMessage, reply, history)
+}
+
+/**
+ * The original transport: post into the user's Discord thread and poll for the
+ * agent's reply. Superseded by the HTTP API — kept only until HERMES_API_URL is
+ * configured, then delete this and `getOrCreateThread`.
+ *
+ * Returns '' after yielding an error event, so the caller stops.
+ */
+async function* askFixerOverDiscord(
+  userId: string,
+  userName: string,
+  content: string,
+  admin: ReturnType<typeof createAdminClient>
+): AsyncGenerator<HermesStreamEvent, string> {
   let threadId: string
   try {
     threadId = await getOrCreateThread(userId, userName, admin)
   } catch (e) {
     yield { type: 'error', message: `Could not reach Discord: ${(e as Error).message}` }
-    return
+    return ''
   }
-
-  const content = jobId ? `${userMessage} [job:${jobId}]` : userMessage
 
   // Post to the user's thread as their real name
   const postResp = await fetch(`${WEBHOOK_URL}?wait=true&thread_id=${threadId}`, {
@@ -136,7 +171,7 @@ export async function* hermesStream(
 
   if (!postResp.ok) {
     yield { type: 'error', message: `Failed to reach Discord: ${postResp.status}` }
-    return
+    return ''
   }
 
   const posted = await postResp.json() as { id: string }
@@ -189,9 +224,24 @@ export async function* hermesStream(
 
   if (!reply) {
     yield { type: 'error', message: 'Hermes did not respond in time. Try again.' }
-    return
+    return ''
   }
 
+  return reply
+}
+
+/**
+ * Everything after the answer arrives, which is the same whichever transport
+ * produced it: surface any queued navigation, emit the reply, and store the turn.
+ */
+async function* finishTurn(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  convId: string,
+  userMessage: string,
+  reply: string,
+  history: StoredMessage[]
+): AsyncGenerator<HermesStreamEvent> {
   // Check for navigation queued by the navigate_to tool during this request
   const { data: userCtx } = await admin
     .from('hermes_user_context')
@@ -236,5 +286,5 @@ export async function* hermesStream(
     await admin.from('hermes_conversations').update({ messages: updatedHistory }).eq('id', convId)
   }
 
-  yield { type: 'done', conversationId: convId! }
+  yield { type: 'done', conversationId: convId }
 }
