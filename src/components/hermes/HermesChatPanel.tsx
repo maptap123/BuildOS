@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, Loader2, Bot, Mic } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSpeechInput } from '@/hooks/useSpeechInput'
+import { OPEN_FIXER_EVENT, type OpenFixerDetail } from '@/lib/hermes/openFixer'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -58,6 +59,26 @@ export function HermesChatPanel() {
       setTimeout(() => inputRef.current?.focus(), 150)
     }
   }, [open])
+
+  // Other pages hand work to Fixer by dispatching this event — see lib/hermes/openFixer.
+  useEffect(() => {
+    function onOpenRequest(e: Event) {
+      const draft = (e as CustomEvent<OpenFixerDetail>).detail?.draft
+      setOpen(true)
+      if (draft) {
+        setInput(draft)
+        // Runs after the panel's own focus effect so the caret lands at the end.
+        setTimeout(() => {
+          const el = inputRef.current
+          if (!el) return
+          el.focus()
+          el.setSelectionRange(el.value.length, el.value.length)
+        }, 200)
+      }
+    }
+    window.addEventListener(OPEN_FIXER_EVENT, onOpenRequest)
+    return () => window.removeEventListener(OPEN_FIXER_EVENT, onOpenRequest)
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
