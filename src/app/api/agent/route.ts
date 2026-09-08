@@ -52,6 +52,12 @@ import { timingSafeEqual } from 'crypto'
  *   create_change_order    { job_id, title, type, amount, reason? }
  *   list_actuals           { job_id, budget_line_id? }
  *   get_budget_summary     { job_id }
+ *
+ * Estimating — Fixer prices new work from JDC's own historical estimates rather than
+ * market rates. find_comparable_estimates first, then add_estimate_lines to write it:
+ *   find_comparable_estimates   { scope, limit? }
+ *   add_estimate_lines          { estimate_id, lines[] }
+ *
  *   list_daily_logs        { job_id, limit? }
  *   create_daily_log       { job_id, log_date?, work_performed, weather_summary?, manpower_count?, delays?, safety_notes?, inspection_notes? }
  *   search_across_jobs     { query, modules? }

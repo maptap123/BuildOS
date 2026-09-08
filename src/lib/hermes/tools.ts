@@ -208,6 +208,49 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'find_comparable_estimates',
+    description: 'Find past JDC estimates that resemble a described scope of work, and return their actual line items. This is the pricing basis for building a new estimate — reuse these cost codes, descriptions and unit costs rather than guessing market rates. Call this first whenever asked to build, draft or price an estimate, then write the result with add_estimate_lines.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        scope: { type: 'string', description: 'The work to price, in plain words. E.g. "full hall bath remodel — demo, tile shower, new vanity, tile floor, paint"' },
+        limit: { type: 'number', description: 'How many comparable jobs to return (default 3, max 5). Each carries its full line items, so keep this small.' },
+      },
+      required: ['scope'],
+    },
+  },
+  {
+    name: 'add_estimate_lines',
+    description: 'Append line items to an existing estimate. Use after find_comparable_estimates to write the estimate you built. Lines are appended, never replacing what is already there.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        estimate_id: { type: 'string' },
+        lines: {
+          type: 'array',
+          description: 'The line items to add, in the order they should appear.',
+          items: {
+            type: 'object' as const,
+            properties: {
+              description: { type: 'string' },
+              phase:       { type: 'string', description: 'e.g. Demo, Plumbing, Tile, Painting' },
+              cost_code:   { type: 'string', description: "JDC's own code from a comparable, e.g. \"14.1320.010\". Omit for a line no comparable covered." },
+              uom:         { type: 'string', description: 'EA, SF, LF, HR, LS, … (default EA)' },
+              quantity:    { type: 'number' },
+              unit_cost:   { type: 'number' },
+              markup_pct:  { type: 'number' },
+              source:      { type: 'string', enum: ['comp', 'market'], description: '"comp" when priced from a comparable job, "market" when no comparable covered it and you inferred the rate.' },
+              comp_estimate_id: { type: 'string', description: 'When source is "comp", the estimate_id of the comparable this line came from, as returned by find_comparable_estimates.' },
+              rationale:   { type: 'string', description: 'One sentence. For comp lines, which job and how you reasoned the quantity. For market lines, why no comparable covered it.' },
+            },
+            required: ['description'],
+          },
+        },
+      },
+      required: ['estimate_id', 'lines'],
+    },
+  },
+  {
     name: 'search_across_jobs',
     description: 'Search for something across all jobs, tasks, and schedule items.',
     input_schema: {
@@ -470,6 +513,148 @@ export async function executeTool(
       }).select().single()
       if (error) throw error
       return { log: data, message: 'Daily log created' }
+    }
+
+    case 'find_comparable_estimates': {
+      if (!await hasPerm(admin, userId, 'budget', 'can_view')) return { error: 'Permission denied' }
+      const scope = String(params.scope ?? '').trim()
+      if (!scope) return { error: 'scope required' }
+
+      const rawLimit = Number(params.limit ?? 3)
+      const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 5) : 3
+
+      const { data: matches, error: matchErr } = await admin.rpc('match_historical_estimates', {
+        scope_text:  scope,
+        match_limit: limit,
+      })
+      if (matchErr) throw matchErr
+      if (!matches?.length) {
+        return { comparables: [], message: 'No past estimates resembled that scope. Price from market rates and mark those lines source:"market".' }
+      }
+
+      const ids = (matches as { historical_estimate_id: string }[]).map(m => m.historical_estimate_id)
+
+      const { data: estimates } = await admin
+        .from('historical_estimates')
+        .select('id, job_id, display_name, client_name, source_year, total_cost, line_count, areas')
+        .in('id', ids)
+
+      const { data: lines } = await admin
+        .from('historical_estimate_lines')
+        .select('historical_estimate_id, cost_code, division_name, cost_type, area, description, uom, quantity, unit_cost, markup_pct')
+        .in('historical_estimate_id', ids)
+        .order('row_number')
+
+      // Preserve the RPC's relevance order — the .in() lookups come back arbitrarily ordered.
+      const byId = new Map((estimates ?? []).map(e => [e.id, e]))
+
+      return {
+        scope,
+        comparables: ids.map(id => {
+          const e = byId.get(id) as Record<string, unknown> | undefined
+          if (!e) return null
+          return {
+            estimate_id: id,
+            job_name:    e.display_name,
+            client_name: e.client_name,
+            year:        e.source_year,
+            total_cost:  Number(e.total_cost),
+            areas:       e.areas,
+            lines: (lines ?? [])
+              .filter(l => l.historical_estimate_id === id)
+              .map(l => ({
+                cost_code:   l.cost_code,
+                division:    l.division_name,
+                cost_type:   l.cost_type,
+                area:        l.area,
+                description: l.description,
+                uom:         l.uom,
+                quantity:    Number(l.quantity),
+                unit_cost:   Number(l.unit_cost),
+                markup_pct:  Number(l.markup_pct),
+              })),
+          }
+        }).filter(Boolean),
+        guidance: 'Build the new estimate from these line items. Reuse cost_code, description, uom, unit_cost and markup_pct verbatim; adjust quantity to the new scope. Only invent a line when the scope needs work no comparable covers, and mark it source:"market". Then call add_estimate_lines.',
+      }
+    }
+
+    case 'add_estimate_lines': {
+      if (!await hasPerm(admin, userId, 'budget', 'can_create')) return { error: 'Permission denied' }
+      const estimateId = String(params.estimate_id ?? '').trim()
+      if (!estimateId) return { error: 'estimate_id required' }
+
+      const incoming = Array.isArray(params.lines) ? params.lines as Record<string, unknown>[] : []
+      if (incoming.length === 0) return { error: 'lines required' }
+
+      // estimate_lines carries lead_id alongside estimate_id; take it from the estimate
+      // rather than trusting the agent to pass a matching one.
+      const { data: estimate, error: estErr } = await admin
+        .from('estimates')
+        .select('id, lead_id, title')
+        .eq('id', estimateId)
+        .single()
+      if (estErr || !estimate) return { error: 'Estimate not found' }
+
+      // Append after whatever is already on the estimate.
+      const { data: lastLine } = await admin
+        .from('estimate_lines')
+        .select('sort_order')
+        .eq('estimate_id', estimateId)
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const startOrder = Number((lastLine as { sort_order?: number } | null)?.sort_order ?? 0) + 1
+
+      // Map the comparable an agent cites back to its job, when it has one.
+      const compIds = [...new Set(incoming.map(l => trim(l.comp_estimate_id)).filter(Boolean) as string[])]
+      const compJobById = new Map<string, string | null>()
+      if (compIds.length > 0) {
+        const { data: comps } = await admin
+          .from('historical_estimates')
+          .select('id, job_id')
+          .in('id', compIds)
+        ;(comps ?? []).forEach(c => compJobById.set(c.id as string, (c.job_id as string | null) ?? null))
+      }
+
+      // These land in numeric columns — a missing or non-numeric field must not become NaN.
+      const num = (v: unknown, fallback: number): number => {
+        const n = Number(v)
+        return Number.isFinite(n) ? n : fallback
+      }
+
+      const rows = incoming
+        .filter(l => trim(l.description))
+        .map((l, i) => ({
+          estimate_id: estimateId,
+          lead_id:     estimate.lead_id,
+          description: String(l.description).trim(),
+          phase:       trim(l.phase),
+          cost_code:   trim(l.cost_code),
+          uom:         trim(l.uom) ?? 'EA',
+          quantity:    num(l.quantity, 1),
+          unit_cost:   num(l.unit_cost, 0),
+          markup_pct:  num(l.markup_pct, 0),
+          sort_order:  startOrder + i,
+          // estimate_lines.source is constrained to manual|catalog|assembly|ai_comp|ai_market;
+          // the agent speaks the same comp/market vocabulary the in-app generator uses.
+          source:      trim(l.source) === 'market' ? 'ai_market' : 'ai_comp',
+          comp_job_id: compJobById.get(trim(l.comp_estimate_id) ?? '') ?? null,
+          ai_rationale: trim(l.rationale),
+        }))
+
+      if (rows.length === 0) return { error: 'No lines had a description' }
+
+      const { data: inserted, error } = await admin.from('estimate_lines').insert(rows).select('id')
+      if (error) throw error
+
+      const total = rows.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
+      return {
+        added: inserted?.length ?? rows.length,
+        estimate: estimate.title,
+        estimated_cost: Math.round(total * 100) / 100,
+        message: `Added ${inserted?.length ?? rows.length} line items to "${estimate.title}".`,
+      }
     }
 
     case 'search_across_jobs': {
