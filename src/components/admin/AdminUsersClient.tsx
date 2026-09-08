@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ShieldCheck, Users, Save, RefreshCw, Search, UserPlus, X, Copy, Check, UserMinus, RotateCcw } from 'lucide-react'
 import type { PermissionModule, User, UserPermission } from '@/types'
 
@@ -91,6 +91,12 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+
+  // Editing name / email / phone on the selected person
+  const [details, setDetails] = useState<{ full_name: string; email: string; phone: string } | null>(null)
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [detailsSaved, setDetailsSaved] = useState(false)
   const [showRemoved, setShowRemoved] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
@@ -111,6 +117,19 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
 
   const selectedUser =
     filteredUsers.find(user => user.id === selectedUserId) ?? filteredUsers[0] ?? users[0]
+
+  // Load the selected person's details into the form, and drop any half-typed
+  // edit when switching to someone else so it cannot be saved onto the wrong user.
+  useEffect(() => {
+    if (!selectedUser) { setDetails(null); return }
+    setDetails({
+      full_name: selectedUser.full_name ?? '',
+      email:     selectedUser.email ?? '',
+      phone:     selectedUser.phone ?? '',
+    })
+    setDetailsError(null)
+    setDetailsSaved(false)
+  }, [selectedUser?.id])   // eslint-disable-line react-hooks/exhaustive-deps
 
   function getPermission(userId: string, module: PermissionModule) {
     return permissions[permissionKey(userId, module)] ?? { ...EMPTY_PERMISSION }
@@ -147,6 +166,38 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
       setError(e instanceof Error ? e.message : 'Permission update failed')
     } finally {
       setSavingKey(null)
+    }
+  }
+
+  // Name, email and phone for the selected person. Phone is what lets Fixer tell
+  // who is texting, so a blank one means that person reaches it as a stranger.
+  async function saveDetails(target: User) {
+    if (!details) return
+    setSavingDetails(true)
+    setDetailsError(null)
+    setDetailsSaved(false)
+    try {
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(details),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error ?? 'Could not save')
+
+      setUsers(prev => prev.map(u => (u.id === target.id ? { ...u, ...body } : u)))
+      // Show the stored value, not what was typed — the phone comes back normalized.
+      setDetails({
+        full_name: body.full_name ?? '',
+        email:     body.email ?? '',
+        phone:     body.phone ?? '',
+      })
+      setDetailsSaved(true)
+      setTimeout(() => setDetailsSaved(false), 2500)
+    } catch (e) {
+      setDetailsError(e instanceof Error ? e.message : 'Could not save')
+    } finally {
+      setSavingDetails(false)
     }
   }
 
@@ -442,6 +493,65 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
               </div>
             </div>
           </div>
+
+          {details && (
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/60">
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</span>
+                  <input
+                    type="text"
+                    value={details.full_name}
+                    onChange={e => setDetails({ ...details, full_name: e.target.value })}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</span>
+                  <input
+                    type="email"
+                    value={details.email}
+                    onChange={e => setDetails({ ...details, email: e.target.value })}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                  />
+                  <span className="text-xs text-gray-400">Also their sign-in address.</span>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</span>
+                  <input
+                    type="tel"
+                    value={details.phone}
+                    onChange={e => setDetails({ ...details, phone: e.target.value })}
+                    placeholder="513 555 0142"
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy-900 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                  />
+                  <span className="text-xs text-gray-400">
+                    {details.phone.trim()
+                      ? 'How Fixer knows who is texting.'
+                      : 'Without this, their texts reach Fixer as an unknown number.'}
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => saveDetails(selectedUser)}
+                  disabled={savingDetails}
+                  className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-800 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                >
+                  {savingDetails ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  {savingDetails ? 'Saving…' : 'Save details'}
+                </button>
+                {detailsSaved && (
+                  <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
+                    <Check size={14} /> Saved
+                  </span>
+                )}
+                {detailsError && <span className="text-sm text-red-600">{detailsError}</span>}
+              </div>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px]">
