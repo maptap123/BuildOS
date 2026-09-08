@@ -15,6 +15,7 @@ import {
 } from '@/lib/schedule/assignments'
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
+import { findLinePricing } from '@/lib/estimates/linePricing'
 
 /**
  * POST /api/agent
@@ -56,6 +57,7 @@ import { timingSafeEqual } from 'crypto'
  * Estimating — Fixer prices new work from JDC's own historical estimates rather than
  * market rates. find_comparable_estimates first, then add_estimate_lines to write it:
  *   find_comparable_estimates   { scope, limit? }
+ *   find_line_pricing           { item, limit? }   — one item across every past estimate
  *   add_estimate_lines          { estimate_id, lines[] }
  *
  *   list_daily_logs        { job_id, limit? }
@@ -721,6 +723,13 @@ export async function POST(request: Request) {
         })
       }
 
+      case 'find_line_pricing': {
+        if (!await hasPerm('budget', 'can_view')) return permError()
+        const item = String(params.item ?? '').trim()
+        if (!item) return NextResponse.json({ error: 'item required' }, { status: 400 })
+        return ok(await findLinePricing(admin, item, Number(params.limit ?? 15)))
+      }
+
       case 'add_estimate_lines': {
         if (!await hasPerm('budget', 'can_create')) return permError()
         const estimateId = String(params.estimate_id ?? '').trim()
@@ -810,7 +819,7 @@ export async function POST(request: Request) {
             'check_sms_sender','approve_sms_sender','list_pending_sms_senders',
             'list_budget','get_budget_summary','list_change_orders','create_change_order','list_actuals',
             'list_daily_logs','create_daily_log',
-            'find_comparable_estimates','add_estimate_lines',
+            'find_comparable_estimates','find_line_pricing','add_estimate_lines',
             'search_across_jobs',
           ],
         }, { status: 400 })

@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notify, getJobNotifyTargets } from '@/lib/notifications'
+import { findLinePricing } from '@/lib/estimates/linePricing'
 
 // ─── Tool schemas for Claude ──────────────────────────────────────────────────
 
@@ -217,6 +218,18 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
         limit: { type: 'number', description: 'How many comparable jobs to return (default 3, max 5). Each carries its full line items, so keep this small.' },
       },
       required: ['scope'],
+    },
+  },
+  {
+    name: 'find_line_pricing',
+    description: "Look up how JDC has actually priced one specific item across every past estimate, newest first. Use this when find_comparable_estimates did not surface a line you need — comparables match whole jobs, so a specialty item (glass shower enclosure, heated floor, a particular fixture) is often priced on a job that is otherwise nothing like this one. Prefer a real price from here over inventing a market rate.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        item:  { type: 'string', description: 'The item to price, in the words the estimate would use. E.g. "glass shower enclosure", "shower hinge door", "bath fan".' },
+        limit: { type: 'number', description: 'Max lines to return (default 15, max 40).' },
+      },
+      required: ['item'],
     },
   },
   {
@@ -577,6 +590,13 @@ export async function executeTool(
         }).filter(Boolean),
         guidance: 'Build the new estimate from these line items. Reuse cost_code, description, uom, unit_cost and markup_pct verbatim; adjust quantity to the new scope. Only invent a line when the scope needs work no comparable covers, and mark it source:"market". Then call add_estimate_lines.',
       }
+    }
+
+    case 'find_line_pricing': {
+      if (!await hasPerm(admin, userId, 'budget', 'can_view')) return { error: 'Permission denied' }
+      const item = String(params.item ?? '').trim()
+      if (!item) return { error: 'item required' }
+      return await findLinePricing(admin, item, Number(params.limit ?? 15))
     }
 
     case 'add_estimate_lines': {
