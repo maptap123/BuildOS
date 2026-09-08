@@ -52,6 +52,12 @@ import { timingSafeEqual } from 'crypto'
  *   create_change_order    { job_id, title, type, amount, reason? }
  *   list_actuals           { job_id, budget_line_id? }
  *   get_budget_summary     { job_id }
+ *
+ * Estimating — Fixer prices new work from JDC's own historical estimates rather than
+ * market rates. find_comparable_estimates first, then add_estimate_lines to write it:
+ *   find_comparable_estimates   { scope, limit? }
+ *   add_estimate_lines          { estimate_id, lines[] }
+ *
  *   list_daily_logs        { job_id, limit? }
  *   create_daily_log       { job_id, log_date?, work_performed, weather_summary?, manpower_count?, delays?, safety_notes?, inspection_notes? }
  *   search_across_jobs     { query, modules? }
@@ -656,6 +662,143 @@ export async function POST(request: Request) {
         return ok({ results, query: q })
       }
 
+      // ─── ESTIMATING ─────────────────────────────────────────────────────
+      // Fixer prices new work from JDC's own past estimates rather than market
+      // rates: find the comparables, build from their lines, write the result.
+      case 'find_comparable_estimates': {
+        if (!await hasPerm('budget', 'can_view')) return permError()
+        const scope = String(params.scope ?? '').trim()
+        if (!scope) return NextResponse.json({ error: 'scope required' }, { status: 400 })
+
+        const rawLimit = Number(params.limit ?? 3)
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 5) : 3
+
+        const { data: matches, error: matchErr } = await admin.rpc('match_historical_estimates', {
+          scope_text:  scope,
+          match_limit: limit,
+        })
+        if (matchErr) throw matchErr
+        if (!matches?.length) {
+          return ok({ comparables: [], message: 'No past estimates resembled that scope. Price from market rates and mark those lines source:"market".' })
+        }
+
+        const ids = (matches as { historical_estimate_id: string }[]).map(m => m.historical_estimate_id)
+        const [{ data: estimates }, { data: lines }] = await Promise.all([
+          admin.from('historical_estimates')
+            .select('id, display_name, client_name, source_year, total_cost, areas')
+            .in('id', ids),
+          admin.from('historical_estimate_lines')
+            .select('historical_estimate_id, cost_code, division_name, cost_type, area, description, uom, quantity, unit_cost, markup_pct')
+            .in('historical_estimate_id', ids)
+            .order('row_number'),
+        ])
+
+        // Preserve the RPC's relevance order — .in() comes back arbitrarily ordered.
+        const byId = new Map((estimates ?? []).map(e => [e.id, e as Record<string, unknown>]))
+
+        return ok({
+          scope,
+          comparables: ids.flatMap(id => {
+            const e = byId.get(id)
+            if (!e) return []
+            return [{
+              estimate_id: id,
+              job_name:    e.display_name,
+              client_name: e.client_name,
+              year:        e.source_year,
+              total_cost:  Number(e.total_cost),
+              areas:       e.areas,
+              lines: (lines ?? [])
+                .filter(l => l.historical_estimate_id === id)
+                .map(l => ({
+                  cost_code: l.cost_code, division: l.division_name, cost_type: l.cost_type,
+                  area: l.area, description: l.description, uom: l.uom,
+                  quantity: Number(l.quantity), unit_cost: Number(l.unit_cost), markup_pct: Number(l.markup_pct),
+                })),
+            }]
+          }),
+          guidance: 'Build the new estimate from these line items. Reuse cost_code, description, uom, unit_cost and markup_pct verbatim; adjust quantity to the new scope. Only invent a line when the scope needs work no comparable covers, and mark it source:"market". Then call add_estimate_lines.',
+        })
+      }
+
+      case 'add_estimate_lines': {
+        if (!await hasPerm('budget', 'can_create')) return permError()
+        const estimateId = String(params.estimate_id ?? '').trim()
+        if (!estimateId) return NextResponse.json({ error: 'estimate_id required' }, { status: 400 })
+
+        const incoming = Array.isArray(params.lines) ? params.lines as Record<string, unknown>[] : []
+        if (incoming.length === 0) return NextResponse.json({ error: 'lines required' }, { status: 400 })
+
+        // lead_id comes off the estimate rather than the agent, so a mismatched
+        // one cannot attach lines to the wrong lead.
+        const { data: estimate, error: estErr } = await admin
+          .from('estimates')
+          .select('id, lead_id, title')
+          .eq('id', estimateId)
+          .single()
+        if (estErr || !estimate) return NextResponse.json({ error: 'Estimate not found' }, { status: 404 })
+
+        const { data: lastLine } = await admin
+          .from('estimate_lines')
+          .select('sort_order')
+          .eq('estimate_id', estimateId)
+          .order('sort_order', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const startOrder = Number((lastLine as { sort_order?: number } | null)?.sort_order ?? 0) + 1
+
+        const str = (v: unknown): string | null => {
+          if (typeof v !== 'string') return null
+          const s = v.trim()
+          return s || null
+        }
+
+        const compIds = [...new Set(incoming.map(l => str(l.comp_estimate_id)).filter(Boolean) as string[])]
+        const compJobById = new Map<string, string | null>()
+        if (compIds.length > 0) {
+          const { data: comps } = await admin.from('historical_estimates').select('id, job_id').in('id', compIds)
+          ;(comps ?? []).forEach(c => compJobById.set(c.id as string, (c.job_id as string | null) ?? null))
+        }
+
+        // These land in numeric columns — a missing or non-numeric value must not become NaN.
+        const num = (v: unknown, fallback: number): number => {
+          const n = Number(v)
+          return Number.isFinite(n) ? n : fallback
+        }
+
+        const rows = incoming
+          .filter(l => str(l.description))
+          .map((l, i) => ({
+            estimate_id: estimateId,
+            lead_id:     estimate.lead_id,
+            description: String(l.description).trim(),
+            phase:       str(l.phase),
+            cost_code:   str(l.cost_code),
+            uom:         str(l.uom) ?? 'EA',
+            quantity:    num(l.quantity, 1),
+            unit_cost:   num(l.unit_cost, 0),
+            markup_pct:  num(l.markup_pct, 0),
+            sort_order:  startOrder + i,
+            // source is constrained to manual|catalog|assembly|ai_comp|ai_market.
+            source:      str(l.source) === 'market' ? 'ai_market' : 'ai_comp',
+            comp_job_id: compJobById.get(str(l.comp_estimate_id) ?? '') ?? null,
+            ai_rationale: str(l.rationale),
+          }))
+
+        if (rows.length === 0) return NextResponse.json({ error: 'No lines had a description' }, { status: 400 })
+
+        const { data: inserted, error } = await admin.from('estimate_lines').insert(rows).select('id')
+        if (error) throw error
+
+        const total = rows.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
+        return ok({
+          added: inserted?.length ?? rows.length,
+          estimate: estimate.title,
+          estimated_cost: Math.round(total * 100) / 100,
+          message: `Added ${inserted?.length ?? rows.length} line items to "${estimate.title}".`,
+        })
+      }
+
       default:
         return NextResponse.json({
           error: `Unknown tool: ${tool}`,
@@ -667,6 +810,7 @@ export async function POST(request: Request) {
             'check_sms_sender','approve_sms_sender','list_pending_sms_senders',
             'list_budget','get_budget_summary','list_change_orders','create_change_order','list_actuals',
             'list_daily_logs','create_daily_log',
+            'find_comparable_estimates','add_estimate_lines',
             'search_across_jobs',
           ],
         }, { status: 400 })
