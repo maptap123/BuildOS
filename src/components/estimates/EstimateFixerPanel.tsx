@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bot, Loader2, Send, Sparkles, Square, Trash2, Check, AlertTriangle } from 'lucide-react'
-import { useFixerChat, formatElapsed } from '@/hooks/useFixerChat'
+import { Bot, Loader2, Send, Sparkles, Trash2, Check, AlertTriangle } from 'lucide-react'
+import { formatElapsed } from '@/hooks/useFixerChat'
+import { useEstimateFixer } from '@/hooks/useEstimateFixer'
 import type { EstimateLineProposal } from '@/types'
 
 /**
@@ -13,10 +14,8 @@ import type { EstimateLineProposal } from '@/types'
  * thread per estimate, and hands back priced lines for review rather than writing them
  * where nobody sees them.
  *
- * The review step is why this exists. Before each turn it opens a proposal session
- * (/api/estimate-lines/proposals/session), which makes add_estimate_lines stage into
- * estimate_line_proposals instead of estimate_lines. Nothing lands until the estimator
- * checks it off.
+ * Requests are saved per user and estimate before server execution begins.
+ * The worker always stages proposed lines; browser lifetime is irrelevant.
  *
  * Line names are not Fixer's to write. Every proposed name is copied from the past line
  * or cost code it cites; anything it could not source arrives blank and unpriced, for a
@@ -77,7 +76,6 @@ export function EstimateFixerPanel({
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const storageKey = `fixer:estimate:${estimateId}`
 
   const loadProposals = useCallback(async () => {
     try {
@@ -105,16 +103,8 @@ export function EstimateFixerPanel({
   }, [loadProposals, onLinesChanged])
 
   const {
-    messages, input, setInput, loading, elapsedMs, send, stop,
-  } = useFixerChat({
-    estimateId,
-    initialConversationId:
-      typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) ?? undefined : undefined,
-    onTurnComplete: handleTurnComplete,
-    onConversationId: useCallback((id: string) => {
-      try { sessionStorage.setItem(storageKey, id) } catch { /* private mode */ }
-    }, [storageKey]),
-  })
+    messages, input, setInput, loading, elapsedMs, send, error: requestError, status,
+  } = useEstimateFixer(estimateId, handleTurnComplete)
 
   // Anything left over from a previous visit is still waiting to be reviewed.
   useEffect(() => { void loadProposals() }, [loadProposals])
@@ -135,24 +125,11 @@ export function EstimateFixerPanel({
     }, 100)
   }, [seedDraft, setInput, onSeedConsumed])
 
-  /**
-   * Opening the session first is what makes this panel's turns reviewable. If it fails
-   * the turn still runs — Fixer just writes directly, the way the floating panel does.
-   */
   const sendWithReview = useCallback(async (text: string) => {
-    if (!text.trim() || loading) return
+    if (!text.trim() || loading || isLocked || !canCreate) return
     setPanelError(null)
-    try {
-      await fetch('/api/estimate-lines/proposals/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estimate_id: estimateId }),
-      })
-    } catch {
-      // Non-fatal by design; see above.
-    }
     await send(text)
-  }, [send, loading, estimateId])
+  }, [send, loading, isLocked, canCreate])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -483,14 +460,7 @@ export function EstimateFixerPanel({
             className="flex-1 bg-transparent text-xs text-navy-900 placeholder-gray-400 resize-none outline-none max-h-40 leading-5 py-0.5 disabled:opacity-50"
           />
           {loading ? (
-            <button
-              onClick={stop}
-              className="w-7 h-7 rounded-lg bg-gray-200 hover:bg-gray-300 text-navy-900 flex items-center justify-center shrink-0 transition-colors"
-              aria-label="Stop Fixer"
-              title="Stop"
-            >
-              <Square size={11} />
-            </button>
+            <Loader2 size={16} className="animate-spin text-gray-400 shrink-0" aria-label={status ?? 'Loading'} />
           ) : (
             <button
               onClick={() => void sendWithReview(input)}
@@ -502,9 +472,11 @@ export function EstimateFixerPanel({
             </button>
           )}
         </div>
+        {requestError && <p role="alert" className="text-xs text-red-700 mt-2">{requestError}</p>}
+        <p className="text-[10px] text-gray-500 mt-2">Once saved, you can close this browser or turn off your computer. Return to this estimate for the answer and proposed lines.</p>
         {loading && (
           <p className="text-[10px] text-gray-400 text-center mt-1.5">
-            Working — {formatElapsed(elapsedMs)}. Pricing a full scope can take a few minutes.
+            {status} {elapsedMs > 0 && `— ${formatElapsed(elapsedMs)}`}
           </p>
         )}
       </div>

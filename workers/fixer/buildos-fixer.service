@@ -1,0 +1,20 @@
+[Unit]
+Description=BuildOS durable Fixer worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+WorkingDirectory=/opt/buildos-fixer
+EnvironmentFile=/etc/buildos-fixer.env
+ExecStart=/opt/hermes/venv/bin/python /opt/buildos-fixer/worker.py
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

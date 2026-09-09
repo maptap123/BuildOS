@@ -67,3 +67,7 @@ ruvector.db
 
 # Supabase CLI local scratch (can contain pooler connection strings)
 supabase/.temp/
+
+# Python worker bytecode and private runtime state
+workers/**/__pycache__/
+workers/fixer/state/

@@ -5,10 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 /**
  * The Fixer conversation, without the chrome
  * =========================================
- * Both Fixer surfaces — the floating panel and the one built into the Estimate
- * Builder — talk to the same SSE endpoint and parse the same five event types. That
- * loop lived twice already and the copies had drifted (one had no abort, no error
- * branch), so it lives here now and the panels only decide how it looks.
+ * The floating Fixer panel uses this interactive SSE transport. The Estimate
+ * Builder uses useEstimateFixer instead, with saved requests executed by a
+ * supervised server worker independently of the browser.
  *
  * `elapsedMs` exists because the gateway answers in one shot: an estimating turn can
  * sit silent for minutes, and a spinner with no clock reads as a hang.

@@ -14,7 +14,9 @@ import {
   type AssignmentContext,
 } from '@/lib/schedule/assignments'
 import { NextResponse } from 'next/server'
-import { timingSafeEqual, randomUUID } from 'crypto'
+import { timingSafeEqual, randomUUID, createHash } from 'crypto'
+import { BACKGROUND_TOOLS, canUseBackground, UUID } from '@/lib/hermes/background'
+import { canonicalJson } from '@/lib/hermes/requestPayload'
 import { findLinePricing } from '@/lib/estimates/linePricing'
 import { mergeCostTypeRows, toCost, unitCostFrom } from '@/lib/estimates/costBreakdown'
 
@@ -90,6 +92,11 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const { tool, params = {} } = body
+
+  const background = 'background' in authResult ? authResult.background : undefined
+  if (background && (!BACKGROUND_TOOLS.has(tool) || (tool === 'add_estimate_lines' && params.estimate_id !== background.estimate_id))) {
+    return NextResponse.json({ error: 'This request can only research pricing and propose lines for its own estimate' }, { status: 403 })
+  }
 
   if (!tool || typeof tool !== 'string') {
     return NextResponse.json({ error: 'tool name required' }, { status: 400 })
@@ -747,6 +754,16 @@ export async function POST(request: Request) {
           .single()
         if (estErr || !estimate) return NextResponse.json({ error: 'Estimate not found' }, { status: 404 })
 
+        if (background) {
+          const drafts = await buildAiEstimateLines(admin, incoming, 0)
+          const { data: count, error } = await admin.rpc('stage_fixer_lines', {
+            p_request: background.id, p_lease: background.lease_token,
+            p_hash: createHash('sha256').update(canonicalJson(incoming)).digest('hex'), p_lines: drafts,
+          })
+          if (error) throw error
+          return ok({ proposed: count, message: 'Lines saved for human review. Nothing has been added to the estimate. Unsourced lines need a name and price before approval.' })
+        }
+
         // Is someone sitting in the builder waiting to review these? If so they get
         // staged for approval instead of landing on the estimate. See migration 042.
         const { data: session } = await admin
@@ -1312,6 +1329,20 @@ async function authenticateAgentRequest(
   const configuredKey = process.env.HERMES_JDC_API_KEY
   const authHeader = request.headers.get('authorization')
   const bearerToken = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]
+
+  if (bearerToken?.startsWith('fixer.')) {
+    const [, id, lease] = bearerToken.split('.')
+    if (!UUID.test(id ?? '') || !UUID.test(lease ?? '')) {
+      return { response: NextResponse.json({ error: 'Invalid request credential' }, { status: 401 }) }
+    }
+    const { data: job } = await admin.from('fixer_requests').select('id,user_id,estimate_id,lease_token')
+      .eq('id', id).eq('lease_token', lease).eq('status', 'running')
+      .gt('lease_until', new Date().toISOString()).gt('deadline', new Date().toISOString()).maybeSingle()
+    if (!job || !await canUseBackground(admin, job.user_id)) {
+      return { response: NextResponse.json({ error: 'Request expired or access revoked' }, { status: 403 }) }
+    }
+    return { user: { id: job.user_id }, background: job }
+  }
 
   if (configuredKey && bearerToken && safeTokenEqual(bearerToken, configuredKey)) {
     const hermesUserId = process.env.HERMES_JDC_USER_ID

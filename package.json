@@ -10,7 +10,11 @@
     "bt:import": "tsx scripts/bt-timeclock-import.ts",
     "bt:import:dry": "tsx scripts/bt-timeclock-import.ts --dry-run",
     "bt:import:file": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json",
-    "bt:import:file:dry": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json --dry-run"
+    "bt:import:file:dry": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json --dry-run",
+    "test:fixer": "tsx scripts/test-fixer.ts",
+    "test:fixer:routes": "tsx scripts/test-fixer-routes.ts",
+    "test:fixer:browser": "tsx scripts/test-fixer-browser.ts",
+    "test:fixer:fixture": "tsx scripts/fixer-browser-fixture.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
@@ -25,11 +29,14 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "^1.60.0",
+    "@tailwindcss/node": "4.3.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "0.27.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "pg": "^8.20.0",

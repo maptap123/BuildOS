@@ -958,6 +958,7 @@ export function EstimateBuilderClient({
 
             {leftTab === 'fixer' ? (
               <EstimateFixerPanel
+                key={activeEstimate.id}
                 estimateId={activeEstimate.id}
                 scopeText={scopeText}
                 canCreate={permissions.can_create}
