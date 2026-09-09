@@ -6,6 +6,7 @@ import {
   unitCostFrom,
   type CostBreakdown,
 } from './costBreakdown'
+import { costCodeVariants, normalizeCostCode } from './costCodes'
 
 /**
  * Turning what Fixer cites into priced estimate lines
@@ -164,7 +165,8 @@ export async function buildAiEstimateLines(
     codes.length
       ? admin.from('cost_catalog')
           .select('id, cost_code, title, uom, unit_cost, labor_cost, material_cost, sub_cost')
-          .in('cost_code', codes)
+          // Both spellings: the cost book writes `14.3000.`, the workbooks `14.3040`.
+          .in('cost_code', costCodeVariants(codes))
       : Promise.resolve(empty),
     // Last resort: the model retyped a name that really is in the vocabulary. Accept it,
     // but snap to the stored spelling so the estimate stays internally consistent.
@@ -185,7 +187,7 @@ export async function buildAiEstimateLines(
   const rows = (r: { data: unknown }) => (r.data ?? []) as Record<string, unknown>[]
 
   const byLineId = new Map(rows(sourceLines).map(r => [r.id as string, r]))
-  const byCode = new Map(rows(catalogItems).map(r => [norm(r.cost_code as string), r]))
+  const byCode = new Map(rows(catalogItems).map(r => [normalizeCostCode(r.cost_code as string), r]))
 
   const byName = new Map<string, Record<string, unknown>>()
   // First match wins, so a repeated description resolves the same way every run.
@@ -207,7 +209,7 @@ export async function buildAiEstimateLines(
     const citedName = str(l.description)
 
     const sourceLine = citedLine ? byLineId.get(citedLine) : undefined
-    const catalogItem = !sourceLine && citedCode ? byCode.get(norm(citedCode)) : undefined
+    const catalogItem = !sourceLine && citedCode ? byCode.get(normalizeCostCode(citedCode)) : undefined
     const namedMatch = !sourceLine && !catalogItem && citedName ? byName.get(norm(citedName)) : undefined
 
     return { line: l, citedCode, citedName, sourceLine, catalogItem, namedMatch }

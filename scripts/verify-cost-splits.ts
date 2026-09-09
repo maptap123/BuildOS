@@ -19,6 +19,7 @@ import {
   splitOrDefault, unitCostFrom, reconcileLineUpdate, lineUnitCost, mergeCostTypeRows,
 } from '../src/lib/estimates/costBreakdown'
 import { fetchGroupSplits, groupKey } from '../src/lib/estimates/aiLines'
+import { costCodeVariants, normalizeCostCode } from '../src/lib/estimates/costCodes'
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 const envFile = path.resolve(__dirname, '../.env.local')
@@ -103,6 +104,23 @@ function pureTests() {
   check('an update that does not touch price is passed through', () => {
     const merged = reconcileLineUpdate({ description: 'Remove kitchen sink' }, {})
     assert.deepEqual(merged, { description: 'Remove kitchen sink' })
+  })
+
+  console.log('\nCost codes')
+
+  check('the cost book trailing dot is not a different code', () => {
+    // `02.4000.` in cost_catalog, `02.4000` in the workbooks — the same item.
+    assert.equal(normalizeCostCode('02.4000.'), normalizeCostCode('02.4000'))
+    assert.equal(normalizeCostCode(' 14.3000. '), '14.3000')
+    assert.equal(normalizeCostCode('18.0070.AA0'), '18.0070.aa0') // an inner dot is real
+    assert.equal(normalizeCostCode(null), '')
+  })
+
+  check('a lookup asks for both spellings', () => {
+    const v = costCodeVariants(['02.4000'])
+    assert.ok(v.includes('02.4000'))
+    assert.ok(v.includes('02.4000.'))
+    assert.equal(costCodeVariants(['02.4000', '02.4000.']).length, 2) // deduplicated
   })
 
   console.log('\nDisplay')
@@ -190,6 +208,33 @@ async function liveTests() {
   check(`a pair set wider than one request still resolves whole (${widePairs.length} pairs)`, () => {
     const missing = widePairs.filter(p => !wideSplits.has(groupKey(p.historical_estimate_id, p.row_number)))
     assert.equal(missing.length, 0, `${missing.length} of ${widePairs.length} pairs went missing`)
+  })
+
+  console.log('\nCost book reachability (live)')
+
+  const { data: coded, error: codedErr } = await admin
+    .from('estimate_lines')
+    .select('cost_code')
+    .not('cost_code', 'is', null)
+  if (codedErr) throw codedErr
+
+  const wantedCodes = [...new Set((coded ?? []).map(r => String(r.cost_code)))]
+  const { data: book, error: bookErr } = await admin
+    .from('cost_catalog')
+    .select('cost_code')
+    .in('cost_code', costCodeVariants(wantedCodes))
+  if (bookErr) throw bookErr
+
+  const bookCodes = new Set((book ?? []).map(r => normalizeCostCode(r.cost_code as string)))
+
+  check(`most line cost codes reach the cost book (${wantedCodes.length} codes)`, () => {
+    const found = wantedCodes.filter(c => bookCodes.has(normalizeCostCode(c)))
+    // Compared literally this was 4 of 56 — the trailing dot made a line report that its
+    // code "isn't in the cost book" while the entry sat right there.
+    assert.ok(
+      found.length > wantedCodes.length / 2,
+      `only ${found.length} of ${wantedCodes.length} codes resolved`
+    )
   })
 
   console.log('\nStored invariant (live)')

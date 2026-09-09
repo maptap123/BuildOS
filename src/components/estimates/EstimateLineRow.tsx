@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Search, Loader2 } from 'lucide-react'
 import type { EstimateLine } from '@/types'
 import { hasBreakdown, lineUnitCost } from '@/lib/estimates/costBreakdown'
+import { normalizeCostCode } from '@/lib/estimates/costCodes'
 
 interface Props {
   line: EstimateLine
@@ -253,8 +254,10 @@ function CatalogPriceSection({
       .then((items: CatalogEntry[]) => {
         if (cancelled) return
         // The search matches titles too, so pick the row whose code is actually this one.
+        // Normalized because the cost book writes a trailing dot and the workbooks do not.
+        const wanted = normalizeCostCode(code)
         const hit = Array.isArray(items)
-          ? items.find(i => i.cost_code?.trim().toLowerCase() === code.toLowerCase())
+          ? items.find(i => normalizeCostCode(i.cost_code) === wanted)
           : undefined
         if (!hit) { setStatus('missing'); return }
         setEntry(hit)
