@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const admin = createAdminClient()
   let query = admin
     .from('cost_catalog')
-    .select('id, cost_code, division_num, division_name, phase, title, uom, unit_cost, labor_cost, material_cost, cost_type')
+    .select('id, cost_code, division_num, division_name, phase, title, uom, unit_cost, labor_cost, material_cost, sub_cost, cost_type')
     .eq('is_active', true)
     .order('division_num')
     .order('cost_code')

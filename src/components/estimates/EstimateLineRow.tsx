@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Search, Loader2 } from 'lucide-react'
 import type { EstimateLine } from '@/types'
-import { hasBreakdown, unitCostFrom } from '@/lib/estimates/costBreakdown'
+import { hasBreakdown, lineUnitCost } from '@/lib/estimates/costBreakdown'
 
 interface Props {
   line: EstimateLine
@@ -37,7 +37,7 @@ const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
 
 function lineBuilderCost(line: EstimateLine): number {
-  return line.quantity * line.unit_cost
+  return line.quantity * lineUnitCost(line)
 }
 
 /**
@@ -212,6 +212,182 @@ function PriceLookupSection({ line, onChange }: Pick<Props, 'line' | 'onChange'>
   )
 }
 
+interface CatalogEntry {
+  id: string
+  cost_code: string
+  title: string
+  uom: string
+  unit_cost: number
+  labor_cost: number
+  material_cost: number
+  sub_cost: number
+}
+
+/**
+ * Correcting the cost book from inside an estimate.
+ *
+ * Kept visibly apart from the line edit above it because the two do different things: the
+ * line edit prices this job, this changes what every estimate written from here on picks
+ * up for the code. JDC's prices move — the same enclosure was $2,000 in 2024 and $3,000 in
+ * 2026 — so a correction has to land somewhere future estimates will read it, not only on
+ * the line in front of you. Estimates already written keep their own copy either way.
+ */
+function CatalogPriceSection({
+  line, onChange,
+}: {
+  line: EstimateLine
+  onChange: Props['onChange']
+}) {
+  const code = line.cost_code?.trim() ?? ''
+  const [entry, setEntry] = useState<CatalogEntry | null>(null)
+  const [draft, setDraft] = useState({ labor_cost: '', material_cost: '', sub_cost: '' })
+  const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'saving' | 'saved'>('loading')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!code) { setStatus('missing'); return }
+    let cancelled = false
+    setStatus('loading')
+    fetch(`/api/cost-catalog?q=${encodeURIComponent(code)}&limit=50`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((items: CatalogEntry[]) => {
+        if (cancelled) return
+        // The search matches titles too, so pick the row whose code is actually this one.
+        const hit = Array.isArray(items)
+          ? items.find(i => i.cost_code?.trim().toLowerCase() === code.toLowerCase())
+          : undefined
+        if (!hit) { setStatus('missing'); return }
+        setEntry(hit)
+        setDraft({
+          labor_cost:    String(hit.labor_cost ?? 0),
+          material_cost: String(hit.material_cost ?? 0),
+          sub_cost:      String(hit.sub_cost ?? 0),
+        })
+        setStatus('ready')
+      })
+      .catch(() => { if (!cancelled) setStatus('missing') })
+    return () => { cancelled = true }
+  }, [code])
+
+  const n = (v: string) => { const x = Number(v); return Number.isFinite(x) ? x : 0 }
+  const draftTotal = n(draft.labor_cost) + n(draft.material_cost) + n(draft.sub_cost)
+
+  async function save(applyToLine: boolean) {
+    if (!entry) return
+    setStatus('saving')
+    setError(null)
+    try {
+      const res = await fetch(`/api/cost-catalog/${entry.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          labor_cost:    n(draft.labor_cost),
+          material_cost: n(draft.material_cost),
+          sub_cost:      n(draft.sub_cost),
+        }),
+      })
+      const updated = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(updated.error ?? 'Failed to save the cost book')
+      setEntry(updated)
+      if (applyToLine) {
+        onChange(line.id, 'labor_cost', updated.labor_cost)
+        onChange(line.id, 'material_cost', updated.material_cost)
+        onChange(line.id, 'sub_cost', updated.sub_cost)
+      }
+      setStatus('saved')
+      setTimeout(() => setStatus('ready'), 2500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save the cost book')
+      setStatus('ready')
+    }
+  }
+
+  if (status === 'loading') {
+    return (
+      <p className="text-[11px] text-gray-400 flex items-center gap-1">
+        <Loader2 size={11} className="animate-spin" /> Looking up the cost book…
+      </p>
+    )
+  }
+
+  if (!entry) {
+    return (
+      <p className="text-[11px] text-gray-400">
+        {code
+          ? `Cost code ${code} isn't in the cost book, so there is no shared price to change.`
+          : 'No cost code on this line, so there is no cost book price to change.'}
+      </p>
+    )
+  }
+
+  const busy = status === 'saving'
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-3">
+      <div className="flex items-baseline justify-between mb-2 gap-2">
+        <p className="text-[11px] font-semibold text-navy-700">
+          Cost book price
+          <span className="ml-1.5 font-mono text-gray-400">{entry.cost_code}</span>
+        </p>
+        <p className="text-[10px] text-gray-400 whitespace-nowrap">
+          now {fmt(entry.unit_cost)} / {entry.uom}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {([
+          ['labor_cost', 'Labor'],
+          ['material_cost', 'Material'],
+          ['sub_cost', 'Sub'],
+        ] as const).map(([field, label]) => (
+          <label key={field} className="block">
+            <span className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">{label}</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={draft[field]}
+              onChange={e => setDraft(d => ({ ...d, [field]: e.target.value }))}
+              className="w-full text-sm text-right text-navy-700 bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-gold-400 tabular-nums"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+        <p className="text-[11px] text-gray-500">
+          New unit cost{' '}
+          <span className="font-semibold text-navy-800 tabular-nums">{fmt(draftTotal)}</span>
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => save(false)}
+            disabled={busy}
+            className="text-[11px] font-semibold text-navy-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Save to cost book'}
+          </button>
+          <button
+            onClick={() => save(true)}
+            disabled={busy}
+            className="text-[11px] font-semibold text-white bg-navy-700 rounded px-2 py-1 hover:bg-navy-800 disabled:opacity-50"
+          >
+            Save &amp; apply here
+          </button>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-gray-400 mt-1.5">
+        Changes what future estimates price this code at. Estimates already written keep their own price.
+      </p>
+      {status === 'saved' && (
+        <p className="text-[11px] text-green-600 font-semibold mt-1">Cost book updated.</p>
+      )}
+      {error && <p className="text-[11px] text-red-600 mt-1">{error}</p>}
+    </div>
+  )
+}
+
 export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }: Props) {
   const [expanded, setExpanded] = useState(false)
   // Once a line is priced in buckets, the unit cost is their sum and is not typed.
@@ -345,7 +521,7 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
               className="text-sm text-right text-navy-700 tabular-nums block"
               title={split ? 'Labor + material + sub' : undefined}
             >
-              {fmt(split ? unitCostFrom(line) ?? line.unit_cost : line.unit_cost)}
+              {fmt(lineUnitCost(line))}
             </span>
           )}
         </td>
@@ -420,6 +596,7 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
               </>
             )}
 
+            {canEdit && <CatalogPriceSection line={line} onChange={onChange} />}
             {canEdit && <PriceLookupSection line={line} onChange={onChange} />}
           </td>
         </tr>
@@ -521,7 +698,7 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
             />
           ) : (
             <span className="block text-sm text-navy-700 tabular-nums py-1.5">
-              {fmt(split ? unitCostFrom(line) ?? line.unit_cost : line.unit_cost)}
+              {fmt(lineUnitCost(line))}
             </span>
           )}
         </label>
@@ -636,6 +813,7 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
             </>
           )}
 
+          {canEdit && <CatalogPriceSection line={line} onChange={onChange} />}
           {canEdit && <PriceLookupSection line={line} onChange={onChange} />}
         </div>
       )}

@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { BREAKDOWN_FIELDS, withDerivedUnitCost } from '@/lib/estimates/costBreakdown'
+import { BREAKDOWN_FIELDS, reconcileLineUpdate, touchesPricing } from '@/lib/estimates/costBreakdown'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -35,13 +35,13 @@ export async function PATCH(request: Request, { params }: Params) {
   // A partial update can set labor without mentioning material, so the stored buckets
   // are needed to recompute unit_cost from the whole line rather than half of it.
   let merged = updates
-  if (BREAKDOWN_FIELDS.some(f => f in updates)) {
+  if (touchesPricing(updates)) {
     const { data: current } = await admin
       .from('estimate_lines')
       .select('labor_cost, material_cost, sub_cost')
       .eq('id', id)
       .maybeSingle()
-    merged = withDerivedUnitCost(updates, current ?? undefined)
+    merged = reconcileLineUpdate(updates, current ?? undefined)
   }
 
   const { data, error } = await admin

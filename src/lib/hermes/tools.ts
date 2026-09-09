@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notify, getJobNotifyTargets } from '@/lib/notifications'
 import { findLinePricing } from '@/lib/estimates/linePricing'
+import { buildAiEstimateLines } from '@/lib/estimates/aiLines'
 
 // ─── Tool schemas for Claude ──────────────────────────────────────────────────
 
@@ -627,54 +628,58 @@ export async function executeTool(
         .maybeSingle()
       const startOrder = Number((lastLine as { sort_order?: number } | null)?.sort_order ?? 0) + 1
 
-      // Map the comparable an agent cites back to its job, when it has one.
-      const compIds = [...new Set(incoming.map(l => trim(l.comp_estimate_id)).filter(Boolean) as string[])]
-      const compJobById = new Map<string, string | null>()
-      if (compIds.length > 0) {
-        const { data: comps } = await admin
-          .from('historical_estimates')
-          .select('id, job_id')
-          .in('id', compIds)
-        ;(comps ?? []).forEach(c => compJobById.set(c.id as string, (c.job_id as string | null) ?? null))
+      // Resolve and price through the same builder the in-app dispatcher uses. This used
+      // to be a hand-rolled map that wrote a bare unit_cost and dropped the labor/material/
+      // sub split, source_line_id and comp attribution entirely — so an estimate built over
+      // SMS came out unreadable while the same request in the app came out right.
+      const drafts = await buildAiEstimateLines(admin, incoming, startOrder)
+      if (drafts.length === 0) return { error: 'No lines to add' }
+
+      const sourced = drafts.filter(d => d.name_status === 'sourced')
+      const unsourced = drafts.filter(d => d.name_status === 'unsourced')
+
+      // Nobody is sitting in a review list over SMS, so an unsourceable line is refused
+      // rather than guessed at. Mirrors the unattended path in api/agent/route.ts.
+      if (unsourced.length > 0) {
+        return {
+          error: 'Unsourced lines cannot be added directly',
+          needs_naming: unsourced.map(d => d.suggested_description ?? '(no description)'),
+          message: `${unsourced.length} line${unsourced.length === 1 ? '' : 's'} matched no past JDC line or cost code. Every line has to carry a line_id from find_comparable_estimates / find_line_pricing, or a cost_code from the cost book — JDC's line names are a fixed vocabulary and must not be reworded or invented. Re-send only the lines you can cite, and tell the estimator what you could not price.`,
+        }
       }
 
-      // These land in numeric columns — a missing or non-numeric field must not become NaN.
-      const num = (v: unknown, fallback: number): number => {
-        const n = Number(v)
-        return Number.isFinite(n) ? n : fallback
-      }
-
-      const rows = incoming
-        .filter(l => trim(l.description))
-        .map((l, i) => ({
+      const { data: inserted, error } = await admin
+        .from('estimate_lines')
+        .insert(sourced.map(d => ({
           estimate_id: estimateId,
           lead_id:     estimate.lead_id,
-          description: String(l.description).trim(),
-          phase:       trim(l.phase),
-          cost_code:   trim(l.cost_code),
-          uom:         trim(l.uom) ?? 'EA',
-          quantity:    num(l.quantity, 1),
-          unit_cost:   num(l.unit_cost, 0),
-          markup_pct:  num(l.markup_pct, 0),
-          sort_order:  startOrder + i,
-          // estimate_lines.source is constrained to manual|catalog|assembly|ai_comp|ai_market;
-          // the agent speaks the same comp/market vocabulary the in-app generator uses.
-          source:      trim(l.source) === 'market' ? 'ai_market' : 'ai_comp',
-          comp_job_id: compJobById.get(trim(l.comp_estimate_id) ?? '') ?? null,
-          ai_rationale: trim(l.rationale),
-        }))
-
-      if (rows.length === 0) return { error: 'No lines had a description' }
-
-      const { data: inserted, error } = await admin.from('estimate_lines').insert(rows).select('id')
+          description: d.description,
+          phase:       d.phase,
+          cost_code:   d.cost_code,
+          uom:         d.uom,
+          quantity:    d.quantity,
+          unit_cost:   d.unit_cost,
+          labor_cost:  d.labor_cost,
+          material_cost: d.material_cost,
+          sub_cost:    d.sub_cost,
+          markup_pct:  d.markup_pct,
+          sort_order:  d.sort_order,
+          source:      d.source,
+          source_line_id: d.source_line_id,
+          cost_item_id: d.cost_item_id,
+          comp_job_id: d.comp_job_id,
+          comp_label:  d.comp_label,
+          ai_rationale: d.ai_rationale,
+        })))
+        .select('id')
       if (error) throw error
 
-      const total = rows.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
+      const total = sourced.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
       return {
-        added: inserted?.length ?? rows.length,
+        added: inserted?.length ?? sourced.length,
         estimate: estimate.title,
         estimated_cost: Math.round(total * 100) / 100,
-        message: `Added ${inserted?.length ?? rows.length} line items to "${estimate.title}".`,
+        message: `Added ${inserted?.length ?? sourced.length} line items to "${estimate.title}".`,
       }
     }
 

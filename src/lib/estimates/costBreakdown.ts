@@ -9,9 +9,12 @@
  *
  *     unit_cost = labor_cost + material_cost + sub_cost
  *
- * A line with no breakdown at all (typed by hand, or from an assembly) keeps its own
- * unit_cost and leaves the buckets null. That is why this returns null rather than 0
- * when nothing is set: 0 would silently zero out a hand-priced line.
+ * `unitCostFrom` returns null rather than 0 for a line with no buckets at all, because 0
+ * would silently zero out a hand-priced line mid-update.
+ *
+ * Nothing reaches `estimate_lines` in that state, though: every write path runs the line
+ * through `splitOrDefault` first, so a stored line always has a split its unit cost adds
+ * up to. See that function for where an unexplained price lands.
  */
 
 export interface CostBreakdown {
@@ -41,6 +44,31 @@ function round(n: number): number {
 
 export function hasBreakdown(b: Partial<CostBreakdown>): boolean {
   return BREAKDOWN_FIELDS.some(f => toCost(b[f]) !== null)
+}
+
+/**
+ * The complete split for a line about to be stored.
+ *
+ * Every estimate line carries one. A bare unit cost with three empty buckets is what made
+ * the Schroeder estimate unreadable — the number was right, but nothing said what it was
+ * made of. When the split is genuinely unknown the whole unit cost becomes material: it is
+ * the only bucket that asserts nothing further about the work, where labor would imply
+ * crew hours and sub would imply a subcontractor who does not exist.
+ *
+ * Buckets win over the unit cost whenever there are any, matching `withDerivedUnitCost`.
+ */
+export function splitOrDefault(
+  unitCost: unknown,
+  b?: Partial<CostBreakdown> | null
+): CostBreakdown {
+  if (b && hasBreakdown(b)) {
+    return {
+      labor_cost:    toCost(b.labor_cost),
+      material_cost: toCost(b.material_cost),
+      sub_cost:      toCost(b.sub_cost),
+    }
+  }
+  return { labor_cost: null, material_cost: round(toCost(unitCost) ?? 0), sub_cost: null }
 }
 
 /**
@@ -78,6 +106,46 @@ export function withDerivedUnitCost(
     // All three cleared: fall back to whatever unit_cost the caller sent, or leave it.
     ...(derived === null ? {} : { unit_cost: derived }),
   }
+}
+
+/**
+ * The unit cost to display and to total with.
+ *
+ * One helper because the row and the Summary panel used to read different fields — the
+ * row showed the buckets' sum while the totals added up the stored `unit_cost`. They
+ * agree now and the database enforces it, but nothing should be reading two sources for
+ * one number.
+ */
+export function lineUnitCost(line: Partial<CostBreakdown> & { unit_cost: number }): number {
+  return unitCostFrom(line) ?? line.unit_cost
+}
+
+/** True when an update changes the price, and so needs the stored buckets to reconcile. */
+export function touchesPricing(updates: Record<string, unknown>): boolean {
+  return BREAKDOWN_FIELDS.some(f => f in updates) || 'unit_cost' in updates
+}
+
+/**
+ * Reconciles a partial line update against what is stored, so unit_cost and the buckets
+ * can never be written out of step. Both PATCH endpoints go through here — the query-param
+ * one and the `[id]` one — because two copies of this rule is how they drift.
+ *
+ * - buckets in the update → unit_cost is recomputed from the merged three
+ * - only a unit cost → the stored split keeps the price if it has one, otherwise the
+ *   number becomes material. unit_cost is a sum, never an independently typed field.
+ */
+export function reconcileLineUpdate(
+  updates: Record<string, unknown>,
+  current?: Partial<CostBreakdown>
+): Record<string, unknown> {
+  if (BREAKDOWN_FIELDS.some(f => f in updates)) {
+    return withDerivedUnitCost(updates, current)
+  }
+  if ('unit_cost' in updates) {
+    const split = splitOrDefault(updates.unit_cost, current)
+    return { ...updates, ...split, unit_cost: unitCostFrom(split) ?? 0 }
+  }
+  return updates
 }
 
 // ── Reading the imported workbooks ───────────────────────────────────────────

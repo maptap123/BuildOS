@@ -1,6 +1,7 @@
 'use client'
 
 import type { EstimateLine } from '@/types'
+import { lineUnitCost } from '@/lib/estimates/costBreakdown'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
@@ -10,8 +11,8 @@ interface Props {
 }
 
 export function EstimateTotals({ lines }: Props) {
-  const builderCost = lines.reduce((s, l) => s + l.quantity * l.unit_cost, 0)
-  const markup      = lines.reduce((s, l) => s + l.quantity * l.unit_cost * (l.markup_pct / 100), 0)
+  const builderCost = lines.reduce((s, l) => s + l.quantity * lineUnitCost(l), 0)
+  const markup      = lines.reduce((s, l) => s + l.quantity * lineUnitCost(l) * (l.markup_pct / 100), 0)
   const total       = builderCost + markup
   const marginPct   = total > 0 ? (markup / total) * 100 : 0
 
@@ -43,7 +44,7 @@ export function EstimateTotals({ lines }: Props) {
           {Array.from(
             lines.reduce((map, l) => {
               const phase = l.phase ?? 'Unassigned'
-              const lineTotal = l.quantity * l.unit_cost * (1 + l.markup_pct / 100)
+              const lineTotal = l.quantity * lineUnitCost(l) * (1 + l.markup_pct / 100)
               map.set(phase, (map.get(phase) ?? 0) + lineTotal)
               return map
             }, new Map<string, number>())

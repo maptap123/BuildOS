@@ -11,6 +11,7 @@
     "bt:import:dry": "tsx scripts/bt-timeclock-import.ts --dry-run",
     "bt:import:file": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json",
     "bt:import:file:dry": "tsx scripts/bt-timeclock-import.ts --from-file scripts/bt-shifts-raw.json --dry-run",
+    "test:cost-splits": "tsx scripts/verify-cost-splits.ts",
     "test:fixer": "tsx scripts/test-fixer.ts",
     "test:fixer:routes": "tsx scripts/test-fixer-routes.ts",
     "test:fixer:browser": "tsx scripts/test-fixer-browser.ts",

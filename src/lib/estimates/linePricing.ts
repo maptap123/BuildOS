@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { mergeCostTypeRows } from './costBreakdown'
+import { fetchGroupSplits, groupKey } from './aiLines'
 
 /**
  * Line-level pricing lookup
@@ -73,7 +74,7 @@ interface RawRow {
 }
 
 /** Identifies one workbook line across the rows the importer split it into. */
-const groupKey = (r: RawRow) => `${r.historical_estimate_id}:${r.row_number}`
+const keyOf = (r: RawRow) => groupKey(r.historical_estimate_id, r.row_number)
 
 export async function findLinePricing(
   admin: SupabaseClient,
@@ -136,31 +137,24 @@ export async function findLinePricing(
   // workbook line. Pull in every sibling of every winner so each one is priced whole
   // rather than as two half-priced duplicates.
   const winners = new Map<string, RawRow>()
-  for (const r of raw) if (!winners.has(groupKey(r))) winners.set(groupKey(r), r)
+  for (const r of raw) if (!winners.has(keyOf(r))) winners.set(keyOf(r), r)
 
-  const siblings = new Map<string, RawRow[]>()
-  if (winners.size > 0) {
-    const estimateIds = [...new Set([...winners.values()].map(r => r.historical_estimate_id))]
-    const rowNumbers = [...new Set([...winners.values()].map(r => r.row_number))]
-    const { data: sibRows } = await admin
-      .from('historical_estimate_lines')
-      .select(SELECT)
-      .in('historical_estimate_id', estimateIds)
-      .in('row_number', rowNumbers)
-    // The two `in` filters are a cross product, so keep only the exact pairs wanted.
-    for (const r of (sibRows ?? []) as unknown as RawRow[]) {
-      const key = groupKey(r)
-      if (!winners.has(key)) continue
-      const bucket = siblings.get(key)
-      if (bucket) bucket.push(r)
-      else siblings.set(key, [r])
-    }
-  }
+  // Asks for the exact (estimate, row) pairs. Crossing `.in(estimate_ids)` with
+  // `.in(row_numbers)` looks equivalent and is not — it truncates once the product
+  // outgrows PostgREST's row cap, which is what left two thirds of an estimate with no
+  // labor/material/sub split at all.
+  const splits = await fetchGroupSplits(
+    admin,
+    [...winners.values()].map(r => ({
+      historical_estimate_id: r.historical_estimate_id,
+      row_number: r.row_number,
+    }))
+  )
 
   const rows: LinePricingRow[] = [...winners.entries()]
     .map(([key, r]) => {
-      const group = siblings.get(key) ?? [r]
-      const costs = mergeCostTypeRows(group.map(g => ({ cost_type: g.cost_type, unit_cost: g.unit_cost })))
+      const costs = splits.get(key)
+        ?? mergeCostTypeRows([{ cost_type: r.cost_type, unit_cost: r.unit_cost }])
       return {
         line_id:     r.id,
         job_name:    r.historical_estimates?.display_name ?? null,
