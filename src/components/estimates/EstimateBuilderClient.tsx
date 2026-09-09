@@ -23,14 +23,12 @@ import {
   Lock,
   Unlock,
   TrendingUp,
-  History,
-  Search,
 } from 'lucide-react'
 import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow, EstimateLineCard } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
+import { EstimateFixerPanel } from './EstimateFixerPanel'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
-import { openFixerWith } from '@/lib/hermes/openFixer'
 
 interface Permissions {
   can_create: boolean
@@ -154,7 +152,10 @@ export function EstimateBuilderClient({
   const [error, setError]                     = useState<string | null>(null)
   const [successMsg, setSuccessMsg]           = useState<string | null>(null)
   const [creating, setCreating]               = useState(false)
-  const [showCatalog, setShowCatalog]         = useState(true)
+  // The left column is Fixer or the catalog, never both — they are two ways to do the
+  // same job, and side by side neither got the room to be usable.
+  const [leftTab, setLeftTab]                 = useState<'fixer' | 'catalog'>('catalog')
+  const [fixerSeed, setFixerSeed]             = useState<string | null>(null)
   const [dirtyLines, setDirtyLines]           = useState<Set<string>>(new Set())
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
 
@@ -217,8 +218,19 @@ export function EstimateBuilderClient({
   }, [dirtyLines, saveLinesSilently])
 
 
-  /** The model is sent the full line detail of each comp, so the selection is capped. */
-  const MAX_COMPS = 5
+  // Fixer's approved lines are written server-side, so the table has to be told.
+  const reloadLines = useCallback(async () => {
+    const est = activeEstimateRef.current
+    if (!est) return
+    try {
+      const res = await fetch(`/api/estimate-lines?estimate_id=${est.id}`)
+      if (!res.ok) return
+      setLines(await res.json())
+      setDirtyLines(new Set())
+    } catch {
+      // Leave what is on screen; the next edit or save will reconcile.
+    }
+  }, [])
 
   // ── Create a new estimate ──────────────────────────────────────
   async function createEstimate() {
@@ -536,16 +548,19 @@ export function EstimateBuilderClient({
   function askFixerToDraft() {
     if (!activeEstimate) return
     const scope = (scopeText ?? '').trim()
-    openFixerWith(
+    setLeftTab('fixer')
+    setFixerSeed(
       [
         scope
           ? `Draft an estimate for this scope: ${scope}`
           : 'Draft an estimate for this job. Ask me for the scope if you need it.',
-        `Price it from comparable past JDC jobs, then add the lines to estimate ${activeEstimate.id}.`,
-        'Tell me which jobs you priced from before you add anything.',
+        'Price it from comparable past JDC jobs.',
+        'Tell me which jobs you priced from.',
       ].join('\n\n')
     )
   }
+
+  const clearFixerSeed = useCallback(() => setFixerSeed(null), [])
 
   const groupedLines    = groupByPhase(lines)
   const totalBuilderCost = lines.reduce((s, l) => s + l.quantity * l.unit_cost, 0)
@@ -866,7 +881,7 @@ export function EstimateBuilderClient({
       {activeEstimate && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-          {/* Left: Cost catalog */}
+          {/* Left: Fixer and the cost catalog, one at a time. Totals stay put. */}
           <div className="lg:col-span-1 space-y-3">
             {activeEstimate.is_locked && (
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
@@ -874,14 +889,31 @@ export function EstimateBuilderClient({
                 Estimate is locked. Unlock to make changes.
               </div>
             )}
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setShowCatalog(v => !v)}
-                className="flex items-center gap-1.5 text-sm font-medium text-navy-700 hover:text-navy-900 transition-colors"
-              >
-                {showCatalog ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                Cost Catalog
-              </button>
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setLeftTab('fixer')}
+                  className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                    leftTab === 'fixer'
+                      ? 'bg-white text-navy-900 shadow-sm'
+                      : 'text-gray-500 hover:text-navy-700'
+                  }`}
+                >
+                  <Sparkles size={12} />
+                  Fixer
+                </button>
+                <button
+                  onClick={() => setLeftTab('catalog')}
+                  className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                    leftTab === 'catalog'
+                      ? 'bg-white text-navy-900 shadow-sm'
+                      : 'text-gray-500 hover:text-navy-700'
+                  }`}
+                >
+                  Catalog
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 {permissions.can_create && !activeEstimate.is_locked && (
                   <button
@@ -913,9 +945,21 @@ export function EstimateBuilderClient({
                 )}
               </div>
             </div>
-            {showCatalog && (
+
+            {leftTab === 'fixer' ? (
+              <EstimateFixerPanel
+                estimateId={activeEstimate.id}
+                scopeText={scopeText}
+                canCreate={permissions.can_create}
+                isLocked={activeEstimate.is_locked}
+                seedDraft={fixerSeed}
+                onSeedConsumed={clearFixerSeed}
+                onLinesChanged={reloadLines}
+              />
+            ) : (
               <CostCatalogSearch onSelect={permissions.can_create && !activeEstimate.is_locked ? addCatalogItem : () => {}} />
             )}
+
             <EstimateTotals lines={lines} />
           </div>
 

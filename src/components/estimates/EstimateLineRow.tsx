@@ -43,6 +43,24 @@ function lineTotal(line: EstimateLine): number {
   return lineBuilderCost(line) * (1 + line.markup_pct / 100)
 }
 
+/**
+ * Marks a line Fixer priced. The comp it came from is recorded on the row, so the
+ * attribution outlives the chat thread that produced it.
+ */
+function AiSourceBadge({ line }: { line: EstimateLine }) {
+  if (line.source !== 'ai_comp' && line.source !== 'ai_market') return null
+  const title = line.ai_rationale
+    ?? (line.source === 'ai_market' ? 'Fixer priced this at market rate' : 'Fixer priced this from a past JDC job')
+  return (
+    <span
+      title={title}
+      className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded whitespace-nowrap"
+    >
+      {line.source === 'ai_market' ? 'Fixer · market' : 'Fixer · comp'}
+    </span>
+  )
+}
+
 async function persistVisibility(id: string, client_visible: boolean) {
   await fetch(`/api/estimate-lines/${id}`, {
     method:  'PATCH',
@@ -202,6 +220,9 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
               Internal only
             </span>
           )}
+          <span className="ml-2 inline-block align-middle">
+            <AiSourceBadge line={line} />
+          </span>
         </td>
 
         {/* phase */}
@@ -374,6 +395,7 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
                 Internal only
               </span>
             )}
+            <AiSourceBadge line={line} />
           </div>
         </div>
         {canEdit && (

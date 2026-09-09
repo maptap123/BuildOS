@@ -25,6 +25,9 @@ interface ChatCompletionResponse {
   error?: { message?: string } | string
 }
 
+/** Falls back to 4 minutes, comfortably inside the chat route's 300s maxDuration. */
+const DEFAULT_TIMEOUT_MS = Number(process.env.FIXER_TIMEOUT_MS) || 240_000
+
 /**
  * Sends a turn to Fixer and returns its reply.
  *
@@ -32,13 +35,16 @@ interface ChatCompletionResponse {
  * session state too, but passing history makes a reply reproducible from what BuildOS
  * stored rather than depending on which session the gateway happens to be holding.
  *
- * @param timeoutMs defaults to 55s to stay inside the caller route's 60s maxDuration
- *                  on Vercel. Raise both together for work that runs longer.
+ * @param timeoutMs must stay under the caller route's maxDuration, or Vercel kills the
+ *                  function before this abort can turn into a readable message. Three
+ *                  budgets have to move together: this one, `maxDuration` on
+ *                  /api/hermes/chat, and `maxDuration` on /api/agent — the gateway calls
+ *                  back into that one for every tool, inside this same window.
  */
 export async function askFixer(
   message: string,
   history: FixerMessage[] = [],
-  timeoutMs = 55_000
+  timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<string> {
   const base = process.env.HERMES_API_URL
   const key = process.env.HERMES_API_KEY
@@ -75,7 +81,13 @@ export async function askFixer(
     return reply
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error(`Fixer did not respond within ${Math.round(timeoutMs / 1000)}s`)
+      // Naming the minutes alone left people retrying the same oversized ask. The way
+      // out of this is a smaller turn, so say that.
+      const mins = Math.max(1, Math.round(timeoutMs / 60_000))
+      throw new Error(
+        `Fixer is still working — this turn ran past ${mins} minute${mins === 1 ? '' : 's'}. ` +
+        'Try it in smaller pieces: find comparable jobs first, then price one phase at a time.'
+      )
     }
     throw e
   } finally {

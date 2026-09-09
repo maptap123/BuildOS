@@ -1,16 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, Loader2, Bot, Mic } from 'lucide-react'
+import { MessageCircle, X, Send, Loader2, Bot, Mic, Square } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSpeechInput } from '@/hooks/useSpeechInput'
+import { useFixerChat, formatElapsed } from '@/hooks/useFixerChat'
 import { OPEN_FIXER_EVENT, type OpenFixerDetail } from '@/lib/hermes/openFixer'
-
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  streaming?: boolean
-}
 
 function extractJobId(pathname: string): string | undefined {
   const segments = pathname.split('/').filter(Boolean)
@@ -39,14 +34,21 @@ export function HermesChatPanel() {
   const jobId = extractJobId(pathname)
 
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<string | undefined>()
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
+
+  const handleNavigate = useCallback((url: string) => {
+    router.push(url)
+    setTimeout(() => setOpen(false), 400)
+  }, [router])
+
+  // The conversation itself lives in the hook — this component is the floating chrome
+  // around it. The Estimate Builder's panel uses the same hook with estimate context.
+  const { messages, input, setInput, loading, elapsedMs, send, stop } = useFixerChat({
+    jobId,
+    onNavigate: handleNavigate,
+  })
 
   // Voice input — appends the recognized phrase to the draft message
   const speech = useSpeechInput(text => {
@@ -78,113 +80,15 @@ export function HermesChatPanel() {
     }
     window.addEventListener(OPEN_FIXER_EVENT, onOpenRequest)
     return () => window.removeEventListener(OPEN_FIXER_EVENT, onOpenRequest)
-  }, [])
+  }, [setInput])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const send = useCallback(async (text: string) => {
-    const msg = text.trim()
-    if (!msg || loading) return
-
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: msg }])
-    setLoading(true)
-
-    // Append a streaming assistant message placeholder
-    setMessages(prev => [...prev, { role: 'assistant', content: '', streaming: true }])
-
-    abortRef.current = new AbortController()
-
-    try {
-      const res = await fetch('/api/hermes/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, conversation_id: conversationId, job_id: jobId }),
-        signal: abortRef.current.signal,
-      })
-
-      if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: 'Failed to reach Fixer' }))
-        setMessages(prev => {
-          const next = [...prev]
-          next[next.length - 1] = { role: 'assistant', content: err.error ?? 'Something went wrong.' }
-          return next
-        })
-        return
-      }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const event = JSON.parse(line.slice(6))
-
-            if (event.type === 'delta') {
-              setMessages(prev => {
-                const next = [...prev]
-                const last = next[next.length - 1]
-                if (last?.role === 'assistant') {
-                  next[next.length - 1] = { ...last, content: last.content + event.text, streaming: true }
-                }
-                return next
-              })
-            }
-
-            if (event.type === 'navigate') {
-              router.push(event.url)
-              setTimeout(() => setOpen(false), 400)
-            }
-
-            if (event.type === 'done') {
-              setConversationId(event.conversationId)
-              setMessages(prev => {
-                const next = [...prev]
-                const last = next[next.length - 1]
-                if (last?.role === 'assistant') {
-                  next[next.length - 1] = { ...last, streaming: false }
-                }
-                return next
-              })
-            }
-
-            if (event.type === 'error') {
-              setMessages(prev => {
-                const next = [...prev]
-                next[next.length - 1] = { role: 'assistant', content: event.message ?? 'Fixer encountered an error.' }
-                return next
-              })
-            }
-          } catch {
-            // malformed SSE line — skip
-          }
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return
-      setMessages(prev => {
-        const next = [...prev]
-        next[next.length - 1] = { role: 'assistant', content: 'Connection lost. Please try again.' }
-        return next
-      })
-    } finally {
-      setLoading(false)
-      abortRef.current = null
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }, [loading, conversationId, jobId, router])
+  useEffect(() => {
+    if (!loading) setTimeout(() => inputRef.current?.focus(), 50)
+  }, [loading])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -194,7 +98,7 @@ export function HermesChatPanel() {
   }
 
   function handleClose() {
-    abortRef.current?.abort()
+    stop()
     setOpen(false)
   }
 
@@ -295,14 +199,18 @@ export function HermesChatPanel() {
                   max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap
                   ${msg.role === 'user'
                     ? 'bg-navy-900 text-white rounded-br-sm'
-                    : 'bg-gray-100 text-navy-900 rounded-bl-sm'
+                    : msg.failed
+                      ? 'bg-red-50 text-red-800 rounded-bl-sm'
+                      : 'bg-gray-100 text-navy-900 rounded-bl-sm'
                   }
                 `}
               >
                 {msg.content || (msg.streaming && (
                   <span className="flex items-center gap-1 text-gray-400">
                     <Loader2 size={12} className="animate-spin" />
-                    <span className="text-xs">Thinking…</span>
+                    <span className="text-xs">
+                      {elapsedMs >= 5000 ? `Working — ${formatElapsed(elapsedMs)}` : 'Thinking…'}
+                    </span>
                   </span>
                 ))}
                 {msg.streaming && msg.content && (
@@ -348,10 +256,9 @@ export function HermesChatPanel() {
                 el.style.height = `${el.scrollHeight}px`
               }}
             />
-            {speech.supported && (
+            {speech.supported && !loading && (
               <button
                 onClick={speech.toggle}
-                disabled={loading}
                 className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                   speech.listening
                     ? 'bg-red-500 text-white animate-pulse'
@@ -362,17 +269,25 @@ export function HermesChatPanel() {
                 <Mic size={14} />
               </button>
             )}
-            <button
-              onClick={() => send(input)}
-              disabled={!input.trim() || loading}
-              className="w-7 h-7 rounded-lg bg-gold-500 hover:bg-gold-600 text-navy-900 flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              aria-label="Send message"
-            >
-              {loading
-                ? <Loader2 size={14} className="animate-spin" />
-                : <Send size={14} />
-              }
-            </button>
+            {loading ? (
+              <button
+                onClick={stop}
+                className="w-7 h-7 rounded-lg bg-gray-200 hover:bg-gray-300 text-navy-900 flex items-center justify-center shrink-0 transition-colors"
+                aria-label="Stop Fixer"
+                title="Stop"
+              >
+                <Square size={12} />
+              </button>
+            ) : (
+              <button
+                onClick={() => send(input)}
+                disabled={!input.trim()}
+                className="w-7 h-7 rounded-lg bg-gold-500 hover:bg-gold-600 text-navy-900 flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Send message"
+              >
+                <Send size={14} />
+              </button>
+            )}
           </div>
           <p className="text-[10px] text-gray-300 text-center mt-1.5">Fixer can make mistakes — verify important info</p>
         </div>

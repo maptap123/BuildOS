@@ -630,6 +630,43 @@ export interface EstimateLine {
   // Proposal visibility
   client_visible: boolean
   internal_note: string | null
+  // Where the line came from. Written since migration 041 by the catalog, assemblies
+  // and Fixer; 'ai_comp' and 'ai_market' are the ones Fixer priced.
+  source: EstimateLineSource | null
+  comp_job_id: string | null
+  ai_rationale: string | null
+}
+
+export type EstimateLineSource = 'manual' | 'catalog' | 'assembly' | 'ai_comp' | 'ai_market'
+
+/**
+ * A line Fixer priced that is waiting on the estimator. Staged rather than written
+ * while the Estimate Builder's Fixer panel is open — see migration 042.
+ */
+export interface EstimateLineProposal {
+  id: string
+  estimate_id: string
+  /** One turn's worth of lines; the review list approves or discards by batch. */
+  batch_id: string
+  description: string
+  phase: string | null
+  cost_code: string | null
+  uom: string
+  quantity: number
+  unit_cost: number
+  markup_pct: number
+  sort_order: number
+  source: 'ai_comp' | 'ai_market' | null
+  comp_job_id: string | null
+  comp_estimate_id: string | null
+  /** Name of the past job this price came from, denormalised for the review list. */
+  comp_label: string | null
+  ai_rationale: string | null
+  status: 'pending' | 'applied' | 'discarded'
+  applied_line_id: string | null
+  decided_by: string | null
+  decided_at: string | null
+  created_at: string
 }
 
 export type VendorType = 'subcontractor' | 'supplier' | 'equipment' | 'other'

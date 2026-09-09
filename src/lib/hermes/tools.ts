@@ -234,7 +234,7 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'add_estimate_lines',
-    description: 'Append line items to an existing estimate. Use after find_comparable_estimates to write the estimate you built. Lines are appended, never replacing what is already there.',
+    description: 'Append line items to an existing estimate. Use after find_comparable_estimates to write the estimate you built. Lines are appended, never replacing what is already there. When the estimator has the Estimate Builder open, these are staged for their approval rather than added straight away — the response says which happened, so report it as it comes back rather than assuming the lines landed.',
     input_schema: {
       type: 'object' as const,
       properties: {

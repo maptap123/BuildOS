@@ -6,6 +6,7 @@ export type HermesChannel = 'app' | 'discord'
 export type HermesStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'navigate'; url: string; label?: string }
+  | { type: 'ping'; elapsedMs: number }
   | { type: 'done'; conversationId: string }
   | { type: 'error'; message: string }
 
@@ -15,11 +16,17 @@ interface StoredMessage {
   timestamp: string
 }
 
+export interface HermesContext {
+  jobId?: string
+  /** Set by the Estimate Builder's own Fixer panel so tools know which estimate is open. */
+  estimateId?: string
+}
+
 export async function* hermesStream(
   userId: string,
   userMessage: string,
   conversationId: string | undefined,
-  jobId: string | undefined
+  context: HermesContext = {}
 ): AsyncGenerator<HermesStreamEvent> {
   const admin = createAdminClient()
 
@@ -44,7 +51,23 @@ export async function* hermesStream(
     convId = conv?.id
   }
 
-  const content = jobId ? `${userMessage} [job:${jobId}]` : userMessage
+  // Store the user's turn before asking, not after. A long estimating turn can time
+  // out, and losing the question along with the answer meant retyping it against a
+  // history that no longer knew it had been asked.
+  const askedAt = new Date().toISOString()
+  const withUserTurn: StoredMessage[] = [
+    ...history,
+    { role: 'user', content: userMessage, timestamp: askedAt },
+  ]
+  if (convId) {
+    await admin.from('hermes_conversations').update({ messages: withUserTurn }).eq('id', convId)
+  }
+
+  const tags = [
+    context.jobId ? `[job:${context.jobId}]` : '',
+    context.estimateId ? `[estimate:${context.estimateId}]` : '',
+  ].filter(Boolean).join(' ')
+  const content = tags ? `${userMessage} ${tags}` : userMessage
 
   let reply: string
   try {
@@ -53,11 +76,17 @@ export async function* hermesStream(
       history.map(m => ({ role: m.role, content: m.content })),
     )
   } catch (e) {
-    yield { type: 'error', message: (e as Error).message }
+    const message = (e as Error).message
+    if (convId) {
+      await admin.from('hermes_conversations').update({
+        messages: [...withUserTurn, { role: 'assistant', content: message, timestamp: new Date().toISOString() }],
+      }).eq('id', convId)
+    }
+    yield { type: 'error', message }
     return
   }
 
-  yield* finishTurn(admin, userId, convId!, userMessage, reply, history)
+  yield* finishTurn(admin, userId, convId!, reply, withUserTurn)
 }
 
 /**
@@ -68,7 +97,6 @@ async function* finishTurn(
   admin: ReturnType<typeof createAdminClient>,
   userId: string,
   convId: string,
-  userMessage: string,
   reply: string,
   history: StoredMessage[]
 ): AsyncGenerator<HermesStreamEvent> {
@@ -109,7 +137,6 @@ async function* finishTurn(
 
   const updatedHistory: StoredMessage[] = [
     ...history,
-    { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
     { role: 'assistant', content: reply, timestamp: new Date().toISOString() },
   ]
   if (convId) {

@@ -14,8 +14,13 @@ import {
   type AssignmentContext,
 } from '@/lib/schedule/assignments'
 import { NextResponse } from 'next/server'
-import { timingSafeEqual } from 'crypto'
+import { timingSafeEqual, randomUUID } from 'crypto'
 import { findLinePricing } from '@/lib/estimates/linePricing'
+
+// The gateway calls back into this route for every tool an estimating turn needs, and
+// all of those round-trips run inside the caller's own window. Left unset it ran on the
+// platform default, which is shorter than a single comp lookup.
+export const maxDuration = 60
 
 /**
  * POST /api/agent
@@ -747,64 +752,81 @@ export async function POST(request: Request) {
           .single()
         if (estErr || !estimate) return NextResponse.json({ error: 'Estimate not found' }, { status: 404 })
 
-        const { data: lastLine } = await admin
-          .from('estimate_lines')
-          .select('sort_order')
+        // Is someone sitting in the builder waiting to review these? If so they get
+        // staged for approval instead of landing on the estimate. See migration 042.
+        const { data: session } = await admin
+          .from('estimate_proposal_sessions')
+          .select('estimate_id')
           .eq('estimate_id', estimateId)
-          .order('sort_order', { ascending: false })
-          .limit(1)
+          .gt('expires_at', new Date().toISOString())
           .maybeSingle()
-        const startOrder = Number((lastLine as { sort_order?: number } | null)?.sort_order ?? 0) + 1
 
-        const str = (v: unknown): string | null => {
-          if (typeof v !== 'string') return null
-          const s = v.trim()
-          return s || null
+        const startOrder = await nextEstimateSortOrder(admin, estimateId, !!session)
+        const drafts = await buildAiEstimateLines(admin, incoming, startOrder)
+        if (drafts.length === 0) return NextResponse.json({ error: 'No lines had a description' }, { status: 400 })
+
+        const total = drafts.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
+        const estimatedCost = Math.round(total * 100) / 100
+
+        if (session) {
+          const batchId = randomUUID()
+          const { data: staged, error } = await admin
+            .from('estimate_line_proposals')
+            .insert(drafts.map(d => ({
+              estimate_id: estimateId,
+              batch_id:    batchId,
+              description: d.description,
+              phase:       d.phase,
+              cost_code:   d.cost_code,
+              uom:         d.uom,
+              quantity:    d.quantity,
+              unit_cost:   d.unit_cost,
+              markup_pct:  d.markup_pct,
+              sort_order:  d.sort_order,
+              source:      d.source,
+              comp_job_id: d.comp_job_id,
+              comp_estimate_id: d.comp_estimate_id,
+              comp_label:  d.comp_label,
+              ai_rationale: d.ai_rationale,
+            })))
+            .select('id')
+          if (error) throw error
+
+          const n = staged?.length ?? drafts.length
+          return ok({
+            proposed: n,
+            estimate: estimate.title,
+            estimated_cost: estimatedCost,
+            // Say plainly that nothing was written, or Fixer reports the job as done.
+            message: `Staged ${n} line${n === 1 ? '' : 's'} (${estimatedCost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}) for review in the Estimate Builder. Nothing has been added to "${estimate.title}" yet — the estimator approves them line by line.`,
+          })
         }
 
-        const compIds = [...new Set(incoming.map(l => str(l.comp_estimate_id)).filter(Boolean) as string[])]
-        const compJobById = new Map<string, string | null>()
-        if (compIds.length > 0) {
-          const { data: comps } = await admin.from('historical_estimates').select('id, job_id').in('id', compIds)
-          ;(comps ?? []).forEach(c => compJobById.set(c.id as string, (c.job_id as string | null) ?? null))
-        }
-
-        // These land in numeric columns — a missing or non-numeric value must not become NaN.
-        const num = (v: unknown, fallback: number): number => {
-          const n = Number(v)
-          return Number.isFinite(n) ? n : fallback
-        }
-
-        const rows = incoming
-          .filter(l => str(l.description))
-          .map((l, i) => ({
+        const { data: inserted, error } = await admin
+          .from('estimate_lines')
+          .insert(drafts.map(d => ({
             estimate_id: estimateId,
             lead_id:     estimate.lead_id,
-            description: String(l.description).trim(),
-            phase:       str(l.phase),
-            cost_code:   str(l.cost_code),
-            uom:         str(l.uom) ?? 'EA',
-            quantity:    num(l.quantity, 1),
-            unit_cost:   num(l.unit_cost, 0),
-            markup_pct:  num(l.markup_pct, 0),
-            sort_order:  startOrder + i,
-            // source is constrained to manual|catalog|assembly|ai_comp|ai_market.
-            source:      str(l.source) === 'market' ? 'ai_market' : 'ai_comp',
-            comp_job_id: compJobById.get(str(l.comp_estimate_id) ?? '') ?? null,
-            ai_rationale: str(l.rationale),
-          }))
-
-        if (rows.length === 0) return NextResponse.json({ error: 'No lines had a description' }, { status: 400 })
-
-        const { data: inserted, error } = await admin.from('estimate_lines').insert(rows).select('id')
+            description: d.description,
+            phase:       d.phase,
+            cost_code:   d.cost_code,
+            uom:         d.uom,
+            quantity:    d.quantity,
+            unit_cost:   d.unit_cost,
+            markup_pct:  d.markup_pct,
+            sort_order:  d.sort_order,
+            source:      d.source,
+            comp_job_id: d.comp_job_id,
+            ai_rationale: d.ai_rationale,
+          })))
+          .select('id')
         if (error) throw error
 
-        const total = rows.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
         return ok({
-          added: inserted?.length ?? rows.length,
+          added: inserted?.length ?? drafts.length,
           estimate: estimate.title,
-          estimated_cost: Math.round(total * 100) / 100,
-          message: `Added ${inserted?.length ?? rows.length} line items to "${estimate.title}".`,
+          estimated_cost: estimatedCost,
+          message: `Added ${inserted?.length ?? drafts.length} line items to "${estimate.title}".`,
         })
       }
 
@@ -952,6 +974,115 @@ function inviteFacts(ctx: AssignmentContext) {
     site_address: jobAddress(ctx.job),
     scope_notes: ctx.item.description,
   }
+}
+
+/**
+ * One shape for a line Fixer priced, whether it is about to be staged for review or
+ * written straight onto the estimate. Both paths build it here so an approved proposal
+ * and a direct write can never disagree about coercion or provenance.
+ */
+interface AiEstimateLineDraft {
+  description: string
+  phase: string | null
+  cost_code: string | null
+  uom: string
+  quantity: number
+  unit_cost: number
+  markup_pct: number
+  sort_order: number
+  source: 'ai_comp' | 'ai_market'
+  comp_job_id: string | null
+  comp_estimate_id: string | null
+  comp_label: string | null
+  ai_rationale: string | null
+}
+
+/**
+ * Where the next batch starts. Pending proposals count too — two turns in a row would
+ * otherwise stage overlapping sort orders and interleave once both were approved.
+ */
+async function nextEstimateSortOrder(
+  admin: ReturnType<typeof createAdminClient>,
+  estimateId: string,
+  includePending: boolean
+): Promise<number> {
+  const { data: lastLine } = await admin
+    .from('estimate_lines')
+    .select('sort_order')
+    .eq('estimate_id', estimateId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let highest = Number((lastLine as { sort_order?: number } | null)?.sort_order ?? 0)
+
+  if (includePending) {
+    const { data: lastProposal } = await admin
+      .from('estimate_line_proposals')
+      .select('sort_order')
+      .eq('estimate_id', estimateId)
+      .eq('status', 'pending')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    highest = Math.max(highest, Number((lastProposal as { sort_order?: number } | null)?.sort_order ?? 0))
+  }
+
+  return highest + 1
+}
+
+async function buildAiEstimateLines(
+  admin: ReturnType<typeof createAdminClient>,
+  incoming: Record<string, unknown>[],
+  startOrder: number
+): Promise<AiEstimateLineDraft[]> {
+  const str = (v: unknown): string | null => {
+    if (typeof v !== 'string') return null
+    const trimmed = v.trim()
+    return trimmed || null
+  }
+
+  // These land in numeric columns — a missing or non-numeric value must not become NaN.
+  const num = (v: unknown, fallback: number): number => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : fallback
+  }
+
+  const compIds = [...new Set(incoming.map(l => str(l.comp_estimate_id)).filter(Boolean) as string[])]
+  const compById = new Map<string, { jobId: string | null; label: string | null }>()
+  if (compIds.length > 0) {
+    const { data: comps } = await admin
+      .from('historical_estimates')
+      .select('id, job_id, display_name')
+      .in('id', compIds)
+    ;(comps ?? []).forEach(c => compById.set(c.id as string, {
+      jobId: (c.job_id as string | null) ?? null,
+      label: (c.display_name as string | null) ?? null,
+    }))
+  }
+
+  return incoming
+    .filter(l => str(l.description))
+    .map((l, i) => {
+      const compEstimateId = str(l.comp_estimate_id)
+      const comp = compEstimateId ? compById.get(compEstimateId) : undefined
+      return {
+        description: String(l.description).trim(),
+        phase:       str(l.phase),
+        cost_code:   str(l.cost_code),
+        uom:         str(l.uom) ?? 'EA',
+        quantity:    num(l.quantity, 1),
+        unit_cost:   num(l.unit_cost, 0),
+        markup_pct:  num(l.markup_pct, 0),
+        sort_order:  startOrder + i,
+        // source is constrained to manual|catalog|assembly|ai_comp|ai_market.
+        source:      (str(l.source) === 'market' ? 'ai_market' : 'ai_comp') as 'ai_comp' | 'ai_market',
+        comp_job_id: comp?.jobId ?? null,
+        comp_estimate_id: compEstimateId,
+        comp_label:  comp?.label ?? null,
+        ai_rationale: str(l.rationale),
+      }
+    })
 }
 
 function notFoundError(resource: string) {
