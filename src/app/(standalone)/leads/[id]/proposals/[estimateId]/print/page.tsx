@@ -16,6 +16,31 @@ type ProposalLineGroup = {
   subtotal: number
   markup: number
   total: number
+  /** Extended labor/material/sub for the group. Internal view only — never shown to a client. */
+  breakdown: CostRollup
+}
+
+/** Extended (qty x per-unit) builder cost, split the way JDC prices a line. */
+type CostRollup = { labor: number; material: number; sub: number }
+
+const ZERO_ROLLUP: CostRollup = { labor: 0, material: 0, sub: 0 }
+
+/**
+ * Sum labor, material and sub across lines, extended by quantity.
+ *
+ * `unit_cost = labor + material + sub` is a check constraint on estimate_lines, so these
+ * three always add back up to the builder cost — which is what makes them worth showing
+ * beside it rather than instead of it.
+ */
+function rollUpCosts(lines: EstimateLine[]): CostRollup {
+  return lines.reduce<CostRollup>((acc, line) => {
+    const qty = Number(line.quantity)
+    return {
+      labor: acc.labor + qty * Number(line.labor_cost ?? 0),
+      material: acc.material + qty * Number(line.material_cost ?? 0),
+      sub: acc.sub + qty * Number(line.sub_cost ?? 0),
+    }
+  }, ZERO_ROLLUP)
 }
 
 const fmtMoney = (n: number) =>
@@ -47,9 +72,28 @@ function groupLines(lines: EstimateLine[], grouped: boolean): ProposalLineGroup[
     .map(([phase, groupLines]) => {
       const subtotal = groupLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
       const markup = groupLines.reduce((sum, line) => sum + lineMarkup(line), 0)
-      return { phase, lines: groupLines, subtotal, markup, total: subtotal + markup }
+      return {
+        phase,
+        lines: groupLines,
+        subtotal,
+        markup,
+        total: subtotal + markup,
+        breakdown: rollUpCosts(groupLines),
+      }
     })
 }
+
+/**
+ * The internal worksheet carries three more money columns than the client proposal
+ * (labor, material, sub), which will not fit on portrait letter. Everything else about
+ * the two views is identical, so only the page box and the max width change.
+ */
+const INTERNAL_CSS = `
+  @page { size: letter landscape; margin: 0.45in; }
+  .print-root { max-width: 1180px; }
+  table { font-size: 12px; }
+  th, td { padding: 7px 6px; }
+`
 
 const CSS = `
   @page { size: letter; margin: 0.55in; }
@@ -109,6 +153,11 @@ const CSS = `
     border: 1px solid #d1d5db; border-radius: 8px; margin: 24px 0; background: #d1d5db;
   }
   .summary-cell { background: #f9fafb; padding: 14px 16px; }
+  .summary-bar.breakdown { grid-template-columns: repeat(4, 1fr); margin-top: -12px; }
+  .summary-bar.breakdown .summary-amount { font-size: 17px; }
+  .summary-cell.cost { background: #0f2a4a; color: #ffffff; }
+  .summary-cell.cost .label { color: #cbd5e1; }
+  .summary-cell.cost .summary-amount { color: #ffffff; }
   .summary-cell.total { background: #0f2a4a; color: #ffffff; }
   .summary-cell.total .label { color: #cbd5e1; }
   .summary-amount { font-size: 20px; font-weight: 800; color: #0f2a4a; }
@@ -122,6 +171,11 @@ const CSS = `
   .phase-row td { background: #eef2f7; color: #0f2a4a; font-size: 11px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; }
   .notes { display: block; margin-top: 3px; color: #6b7280; font-size: 11px; }
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* The labor/material/sub trio reads as one block that adds up to the unit cost beside it. */
+  .split { background: #f8fafc; color: #334155; }
+  th.split { background: #1e3a5f; color: #ffffff; }
+  .split-last { border-right: 2px solid #cbd5e1; }
+  th.split-last { border-right: 2px solid #1e3a5f; }
   .totals { width: 330px; margin: 18px 0 0 auto; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; }
   .totals-row { display: flex; justify-content: space-between; gap: 18px; padding: 10px 13px; border-top: 1px solid #e5e7eb; }
   .totals-row:first-child { border-top: 0; }
@@ -202,10 +256,19 @@ export default async function PrintProposalPage({
   const showLineDetails = disp.mode === 'itemized'
   // Whether any cost/markup column is exposed — drives the summary bar layout.
   const showCostColumns = disp.showUnitCost || disp.showMarkup
+  // How a line is priced — labor + material + sub. Internal only: it is the builder's own
+  // cost structure, and it is exactly what a client must never be handed.
+  const showSplit = isInternalView
+  // Columns before the labor/material/sub trio, and the price columns after it. The phase
+  // header row spans them so its subtotals line up under the columns they total.
+  const leadColCount = 1 /* item */ + (disp.showCostCode ? 1 : 0) + (disp.showQtyUnit ? 2 : 0)
+  const midColCount =
+    (disp.showUnitCost ? 1 : 0) + (disp.showUnitPrice ? 1 : 0) + (disp.showMarkup ? 1 : 0)
   const detailColCount =
     1 /* item */ +
     (disp.showCostCode ? 1 : 0) +
     (disp.showQtyUnit ? 2 : 0) +
+    (showSplit ? 3 : 0) +
     (disp.showUnitCost ? 1 : 0) +
     (disp.showUnitPrice ? 1 : 0) +
     (disp.showMarkup ? 1 : 0) +
@@ -215,6 +278,7 @@ export default async function PrintProposalPage({
   const subtotal = visibleLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
   const markup = visibleLines.reduce((sum, line) => sum + lineMarkup(line), 0)
   const total = subtotal + markup
+  const costs = rollUpCosts(visibleLines)
   const proposalTitle = typedEstimate.title || typedEstimate.job_name || typedLead.title || `Estimate v${typedEstimate.version}`
   const statusLabel = typedEstimate.status === 'approved' ? 'Accepted' : typedEstimate.status
   const publicProposalHref = typedEstimate.public_token ? `/proposals/${typedEstimate.public_token}` : null
@@ -222,7 +286,7 @@ export default async function PrintProposalPage({
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: isInternalView ? CSS + INTERNAL_CSS : CSS }} />
       <div className="print-root">
         <div className="toolbar no-print">
           <div>
@@ -335,6 +399,27 @@ export default async function PrintProposalPage({
           </section>
         )}
 
+        {showSplit && (
+          <section className="summary-bar breakdown">
+            <div className="summary-cell">
+              <div className="label">Labor</div>
+              <div className="summary-amount">{fmtMoney(costs.labor)}</div>
+            </div>
+            <div className="summary-cell">
+              <div className="label">Material</div>
+              <div className="summary-amount">{fmtMoney(costs.material)}</div>
+            </div>
+            <div className="summary-cell">
+              <div className="label">Sub</div>
+              <div className="summary-amount">{fmtMoney(costs.sub)}</div>
+            </div>
+            <div className="summary-cell cost">
+              <div className="label">Builder Cost</div>
+              <div className="summary-amount">{fmtMoney(costs.labor + costs.material + costs.sub)}</div>
+            </div>
+          </section>
+        )}
+
         {(typedEstimate.scope_text || typedEstimate.notes) && (
           <section className="section">
             <h2 className="section-title">Scope Summary</h2>
@@ -352,6 +437,9 @@ export default async function PrintProposalPage({
                   {disp.showCostCode && <th style={{ width: '76px' }}>Code</th>}
                   {disp.showQtyUnit && <th className="num" style={{ width: '64px' }}>Qty</th>}
                   {disp.showQtyUnit && <th style={{ width: '58px' }}>Unit</th>}
+                  {showSplit && <th className="num split" style={{ width: '86px' }}>Labor</th>}
+                  {showSplit && <th className="num split" style={{ width: '86px' }}>Material</th>}
+                  {showSplit && <th className="num split split-last" style={{ width: '86px' }}>Sub</th>}
                   {disp.showUnitCost && <th className="num" style={{ width: '96px' }}>Unit Cost</th>}
                   {disp.showUnitPrice && <th className="num" style={{ width: '96px' }}>Unit Price</th>}
                   {disp.showMarkup && <th className="num" style={{ width: '74px' }}>Markup</th>}
@@ -366,9 +454,22 @@ export default async function PrintProposalPage({
                     <Fragment key={group.phase || `group-${gi}`}>
                       {disp.showPhases && group.phase && (
                         <tr className="phase-row">
-                          <td colSpan={disp.showPhaseSubtotals && disp.showLineTotal ? Math.max(detailColCount - 1, 1) : detailColCount}>{group.phase}</td>
-                          {disp.showPhaseSubtotals && disp.showLineTotal && (
-                            <td className="num">{fmtMoney(group.total)}</td>
+                          {showSplit && disp.showPhaseSubtotals ? (
+                            <>
+                              <td colSpan={leadColCount}>{group.phase}</td>
+                              <td className="num split">{fmtMoney(group.breakdown.labor)}</td>
+                              <td className="num split">{fmtMoney(group.breakdown.material)}</td>
+                              <td className="num split split-last">{fmtMoney(group.breakdown.sub)}</td>
+                              {midColCount > 0 && <td colSpan={midColCount} />}
+                              {disp.showLineTotal && <td className="num">{fmtMoney(group.total)}</td>}
+                            </>
+                          ) : (
+                            <>
+                              <td colSpan={disp.showPhaseSubtotals && disp.showLineTotal ? Math.max(detailColCount - 1, 1) : detailColCount}>{group.phase}</td>
+                              {disp.showPhaseSubtotals && disp.showLineTotal && (
+                                <td className="num">{fmtMoney(group.total)}</td>
+                              )}
+                            </>
                           )}
                         </tr>
                       )}
@@ -393,6 +494,9 @@ export default async function PrintProposalPage({
                             {disp.showCostCode && <td>{line.cost_code || '-'}</td>}
                             {disp.showQtyUnit && <td className="num">{fmtQty(Number(line.quantity))}</td>}
                             {disp.showQtyUnit && <td>{line.uom}</td>}
+                            {showSplit && <td className="num split">{fmtMoney(Number(line.labor_cost ?? 0))}</td>}
+                            {showSplit && <td className="num split">{fmtMoney(Number(line.material_cost ?? 0))}</td>}
+                            {showSplit && <td className="num split split-last">{fmtMoney(Number(line.sub_cost ?? 0))}</td>}
                             {disp.showUnitCost && <td className="num">{fmtMoney(Number(line.unit_cost))}</td>}
                             {disp.showUnitPrice && <td className="num">{fmtMoney(clientUnitPrice(line))}</td>}
                             {disp.showMarkup && <td className="num">{Number(line.markup_pct)}%</td>}
@@ -406,6 +510,9 @@ export default async function PrintProposalPage({
               </tbody>
             </table>
             <div className="totals">
+              {showSplit && <div className="totals-row"><span>Labor</span><strong>{fmtMoney(costs.labor)}</strong></div>}
+              {showSplit && <div className="totals-row"><span>Material</span><strong>{fmtMoney(costs.material)}</strong></div>}
+              {showSplit && <div className="totals-row"><span>Sub</span><strong>{fmtMoney(costs.sub)}</strong></div>}
               {showCostColumns && <div className="totals-row"><span>Subtotal</span><strong>{fmtMoney(subtotal)}</strong></div>}
               {showCostColumns && <div className="totals-row"><span>Markup</span><strong>{fmtMoney(markup)}</strong></div>}
               <div className="totals-row grand"><span>Total</span><span>{fmtMoney(total)}</span></div>
