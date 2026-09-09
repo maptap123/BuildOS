@@ -603,6 +603,8 @@ export interface Estimate {
   // Proposal visibility settings
   show_line_details: boolean
   show_cost_breakdown: boolean
+  /** BuilderTrend-parity client-visibility config; null falls back to the two flags above. */
+  proposal_display: import('@/lib/estimates/proposalDisplay').ProposalDisplay | null
   proposal_header_text: string | null
   proposal_footer_text: string | null
   // Lock

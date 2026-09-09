@@ -1,20 +1,30 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CheckCircle, Clock, FileText, XCircle } from 'lucide-react'
 import { ProposalResponseForm } from './ProposalResponseForm'
+import {
+  resolveProposalDisplay,
+  clientUnitPrice,
+  clientLineTotal,
+  type ProposalDisplay,
+} from '@/lib/estimates/proposalDisplay'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
+
+const fmtQty = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(n)
 
 interface ProposalLine {
   id: string
   description: string
   phase: string | null
+  cost_code: string | null
   uom: string
   quantity: number
   unit_cost: number
   markup_pct: number
   sort_order: number
   notes: string | null
+  client_visible: boolean | null
 }
 
 interface ProposalRow {
@@ -29,6 +39,11 @@ interface ProposalRow {
   version: number
   notes: string | null
   public_token: string
+  show_line_details: boolean | null
+  show_cost_breakdown: boolean | null
+  proposal_display: ProposalDisplay | null
+  proposal_header_text: string | null
+  proposal_footer_text: string | null
   client_approved_at: string | null
   client_rejected_at: string | null
   client_name: string | null
@@ -47,13 +62,13 @@ interface ProposalRow {
 }
 
 function lineTotal(line: ProposalLine) {
-  return Number(line.quantity) * Number(line.unit_cost) * (1 + Number(line.markup_pct) / 100)
+  return clientLineTotal(line)
 }
 
-function groupedLines(lines: ProposalLine[]) {
+function groupedLines(lines: ProposalLine[], grouped: boolean) {
   const map = new Map<string, ProposalLine[]>()
   for (const line of [...lines].sort((a, b) => a.sort_order - b.sort_order)) {
-    const phase = line.phase ?? 'Project'
+    const phase = grouped ? (line.phase ?? 'Project') : ''
     map.set(phase, [...(map.get(phase) ?? []), line])
   }
   return Array.from(map.entries())
@@ -90,6 +105,11 @@ export default async function PublicProposalPage({
       version,
       notes,
       public_token,
+      show_line_details,
+      show_cost_breakdown,
+      proposal_display,
+      proposal_header_text,
+      proposal_footer_text,
       client_approved_at,
       client_rejected_at,
       client_name,
@@ -108,12 +128,14 @@ export default async function PublicProposalPage({
         id,
         description,
         phase,
+        cost_code,
         uom,
         quantity,
         unit_cost,
         markup_pct,
         sort_order,
-        notes
+        notes,
+        client_visible
       )
     `)
     .eq('public_token', token)
@@ -136,7 +158,11 @@ export default async function PublicProposalPage({
   const proposal = data as unknown as ProposalRow
   const title = proposal.title ?? proposal.job_name ?? proposal.lead?.title ?? `Proposal v${proposal.version}`
   const clientName = proposal.client_name ?? proposal.lead?.client_name ?? 'Client'
-  const total = proposal.lines.reduce((sum, line) => sum + lineTotal(line), 0)
+
+  // Client only ever sees lines flagged visible, rendered per the estimate's display config.
+  const disp = resolveProposalDisplay(proposal)
+  const visibleLines = proposal.lines.filter(l => l.client_visible !== false)
+  const total = visibleLines.reduce((sum, line) => sum + lineTotal(line), 0)
   const statusLabel = proposal.status === 'approved' ? 'Accepted' : proposal.status === 'rejected' ? 'Declined' : proposal.status
 
   return (
@@ -178,6 +204,14 @@ export default async function PublicProposalPage({
                 </div>
               </div>
 
+              {proposal.proposal_header_text && (
+                <section>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
+                    {proposal.proposal_header_text}
+                  </p>
+                </section>
+              )}
+
               {proposal.scope_text && (
                 <section>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Scope</p>
@@ -185,51 +219,78 @@ export default async function PublicProposalPage({
                 </section>
               )}
 
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText size={16} className="text-gray-400" />
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Line Items</p>
-                </div>
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  {proposal.lines.length === 0 ? (
-                    <p className="px-4 py-8 text-center text-sm text-gray-400">No line items are available.</p>
-                  ) : (
-                    groupedLines(proposal.lines).map(([phase, lines]) => {
-                      const phaseTotal = lines.reduce((sum, line) => sum + lineTotal(line), 0)
-                      return (
-                        <div key={phase} className="border-b border-gray-100 last:border-b-0">
-                          <div className="flex items-center justify-between bg-gray-50 px-4 py-2">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{phase}</span>
-                            <span className="text-sm font-semibold text-[#0f2a4a] tabular-nums">{fmt(phaseTotal)}</span>
-                          </div>
-                          <div className="divide-y divide-gray-100">
-                            {lines.map(line => (
-                              <div key={line.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
-                                <div>
-                                  <p className="text-sm font-medium text-gray-800">{line.description}</p>
-                                  <p className="text-xs text-gray-400 mt-0.5">
-                                    {Number(line.quantity).toLocaleString('en-US')} {line.uom}
-                                  </p>
-                                </div>
-                                <p className="text-sm font-semibold text-gray-700 tabular-nums">{fmt(lineTotal(line))}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                  <div className="flex items-center justify-between bg-[#0f2a4a] px-4 py-3 text-white">
-                    <span className="text-sm font-semibold uppercase tracking-wide">Total</span>
-                    <span className="text-xl font-bold tabular-nums">{fmt(total)}</span>
+              {disp.mode === 'itemized' && (
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileText size={16} className="text-gray-400" />
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Line Items</p>
                   </div>
-                </div>
-              </section>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    {visibleLines.length === 0 ? (
+                      <p className="px-4 py-8 text-center text-sm text-gray-400">No line items are available.</p>
+                    ) : (
+                      groupedLines(visibleLines, disp.showPhases).map(([phase, lines], gi) => {
+                        const phaseTotal = lines.reduce((sum, line) => sum + lineTotal(line), 0)
+                        return (
+                          <div key={phase || `group-${gi}`} className="border-b border-gray-100 last:border-b-0">
+                            {disp.showPhases && phase && (
+                              <div className="flex items-center justify-between bg-gray-50 px-4 py-2">
+                                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{phase}</span>
+                                {disp.showPhaseSubtotals && disp.showLineTotal && (
+                                  <span className="text-sm font-semibold text-[#0f2a4a] tabular-nums">{fmt(phaseTotal)}</span>
+                                )}
+                              </div>
+                            )}
+                            <div className="divide-y divide-gray-100">
+                              {lines.map(line => {
+                                const meta: string[] = []
+                                if (disp.showCostCode && line.cost_code) meta.push(line.cost_code)
+                                if (disp.showQtyUnit) meta.push(`${fmtQty(Number(line.quantity))} ${line.uom}`.trim())
+                                if (disp.showUnitPrice) meta.push(`${fmt(clientUnitPrice(line))}/${line.uom || 'unit'}`)
+                                if (disp.showUnitCost) meta.push(`cost ${fmt(Number(line.unit_cost))}`)
+                                if (disp.showMarkup) meta.push(`${Number(line.markup_pct)}% markup`)
+                                return (
+                                  <div key={line.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                                    <div>
+                                      {disp.showItemTitle && <p className="text-sm font-medium text-gray-800">{line.description}</p>}
+                                      {disp.showDescription && line.notes && (
+                                        <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-wrap">{line.notes}</p>
+                                      )}
+                                      {meta.length > 0 && (
+                                        <p className="text-xs text-gray-400 mt-0.5">{meta.join('  •  ')}</p>
+                                      )}
+                                    </div>
+                                    {disp.showLineTotal && (
+                                      <p className="text-sm font-semibold text-gray-700 tabular-nums">{fmt(lineTotal(line))}</p>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                    <div className="flex items-center justify-between bg-[#0f2a4a] px-4 py-3 text-white">
+                      <span className="text-sm font-semibold uppercase tracking-wide">Total</span>
+                      <span className="text-xl font-bold tabular-nums">{fmt(total)}</span>
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {proposal.notes && (
                 <section>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Notes</p>
                   <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{proposal.notes}</p>
+                </section>
+              )}
+
+              {proposal.proposal_footer_text && (
+                <section>
+                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                    {proposal.proposal_footer_text}
+                  </p>
                 </section>
               )}
             </div>

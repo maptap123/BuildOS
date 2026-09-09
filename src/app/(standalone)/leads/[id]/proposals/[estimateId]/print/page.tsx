@@ -3,6 +3,11 @@ import { Fragment } from 'react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { Estimate, EstimateLine, Lead } from '@/types'
+import {
+  resolveProposalDisplay,
+  clientUnitPrice,
+  type ProposalDisplay,
+} from '@/lib/estimates/proposalDisplay'
 
 type ProposalLineGroup = {
   phase: string
@@ -27,10 +32,11 @@ const lineSubtotal = (line: EstimateLine) => Number(line.quantity) * Number(line
 const lineMarkup = (line: EstimateLine) => lineSubtotal(line) * (Number(line.markup_pct) / 100)
 const lineTotal = (line: EstimateLine) => lineSubtotal(line) + lineMarkup(line)
 
-function groupLines(lines: EstimateLine[]): ProposalLineGroup[] {
+function groupLines(lines: EstimateLine[], grouped: boolean): ProposalLineGroup[] {
   const groups = new Map<string, EstimateLine[]>()
   for (const line of lines) {
-    const phase = line.phase?.trim() || 'General Conditions'
+    // When phases are turned off, collapse everything into one unnamed group.
+    const phase = grouped ? (line.phase?.trim() || 'General Conditions') : ''
     groups.set(phase, [...(groups.get(phase) ?? []), line])
   }
   return Array.from(groups.entries()).map(([phase, groupLines]) => {
@@ -174,10 +180,33 @@ export default async function PrintProposalPage({
   const allLines = (lines ?? []) as EstimateLine[]
 
   const visibleLines = isInternalView ? allLines : allLines.filter(l => l.client_visible !== false)
-  const showLineDetails = isInternalView || (typedEstimate.show_line_details !== false)
-  const showCostBreakdown = isInternalView || (typedEstimate.show_cost_breakdown === true)
 
-  const groups = groupLines(visibleLines)
+  // Client display config. The internal view forces everything on so the estimator
+  // always sees the full picture regardless of what the client is set to see.
+  const clientDisplay = resolveProposalDisplay(typedEstimate)
+  const disp: ProposalDisplay = isInternalView
+    ? {
+        mode: 'itemized',
+        showItemTitle: true, showDescription: true, showCostCode: true,
+        showQtyUnit: true, showUnitPrice: true, showLineTotal: true,
+        showPhases: true, showPhaseSubtotals: true,
+        showUnitCost: true, showMarkup: true,
+      }
+    : clientDisplay
+
+  const showLineDetails = disp.mode === 'itemized'
+  // Whether any cost/markup column is exposed — drives the summary bar layout.
+  const showCostColumns = disp.showUnitCost || disp.showMarkup
+  const detailColCount =
+    1 /* item */ +
+    (disp.showCostCode ? 1 : 0) +
+    (disp.showQtyUnit ? 2 : 0) +
+    (disp.showUnitCost ? 1 : 0) +
+    (disp.showUnitPrice ? 1 : 0) +
+    (disp.showMarkup ? 1 : 0) +
+    (disp.showLineTotal ? 1 : 0)
+
+  const groups = groupLines(visibleLines, disp.showPhases)
   const subtotal = visibleLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
   const markup = visibleLines.reduce((sum, line) => sum + lineMarkup(line), 0)
   const total = subtotal + markup
@@ -277,20 +306,29 @@ export default async function PrintProposalPage({
           </div>
         </section>
 
-        <section className="summary-bar">
-          <div className="summary-cell">
-            <div className="label">Subtotal</div>
-            <div className="summary-amount">{fmtMoney(subtotal)}</div>
-          </div>
-          <div className="summary-cell">
-            <div className="label">Markup</div>
-            <div className="summary-amount">{fmtMoney(markup)}</div>
-          </div>
-          <div className="summary-cell total">
-            <div className="label">Proposal Total</div>
-            <div className="summary-amount">{fmtMoney(total)}</div>
-          </div>
-        </section>
+        {showCostColumns ? (
+          <section className="summary-bar">
+            <div className="summary-cell">
+              <div className="label">Subtotal</div>
+              <div className="summary-amount">{fmtMoney(subtotal)}</div>
+            </div>
+            <div className="summary-cell">
+              <div className="label">Markup</div>
+              <div className="summary-amount">{fmtMoney(markup)}</div>
+            </div>
+            <div className="summary-cell total">
+              <div className="label">Proposal Total</div>
+              <div className="summary-amount">{fmtMoney(total)}</div>
+            </div>
+          </section>
+        ) : (
+          <section className="summary-bar" style={{ gridTemplateColumns: '1fr' }}>
+            <div className="summary-cell total">
+              <div className="label">Proposal Total</div>
+              <div className="summary-amount">{fmtMoney(total)}</div>
+            </div>
+          </section>
+        )}
 
         {(typedEstimate.scope_text || typedEstimate.notes) && (
           <section className="section">
@@ -305,49 +343,55 @@ export default async function PrintProposalPage({
             <table>
               <thead>
                 <tr>
-                  <th>Description</th>
-                  {showCostBreakdown && <th style={{ width: '76px' }}>Code</th>}
-                  {showCostBreakdown && <th className="num" style={{ width: '64px' }}>Qty</th>}
-                  {showCostBreakdown && <th style={{ width: '58px' }}>Unit</th>}
-                  {showCostBreakdown && <th className="num" style={{ width: '96px' }}>Unit Cost</th>}
-                  {showCostBreakdown && <th className="num" style={{ width: '74px' }}>Markup</th>}
-                  <th className="num" style={{ width: '106px' }}>Total</th>
+                  <th>{disp.showItemTitle ? 'Description' : 'Item'}</th>
+                  {disp.showCostCode && <th style={{ width: '76px' }}>Code</th>}
+                  {disp.showQtyUnit && <th className="num" style={{ width: '64px' }}>Qty</th>}
+                  {disp.showQtyUnit && <th style={{ width: '58px' }}>Unit</th>}
+                  {disp.showUnitCost && <th className="num" style={{ width: '96px' }}>Unit Cost</th>}
+                  {disp.showUnitPrice && <th className="num" style={{ width: '96px' }}>Unit Price</th>}
+                  {disp.showMarkup && <th className="num" style={{ width: '74px' }}>Markup</th>}
+                  {disp.showLineTotal && <th className="num" style={{ width: '106px' }}>Total</th>}
                 </tr>
               </thead>
               <tbody>
                 {groups.length === 0 ? (
-                  <tr><td colSpan={showCostBreakdown ? 7 : 2} className="muted">No proposal line items have been added.</td></tr>
+                  <tr><td colSpan={detailColCount} className="muted">No proposal line items have been added.</td></tr>
                 ) : (
-                  groups.map(group => (
-                    <Fragment key={group.phase}>
-                      <tr className="phase-row">
-                        <td colSpan={showCostBreakdown ? 6 : 1}>{group.phase}</td>
-                        <td className="num">{fmtMoney(group.total)}</td>
-                      </tr>
+                  groups.map((group, gi) => (
+                    <Fragment key={group.phase || `group-${gi}`}>
+                      {disp.showPhases && group.phase && (
+                        <tr className="phase-row">
+                          <td colSpan={disp.showPhaseSubtotals && disp.showLineTotal ? Math.max(detailColCount - 1, 1) : detailColCount}>{group.phase}</td>
+                          {disp.showPhaseSubtotals && disp.showLineTotal && (
+                            <td className="num">{fmtMoney(group.total)}</td>
+                          )}
+                        </tr>
+                      )}
                       {group.lines.map(line => {
                         const isLineHidden = line.client_visible === false
                         return (
                           <tr key={line.id} style={isLineHidden ? { background: '#fef9c3' } : {}}>
                             <td>
-                              <span>{line.description}</span>
+                              {disp.showItemTitle && <span>{line.description}</span>}
                               {isLineHidden && (
                                 <span style={{ marginLeft: '8px', fontSize: '10px', fontWeight: 700, background: '#fde047', color: '#713f12', padding: '1px 6px', borderRadius: '4px' }}>
                                   INTERNAL
                                 </span>
                               )}
-                              {line.notes && <span className="notes">{line.notes}</span>}
+                              {disp.showDescription && line.notes && <span className="notes">{line.notes}</span>}
                               {isInternalView && line.internal_note && (
                                 <span className="notes" style={{ color: '#d97706', fontStyle: 'italic' }}>
                                   Internal note: {line.internal_note}
                                 </span>
                               )}
                             </td>
-                            {showCostBreakdown && <td>{line.cost_code || '-'}</td>}
-                            {showCostBreakdown && <td className="num">{fmtQty(Number(line.quantity))}</td>}
-                            {showCostBreakdown && <td>{line.uom}</td>}
-                            {showCostBreakdown && <td className="num">{fmtMoney(Number(line.unit_cost))}</td>}
-                            {showCostBreakdown && <td className="num">{Number(line.markup_pct)}%</td>}
-                            <td className="num">{fmtMoney(lineTotal(line))}</td>
+                            {disp.showCostCode && <td>{line.cost_code || '-'}</td>}
+                            {disp.showQtyUnit && <td className="num">{fmtQty(Number(line.quantity))}</td>}
+                            {disp.showQtyUnit && <td>{line.uom}</td>}
+                            {disp.showUnitCost && <td className="num">{fmtMoney(Number(line.unit_cost))}</td>}
+                            {disp.showUnitPrice && <td className="num">{fmtMoney(clientUnitPrice(line))}</td>}
+                            {disp.showMarkup && <td className="num">{Number(line.markup_pct)}%</td>}
+                            {disp.showLineTotal && <td className="num">{fmtMoney(lineTotal(line))}</td>}
                           </tr>
                         )
                       })}
@@ -357,19 +401,9 @@ export default async function PrintProposalPage({
               </tbody>
             </table>
             <div className="totals">
-              <div className="totals-row"><span>Subtotal</span><strong>{fmtMoney(subtotal)}</strong></div>
-              <div className="totals-row"><span>Markup</span><strong>{fmtMoney(markup)}</strong></div>
+              {showCostColumns && <div className="totals-row"><span>Subtotal</span><strong>{fmtMoney(subtotal)}</strong></div>}
+              {showCostColumns && <div className="totals-row"><span>Markup</span><strong>{fmtMoney(markup)}</strong></div>}
               <div className="totals-row grand"><span>Total</span><span>{fmtMoney(total)}</span></div>
-            </div>
-          </section>
-        )}
-
-        {!showLineDetails && (
-          <section className="section">
-            <div className="summary-bar">
-              <div className="summary-cell"><div className="label">Subtotal</div><div className="summary-amount">{fmtMoney(subtotal)}</div></div>
-              <div className="summary-cell"><div className="label">Markup</div><div className="summary-amount">{fmtMoney(markup)}</div></div>
-              <div className="summary-cell total"><div className="label">Proposal Total</div><div className="summary-amount">{fmtMoney(total)}</div></div>
             </div>
           </section>
         )}

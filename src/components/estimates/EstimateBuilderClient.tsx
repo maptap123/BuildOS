@@ -29,6 +29,7 @@ import { EstimateLineRow, EstimateLineCard } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
 import { EstimateFixerPanel } from './EstimateFixerPanel'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
+import { resolveProposalDisplay, type ProposalDisplay } from '@/lib/estimates/proposalDisplay'
 
 interface Permissions {
   can_create: boolean
@@ -507,6 +508,21 @@ export function EstimateBuilderClient({
     }
   }
 
+  // Merge a change into the resolved display config and persist the whole object,
+  // so every field is explicit once the estimator touches the panel.
+  async function saveProposalDisplay(patch: Partial<ProposalDisplay>) {
+    if (!activeEstimate) return
+    const next: ProposalDisplay = { ...resolveProposalDisplay(activeEstimate), ...patch }
+    setProposalSettingsSaving(true)
+    try {
+      await patchEstimate({ proposal_display: next })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save proposal settings')
+    } finally {
+      setProposalSettingsSaving(false)
+    }
+  }
+
   async function markProposalSent() {
     if (!activeEstimate) return
     setSaving(true)
@@ -813,35 +829,97 @@ export function EstimateBuilderClient({
             {proposalSettingsSaving && <Loader2 size={12} className="animate-spin ml-1 text-gray-400" />}
           </button>
 
-          {showProposalSettings && (
-            <div className="mt-4 space-y-4">
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={activeEstimate.show_line_details ?? true}
-                    onChange={e => saveProposalSetting('show_line_details', e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-navy-700 focus:ring-navy-500"
-                  />
-                  <div>
-                    <p className="text-sm text-navy-800 font-medium">Show line item details to client</p>
-                    <p className="text-xs text-gray-400">Display the full line-by-line breakdown in the client proposal</p>
-                  </div>
-                </label>
+          {showProposalSettings && (() => {
+            const disp = resolveProposalDisplay(activeEstimate)
+            const Toggle = ({
+              checked, onChange, title, hint, disabled = false, indent = false,
+            }: { checked: boolean; onChange: (v: boolean) => void; title: string; hint?: string; disabled?: boolean; indent?: boolean }) => (
+              <label className={`flex items-center gap-3 ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${indent ? 'ml-7' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={e => onChange(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-navy-700 focus:ring-navy-500 shrink-0"
+                />
+                <div>
+                  <p className="text-sm text-navy-800 font-medium">{title}</p>
+                  {hint && <p className="text-xs text-gray-400">{hint}</p>}
+                </div>
+              </label>
+            )
+            return (
+            <div className="mt-4 space-y-5">
+              <p className="text-xs text-gray-400">These settings control what the client sees on both the printed proposal and the shared client link.</p>
 
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={activeEstimate.show_cost_breakdown ?? false}
-                    onChange={e => saveProposalSetting('show_cost_breakdown', e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-navy-700 focus:ring-navy-500"
-                  />
-                  <div>
-                    <p className="text-sm text-navy-800 font-medium">Show cost breakdown</p>
-                    <p className="text-xs text-gray-400">Show unit costs and markup percentages (otherwise shows totals only)</p>
-                  </div>
-                </label>
+              {/* What the client sees at all — itemized vs total only */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Proposal layout</p>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="proposal-mode"
+                      checked={disp.mode === 'itemized'}
+                      onChange={() => saveProposalDisplay({ mode: 'itemized' })}
+                      className="w-4 h-4 border-gray-300 text-navy-700 focus:ring-navy-500 shrink-0"
+                    />
+                    <div>
+                      <p className="text-sm text-navy-800 font-medium">Itemized</p>
+                      <p className="text-xs text-gray-400">Show line items (columns and phases configurable below)</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="proposal-mode"
+                      checked={disp.mode === 'total_only'}
+                      onChange={() => saveProposalDisplay({ mode: 'total_only' })}
+                      className="w-4 h-4 border-gray-300 text-navy-700 focus:ring-navy-500 shrink-0"
+                    />
+                    <div>
+                      <p className="text-sm text-navy-800 font-medium">Total only</p>
+                      <p className="text-xs text-gray-400">Hide all line items and phases — client sees a single proposal total</p>
+                    </div>
+                  </label>
+                </div>
               </div>
+
+              {disp.mode === 'itemized' && (
+                <>
+                  {/* Columns the client sees */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Columns shown to client</p>
+                    <div className="flex flex-col gap-2.5">
+                      <Toggle checked={disp.showItemTitle}   onChange={v => saveProposalDisplay({ showItemTitle: v })}   title="Item name" />
+                      <Toggle checked={disp.showDescription} onChange={v => saveProposalDisplay({ showDescription: v })} title="Description / notes" />
+                      <Toggle checked={disp.showCostCode}    onChange={v => saveProposalDisplay({ showCostCode: v })}    title="Cost code" />
+                      <Toggle checked={disp.showQtyUnit}     onChange={v => saveProposalDisplay({ showQtyUnit: v })}     title="Quantity & unit" />
+                      <Toggle checked={disp.showUnitPrice}   onChange={v => saveProposalDisplay({ showUnitPrice: v })}   title="Unit price" hint="Marked-up price per unit — not your cost" />
+                      <Toggle checked={disp.showLineTotal}   onChange={v => saveProposalDisplay({ showLineTotal: v })}   title="Line total" />
+                    </div>
+                  </div>
+
+                  {/* Phases (BuilderTrend "groups") */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Phases</p>
+                    <div className="flex flex-col gap-2.5">
+                      <Toggle checked={disp.showPhases} onChange={v => saveProposalDisplay({ showPhases: v })} title="Group lines by phase" hint="Show phase headers; unchecked shows a flat list" />
+                      <Toggle checked={disp.showPhaseSubtotals} disabled={!disp.showPhases} indent onChange={v => saveProposalDisplay({ showPhaseSubtotals: v })} title="Show phase subtotals" />
+                    </div>
+                  </div>
+
+                  {/* Advanced — normally hidden from clients */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Advanced — reveals your numbers</p>
+                    <div className="flex flex-col gap-2.5 rounded-lg bg-amber-50/60 border border-amber-100 px-3 py-2.5">
+                      <p className="text-xs text-amber-700">BuilderTrend never shows these to clients. Leave off unless you deliberately want the client to see them.</p>
+                      <Toggle checked={disp.showUnitCost} onChange={v => saveProposalDisplay({ showUnitCost: v })} title="Show unit cost (your raw cost)" />
+                      <Toggle checked={disp.showMarkup}   onChange={v => saveProposalDisplay({ showMarkup: v })}   title="Show markup %" />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Header text</label>
@@ -865,7 +943,8 @@ export function EstimateBuilderClient({
                 />
               </div>
             </div>
-          )}
+            )
+          })()}
         </div>
       )}
 
