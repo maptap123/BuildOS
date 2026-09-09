@@ -82,6 +82,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Proposals span more than one estimate' }, { status: 400 })
   }
 
+  // Fixer could not source these, and nobody has named them yet. Approving a blank
+  // line would put an unnamed row on a client-facing estimate.
+  const unnamed = proposals.filter(
+    p => p.name_status === 'unsourced' || !String(p.description ?? '').trim()
+  )
+  if (unnamed.length > 0) {
+    return NextResponse.json({
+      error: `${unnamed.length} line${unnamed.length === 1 ? ' still needs' : 's still need'} a name and price`,
+      unnamed_ids: unnamed.map(p => p.id),
+    }, { status: 422 })
+  }
+
   const { data: estimate, error: estErr } = await admin
     .from('estimates')
     .select('id, lead_id, is_locked')
@@ -116,9 +128,12 @@ export async function POST(request: Request) {
       unit_cost:    p.unit_cost,
       markup_pct:   p.markup_pct,
       sort_order:   startOrder + i,
-      source:       p.source,
-      comp_job_id:  p.comp_job_id,
-      ai_rationale: p.ai_rationale,
+      source:         p.source,
+      source_line_id: p.source_line_id,
+      cost_item_id:   p.cost_item_id,
+      comp_job_id:    p.comp_job_id,
+      comp_label:     p.comp_label,
+      ai_rationale:   p.ai_rationale,
     })))
     .select('*')
 
@@ -138,6 +153,56 @@ export async function POST(request: Request) {
   ))
 
   return NextResponse.json(inserted ?? [], { status: 201 })
+}
+
+// PATCH /api/estimate-lines/proposals  { proposal_id, description, unit_cost, ... }
+//
+// The estimator filling in a line Fixer could not source. Naming it by hand is what
+// makes it usable — the row stays marked ai_market so the estimate still records that
+// it did not come from a past job.
+export async function PATCH(request: Request) {
+  const g = await guard('can_create')
+  if (g.error) return g.error
+
+  const body = await request.json().catch(() => ({})) as {
+    proposal_id?: string
+    description?: string
+    unit_cost?: number
+    quantity?: number
+    uom?: string
+    phase?: string
+  }
+
+  const id = body.proposal_id?.trim()
+  if (!id) return NextResponse.json({ error: 'proposal_id required' }, { status: 400 })
+
+  const updates: Record<string, unknown> = {}
+  const name = body.description?.trim()
+  if (name !== undefined) {
+    if (!name) return NextResponse.json({ error: 'description cannot be blank' }, { status: 400 })
+    updates.description = name
+    // A person typed it, so it is no longer an unnamed guess.
+    updates.name_status = 'sourced'
+  }
+  if (body.unit_cost !== undefined) updates.unit_cost = Number(body.unit_cost) || 0
+  if (body.quantity !== undefined) updates.quantity = Number(body.quantity) || 0
+  if (body.uom !== undefined) updates.uom = body.uom.trim() || 'EA'
+  if (body.phase !== undefined) updates.phase = body.phase.trim() || null
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'nothing to update' }, { status: 400 })
+  }
+
+  const { data, error } = await g.admin
+    .from('estimate_line_proposals')
+    .update(updates)
+    .eq('id', id)
+    .eq('status', 'pending')
+    .select('*')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }
 
 // DELETE /api/estimate-lines/proposals  — discard by id list or whole batch

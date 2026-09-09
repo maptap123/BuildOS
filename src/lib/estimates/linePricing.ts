@@ -17,6 +17,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 
 export interface LinePricingRow {
+  /** The row this price came from. Pass it to add_estimate_lines as line_id so the
+   *  description is copied from here rather than retyped. */
+  line_id:     string
   job_name:    string | null
   year:        string | null
   cost_code:   string | null
@@ -47,10 +50,11 @@ function sanitize(word: string): string {
 }
 
 const SELECT =
-  'description, cost_code, cost_type, uom, quantity, unit_cost, markup_pct, ' +
+  'id, description, cost_code, cost_type, uom, quantity, unit_cost, markup_pct, ' +
   'historical_estimates(display_name, source_year)'
 
 interface RawRow {
+  id: string
   description: string
   cost_code: string | null
   cost_type: string | null
@@ -98,7 +102,9 @@ export async function findLinePricing(
     for (let i = 0; i < words.length; i++) {
       const subset = words.filter((_, j) => j !== i)
       for (const row of await andQuery(subset)) {
-        const key = `${row.description}|${row.unit_cost}|${row.uom}`
+        // Keyed by row id now that the id is what gets cited back — two identical
+        // looking lines on different jobs are still two different sources.
+        const key = row.id
         if (!seen.has(key)) { seen.add(key); raw.push(row) }
       }
     }
@@ -112,7 +118,7 @@ export async function findLinePricing(
   if (best < required) {
     return {
       item, matched_words: best, of_words: words.length, count: 0, pricing: [],
-      message: `No past JDC line matches "${item}". Price it at a realistic market rate and mark that line source:"market" — do not reuse a loosely related line.`,
+      message: `No past JDC line matches "${item}". Send the line with no line_id and no cost_code so the estimator names and prices it — do not invent a description, and do not reuse a loosely related line.`,
     }
   }
 
@@ -120,6 +126,7 @@ export async function findLinePricing(
 
   const rows: LinePricingRow[] = raw
     .map(r => ({
+      line_id:     r.id,
       job_name:    r.historical_estimates?.display_name ?? null,
       year:        r.historical_estimates?.source_year ?? null,
       cost_code:   r.cost_code,
@@ -136,7 +143,7 @@ export async function findLinePricing(
   if (rows.length === 0) {
     return {
       item, matched_words: best, of_words: words.length, count: 0, pricing: [],
-      message: `No past JDC line matches "${item}". Price it at a realistic market rate and mark that line source:"market".`,
+      message: `No past JDC line matches "${item}". Send the line with no line_id and no cost_code so the estimator names and prices it — do not invent a description.`,
     }
   }
 

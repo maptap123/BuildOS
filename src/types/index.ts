@@ -634,6 +634,11 @@ export interface EstimateLine {
   // and Fixer; 'ai_comp' and 'ai_market' are the ones Fixer priced.
   source: EstimateLineSource | null
   comp_job_id: string | null
+  /** Name of the past estimate it was priced from. Stored because 84 of the 188
+   *  historical estimates have no job link, so comp_job_id alone loses the attribution. */
+  comp_label: string | null
+  /** The historical_estimate_lines row this line's name and price were copied from. */
+  source_line_id: string | null
   ai_rationale: string | null
 }
 
@@ -657,6 +662,17 @@ export interface EstimateLineProposal {
   markup_pct: number
   sort_order: number
   source: 'ai_comp' | 'ai_market' | null
+  /**
+   * 'sourced'   — the name was copied from a real past line or cost code.
+   * 'unsourced' — Fixer matched nothing, so it was left blank for a person to name.
+   *               JDC's 12,234 past lines use only 699 distinct names; a paraphrase
+   *               reads as a different item, so the model is never allowed to author one.
+   */
+  name_status: 'sourced' | 'unsourced'
+  /** What Fixer would have called an unsourced line. A hint only, never the name. */
+  suggested_description: string | null
+  source_line_id: string | null
+  cost_item_id: string | null
   comp_job_id: string | null
   comp_estimate_id: string | null
   /** Name of the past job this price came from, denormalised for the review list. */

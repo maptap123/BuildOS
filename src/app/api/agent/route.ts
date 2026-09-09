@@ -695,7 +695,7 @@ export async function POST(request: Request) {
             .select('id, display_name, client_name, source_year, total_cost, areas')
             .in('id', ids),
           admin.from('historical_estimate_lines')
-            .select('historical_estimate_id, cost_code, division_name, cost_type, area, description, uom, quantity, unit_cost, markup_pct')
+            .select('id, historical_estimate_id, cost_code, division_name, cost_type, area, description, uom, quantity, unit_cost, markup_pct')
             .in('historical_estimate_id', ids)
             .order('row_number'),
         ])
@@ -718,13 +718,14 @@ export async function POST(request: Request) {
               lines: (lines ?? [])
                 .filter(l => l.historical_estimate_id === id)
                 .map(l => ({
+                  line_id: l.id,
                   cost_code: l.cost_code, division: l.division_name, cost_type: l.cost_type,
                   area: l.area, description: l.description, uom: l.uom,
                   quantity: Number(l.quantity), unit_cost: Number(l.unit_cost), markup_pct: Number(l.markup_pct),
                 })),
             }]
           }),
-          guidance: 'Build the new estimate from these line items. Reuse cost_code, description, uom, unit_cost and markup_pct verbatim; adjust quantity to the new scope. Only invent a line when the scope needs work no comparable covers, and mark it source:"market". Then call add_estimate_lines.',
+          guidance: 'Build the new estimate from these line items. Pass each line back to add_estimate_lines with its line_id — the description and cost_code are taken from that row, so do not retype or reword them. JDC reuses a fixed vocabulary of line names and a paraphrase is treated as a different, unknown item. Adjust only quantity to the new scope. If the scope needs work no comparable covers, send that line with no line_id and no cost_code: it is held back for the estimator to name and price rather than guessed at.',
         })
       }
 
@@ -763,10 +764,13 @@ export async function POST(request: Request) {
 
         const startOrder = await nextEstimateSortOrder(admin, estimateId, !!session)
         const drafts = await buildAiEstimateLines(admin, incoming, startOrder)
-        if (drafts.length === 0) return NextResponse.json({ error: 'No lines had a description' }, { status: 400 })
+        if (drafts.length === 0) return NextResponse.json({ error: 'No lines to add' }, { status: 400 })
 
-        const total = drafts.reduce((s, r) => s + r.quantity * r.unit_cost, 0)
+        const sourced = drafts.filter(d => d.name_status === 'sourced')
+        const unsourced = drafts.filter(d => d.name_status === 'unsourced')
+        const total = sourced.reduce((sum, r) => sum + r.quantity * r.unit_cost, 0)
         const estimatedCost = Math.round(total * 100) / 100
+        const money = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
         if (session) {
           const batchId = randomUUID()
@@ -776,6 +780,8 @@ export async function POST(request: Request) {
               estimate_id: estimateId,
               batch_id:    batchId,
               description: d.description,
+              name_status: d.name_status,
+              suggested_description: d.suggested_description,
               phase:       d.phase,
               cost_code:   d.cost_code,
               uom:         d.uom,
@@ -784,6 +790,8 @@ export async function POST(request: Request) {
               markup_pct:  d.markup_pct,
               sort_order:  d.sort_order,
               source:      d.source,
+              source_line_id: d.source_line_id,
+              cost_item_id: d.cost_item_id,
               comp_job_id: d.comp_job_id,
               comp_estimate_id: d.comp_estimate_id,
               comp_label:  d.comp_label,
@@ -793,18 +801,36 @@ export async function POST(request: Request) {
           if (error) throw error
 
           const n = staged?.length ?? drafts.length
+          // Say plainly that nothing was written, or Fixer reports the job as done.
+          let message = `Staged ${n} line${n === 1 ? '' : 's'} for review in the Estimate Builder. Nothing has been added to "${estimate.title}" yet — the estimator approves them line by line.`
+          if (unsourced.length > 0) {
+            message += ` ${unsourced.length} of them matched no past line or cost code, so ${unsourced.length === 1 ? 'it is' : 'they are'} held blank for the estimator to name and price: ${unsourced.map(d => d.suggested_description ?? '(no suggestion)').join('; ')}. Tell them which ${unsourced.length === 1 ? 'one needs' : 'ones need'} attention.`
+          }
+          if (sourced.length > 0) message += ` The ${sourced.length} sourced line${sourced.length === 1 ? '' : 's'} come to ${money(estimatedCost)}.`
+
           return ok({
             proposed: n,
+            sourced: sourced.length,
+            needs_naming: unsourced.length,
             estimate: estimate.title,
             estimated_cost: estimatedCost,
-            // Say plainly that nothing was written, or Fixer reports the job as done.
-            message: `Staged ${n} line${n === 1 ? '' : 's'} (${estimatedCost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}) for review in the Estimate Builder. Nothing has been added to "${estimate.title}" yet — the estimator approves them line by line.`,
+            message,
           })
+        }
+
+        // Unattended path (SMS, the floating panel): there is no review list to fix a
+        // blank line in, so an unsourceable line is refused rather than guessed at.
+        if (unsourced.length > 0) {
+          return NextResponse.json({
+            error: 'Unsourced lines cannot be added directly',
+            needs_naming: unsourced.map(d => d.suggested_description ?? '(no description)'),
+            message: `${unsourced.length} line${unsourced.length === 1 ? '' : 's'} matched no past JDC line or cost code. Every line has to carry a line_id from find_comparable_estimates / find_line_pricing, or a cost_code from the cost book — JDC's line names are a fixed vocabulary and must not be reworded or invented. Re-send only the lines you can cite, and tell the estimator what you could not price.`,
+          }, { status: 422 })
         }
 
         const { data: inserted, error } = await admin
           .from('estimate_lines')
-          .insert(drafts.map(d => ({
+          .insert(sourced.map(d => ({
             estimate_id: estimateId,
             lead_id:     estimate.lead_id,
             description: d.description,
@@ -816,17 +842,20 @@ export async function POST(request: Request) {
             markup_pct:  d.markup_pct,
             sort_order:  d.sort_order,
             source:      d.source,
+            source_line_id: d.source_line_id,
+            cost_item_id: d.cost_item_id,
             comp_job_id: d.comp_job_id,
+            comp_label: d.comp_label,
             ai_rationale: d.ai_rationale,
           })))
           .select('id')
         if (error) throw error
 
         return ok({
-          added: inserted?.length ?? drafts.length,
+          added: inserted?.length ?? sourced.length,
           estimate: estimate.title,
           estimated_cost: estimatedCost,
-          message: `Added ${inserted?.length ?? drafts.length} line items to "${estimate.title}".`,
+          message: `Added ${inserted?.length ?? sourced.length} line items to "${estimate.title}".`,
         })
       }
 
@@ -982,7 +1011,12 @@ function inviteFacts(ctx: AssignmentContext) {
  * and a direct write can never disagree about coercion or provenance.
  */
 interface AiEstimateLineDraft {
+  /** Copied from the cited source row. Empty when nothing could be cited. */
   description: string
+  /** 'unsourced' means Fixer matched no real line — a person has to name it. */
+  name_status: 'sourced' | 'unsourced'
+  /** What the model would have called it. A hint for the estimator, never the name. */
+  suggested_description: string | null
   phase: string | null
   cost_code: string | null
   uom: string
@@ -991,6 +1025,8 @@ interface AiEstimateLineDraft {
   markup_pct: number
   sort_order: number
   source: 'ai_comp' | 'ai_market'
+  source_line_id: string | null
+  cost_item_id: string | null
   comp_job_id: string | null
   comp_estimate_id: string | null
   comp_label: string | null
@@ -1048,41 +1084,125 @@ async function buildAiEstimateLines(
     return Number.isFinite(n) ? n : fallback
   }
 
-  const compIds = [...new Set(incoming.map(l => str(l.comp_estimate_id)).filter(Boolean) as string[])]
+  const norm = (v: string) => v.trim().toLowerCase()
+
+  // ── Resolve every citation in batched lookups ────────────────────────────
+  const lineIds = [...new Set(incoming.map(l => str(l.line_id)).filter(Boolean) as string[])]
+  const codes   = [...new Set(incoming.map(l => str(l.cost_code)).filter(Boolean) as string[])]
+  const typed   = [...new Set(incoming.map(l => str(l.description)).filter(Boolean) as string[])]
+
+  const empty = { data: [] as Record<string, unknown>[] }
+
+  const [sourceLines, catalogItems, typedHist, typedCatalog] = await Promise.all([
+    lineIds.length
+      ? admin.from('historical_estimate_lines')
+          .select('id, historical_estimate_id, description, cost_code, uom')
+          .in('id', lineIds)
+      : Promise.resolve(empty),
+    codes.length
+      ? admin.from('cost_catalog').select('id, cost_code, title, uom').in('cost_code', codes)
+      : Promise.resolve(empty),
+    // Last resort: the model retyped a name that really is in the vocabulary. Accept it,
+    // but snap to the stored spelling so the estimate stays internally consistent.
+    typed.length
+      ? admin.from('historical_estimate_lines')
+          .select('id, historical_estimate_id, description, cost_code, uom')
+          .in('description', typed)
+      : Promise.resolve(empty),
+    typed.length
+      ? admin.from('cost_catalog').select('id, cost_code, title, uom').in('title', typed)
+      : Promise.resolve(empty),
+  ])
+
+  // PostgREST hands back differently-shaped rows per table; one loose record type
+  // keeps the lookup below from having to narrow a union at every access.
+  const rows = (r: { data: unknown }) => (r.data ?? []) as Record<string, unknown>[]
+
+  const byLineId = new Map(rows(sourceLines).map(r => [r.id as string, r]))
+  const byCode = new Map(rows(catalogItems).map(r => [norm(r.cost_code as string), r]))
+
+  const byName = new Map<string, Record<string, unknown>>()
+  for (const r of rows(typedHist)) byName.set(norm(r.description as string), r)
+  for (const r of rows(typedCatalog)) {
+    const k = norm(r.title as string)
+    if (!byName.has(k)) byName.set(k, r)
+  }
+
+  // Comp job attribution, resolved from whichever historical estimate the name came from.
+  const compIds = new Set<string>()
+  for (const l of incoming) {
+    const c = str(l.comp_estimate_id)
+    if (c) compIds.add(c)
+  }
+  for (const r of [...rows(sourceLines), ...rows(typedHist)]) {
+    if (r.historical_estimate_id) compIds.add(r.historical_estimate_id as string)
+  }
+
   const compById = new Map<string, { jobId: string | null; label: string | null }>()
-  if (compIds.length > 0) {
+  if (compIds.size > 0) {
     const { data: comps } = await admin
       .from('historical_estimates')
       .select('id, job_id, display_name')
-      .in('id', compIds)
-    ;(comps ?? []).forEach(c => compById.set(c.id as string, {
-      jobId: (c.job_id as string | null) ?? null,
-      label: (c.display_name as string | null) ?? null,
-    }))
+      .in('id', [...compIds])
+    for (const c of comps ?? []) {
+      compById.set(c.id as string, {
+        jobId: (c.job_id as string | null) ?? null,
+        label: (c.display_name as string | null) ?? null,
+      })
+    }
   }
 
-  return incoming
-    .filter(l => str(l.description))
-    .map((l, i) => {
-      const compEstimateId = str(l.comp_estimate_id)
-      const comp = compEstimateId ? compById.get(compEstimateId) : undefined
-      return {
-        description: String(l.description).trim(),
-        phase:       str(l.phase),
-        cost_code:   str(l.cost_code),
-        uom:         str(l.uom) ?? 'EA',
-        quantity:    num(l.quantity, 1),
-        unit_cost:   num(l.unit_cost, 0),
-        markup_pct:  num(l.markup_pct, 0),
-        sort_order:  startOrder + i,
-        // source is constrained to manual|catalog|assembly|ai_comp|ai_market.
-        source:      (str(l.source) === 'market' ? 'ai_market' : 'ai_comp') as 'ai_comp' | 'ai_market',
-        comp_job_id: comp?.jobId ?? null,
-        comp_estimate_id: compEstimateId,
-        comp_label:  comp?.label ?? null,
-        ai_rationale: str(l.rationale),
-      }
-    })
+  return incoming.map((l, i) => {
+    const citedLine = str(l.line_id)
+    const citedCode = str(l.cost_code)
+    const citedName = str(l.description)
+
+    const sourceLine = citedLine ? byLineId.get(citedLine) : undefined
+    const catalogItem = !sourceLine && citedCode ? byCode.get(norm(citedCode)) : undefined
+    const namedMatch = !sourceLine && !catalogItem && citedName ? byName.get(norm(citedName)) : undefined
+    const resolved = sourceLine ?? catalogItem ?? namedMatch
+
+    // The description is whatever the source row calls it. What the model typed is never
+    // the name: JDC reuses a fixed vocabulary and a paraphrase reads as a different item.
+    // In cost_catalog that name is `title` — its `description` holds usage metadata.
+    const canonicalName = resolved
+      ? String(resolved.description ?? resolved.title ?? '').trim()
+      : ''
+
+    const fromHistorical = sourceLine ?? namedMatch
+    const compEstimateId =
+      (fromHistorical?.historical_estimate_id as string | undefined)
+      ?? str(l.comp_estimate_id)
+      ?? null
+    const comp = compEstimateId ? compById.get(compEstimateId) : undefined
+
+    const isHistorical = !!(fromHistorical?.historical_estimate_id)
+    const catalogRow = catalogItem ?? (namedMatch && namedMatch.title ? namedMatch : undefined)
+
+    return {
+      // An unsourced line carries no name at all rather than a plausible-looking guess.
+      description: canonicalName,
+      name_status: (canonicalName ? 'sourced' : 'unsourced') as 'sourced' | 'unsourced',
+      suggested_description: canonicalName ? null : citedName,
+      phase: str(l.phase),
+      cost_code: (resolved ? str(resolved.cost_code as string) : null) ?? citedCode,
+      uom: (resolved ? str(resolved.uom as string) : null) ?? str(l.uom) ?? 'EA',
+      quantity: num(l.quantity, 1),
+      // An unnamed line gets no price either — a number beside a blank name invites
+      // approving it unread.
+      unit_cost: canonicalName ? num(l.unit_cost, 0) : 0,
+      markup_pct: canonicalName ? num(l.markup_pct, 0) : 0,
+      sort_order: startOrder + i,
+      // source is constrained to manual|catalog|assembly|ai_comp|ai_market.
+      source: (isHistorical ? 'ai_comp' : 'ai_market') as 'ai_comp' | 'ai_market',
+      source_line_id: (fromHistorical?.id as string | undefined) ?? null,
+      cost_item_id: (catalogRow?.id as string | undefined) ?? null,
+      comp_job_id: comp?.jobId ?? null,
+      comp_estimate_id: compEstimateId,
+      comp_label: comp?.label ?? null,
+      ai_rationale: str(l.rationale),
+    }
+  })
 }
 
 function notFoundError(resource: string) {

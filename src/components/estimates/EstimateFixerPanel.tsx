@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bot, Loader2, Send, Sparkles, Square, Trash2, Check } from 'lucide-react'
+import { Bot, Loader2, Send, Sparkles, Square, Trash2, Check, AlertTriangle } from 'lucide-react'
 import { useFixerChat, formatElapsed } from '@/hooks/useFixerChat'
 import type { EstimateLineProposal } from '@/types'
 
@@ -17,6 +17,10 @@ import type { EstimateLineProposal } from '@/types'
  * (/api/estimate-lines/proposals/session), which makes add_estimate_lines stage into
  * estimate_line_proposals instead of estimate_lines. Nothing lands until the estimator
  * checks it off.
+ *
+ * Line names are not Fixer's to write. Every proposed name is copied from the past line
+ * or cost code it cites; anything it could not source arrives blank and unpriced, for a
+ * person to fill in here before it can be approved.
  */
 
 interface Props {
@@ -49,6 +53,10 @@ function proposalTotal(p: EstimateLineProposal) {
   return p.quantity * p.unit_cost * (1 + p.markup_pct / 100)
 }
 
+function isUnnamed(p: EstimateLineProposal) {
+  return p.name_status === 'unsourced' || !p.description?.trim()
+}
+
 export function EstimateFixerPanel({
   estimateId,
   scopeText,
@@ -62,6 +70,9 @@ export function EstimateFixerPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [applying, setApplying] = useState(false)
   const [panelError, setPanelError] = useState<string | null>(null)
+  /** In-progress edits for the lines Fixer could not name. */
+  const [drafts, setDrafts] = useState<Record<string, { description: string; unit_cost: string }>>({})
+  const [savingId, setSavingId] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -74,9 +85,15 @@ export function EstimateFixerPanel({
       if (!res.ok) return
       const rows: EstimateLineProposal[] = await res.json()
       setProposals(rows)
-      // Everything arrives checked — the common case is "these look right, add them",
-      // and unchecking two is less work than checking eleven.
-      setSelected(new Set(rows.map(r => r.id)))
+      // Sourced lines arrive checked — the common case is "these look right, add them".
+      // Unnamed ones cannot be checked until someone names them.
+      setSelected(new Set(rows.filter(r => !isUnnamed(r)).map(r => r.id)))
+      setDrafts(Object.fromEntries(
+        rows.filter(isUnnamed).map(r => [r.id, {
+          description: r.suggested_description ?? '',
+          unit_cost: r.unit_cost ? String(r.unit_cost) : '',
+        }])
+      ))
     } catch {
       // A failed refresh just means the review list is stale; the chat still works.
     }
@@ -146,8 +163,35 @@ export function EstimateFixerPanel({
     })
   }
 
+  async function saveName(p: EstimateLineProposal) {
+    const draft = drafts[p.id]
+    if (!draft?.description.trim()) return
+    setSavingId(p.id)
+    setPanelError(null)
+    try {
+      const res = await fetch('/api/estimate-lines/proposals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposal_id: p.id,
+          description: draft.description.trim(),
+          unit_cost: Number(draft.unit_cost) || 0,
+        }),
+      })
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Could not save that name')
+      }
+      await loadProposals()
+    } catch (e) {
+      setPanelError(e instanceof Error ? e.message : 'Could not save that name')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   async function applySelected() {
-    const ids = proposals.filter(p => selected.has(p.id)).map(p => p.id)
+    const ids = proposals.filter(p => selected.has(p.id) && !isUnnamed(p)).map(p => p.id)
     if (ids.length === 0) return
     setApplying(true)
     setPanelError(null)
@@ -195,8 +239,9 @@ export function EstimateFixerPanel({
   }
 
   const selectedTotal = proposals
-    .filter(p => selected.has(p.id))
+    .filter(p => selected.has(p.id) && !isUnnamed(p))
     .reduce((sum, p) => sum + proposalTotal(p), 0)
+  const unnamedCount = proposals.filter(isUnnamed).length
 
   const disabled = !canCreate || isLocked
 
@@ -224,7 +269,7 @@ export function EstimateFixerPanel({
                 : 'Write the scope notes above, then ask me to price them from comparable past jobs.'}
             </p>
             <p className="text-[10px] text-gray-400 mt-2">
-              A whole house goes faster one phase at a time.
+              Line names come from your past estimates and cost book, never from me.
             </p>
           </div>
         )}
@@ -271,43 +316,103 @@ export function EstimateFixerPanel({
               <p className="text-[11px] font-semibold text-navy-900">{fmt(selectedTotal)}</p>
             </div>
 
-            <ul className="divide-y divide-gold-200/70 max-h-64 overflow-y-auto">
-              {proposals.map(p => (
-                <li key={p.id} className="px-3 py-2">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(p.id)}
-                      onChange={() => toggle(p.id)}
-                      className="mt-0.5 shrink-0 accent-gold-500"
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[11px] font-medium text-navy-900 leading-snug">
-                        {p.description}
-                      </span>
-                      <span className="block text-[10px] text-gray-500 mt-0.5">
-                        {p.quantity} {p.uom} × {fmt(p.unit_cost)}
-                        {p.markup_pct > 0 && ` + ${p.markup_pct}%`}
-                        {' = '}
-                        <span className="font-medium text-navy-700">{fmt(proposalTotal(p))}</span>
-                      </span>
-                      {/* The whole point of the review step: where the number came from. */}
-                      <span className="block text-[10px] text-gray-400 mt-0.5">
-                        {p.source === 'ai_market'
-                          ? 'No comparable — market rate'
-                          : p.comp_label
-                            ? `from ${p.comp_label}`
-                            : 'from a past job'}
-                      </span>
-                      {p.ai_rationale && (
-                        <span className="block text-[10px] text-gray-400 italic mt-0.5 leading-snug">
-                          {p.ai_rationale}
-                        </span>
+            {unnamedCount > 0 && (
+              <p className="px-3 py-1.5 text-[10px] text-red-700 bg-red-50 border-b border-red-200 flex items-start gap-1.5">
+                <AlertTriangle size={11} className="shrink-0 mt-px" />
+                <span>
+                  {unnamedCount === 1 ? 'One line' : `${unnamedCount} lines`} matched nothing in your
+                  past estimates or cost book. Name and price {unnamedCount === 1 ? 'it' : 'them'} to use
+                  {unnamedCount === 1 ? ' it' : ' them'} — Fixer does not make names up.
+                </span>
+              </p>
+            )}
+
+            <ul className="divide-y divide-gold-200/70 max-h-72 overflow-y-auto">
+              {proposals.map(p => {
+                const unnamed = isUnnamed(p)
+
+                if (unnamed) {
+                  const draft = drafts[p.id] ?? { description: '', unit_cost: '' }
+                  return (
+                    <li key={p.id} className="px-3 py-2 bg-red-50/60">
+                      <p className="text-[10px] font-semibold text-red-700 flex items-center gap-1">
+                        <AlertTriangle size={10} />
+                        Needs a name
+                      </p>
+                      {p.suggested_description && (
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                          Fixer suggested “{p.suggested_description}” — check it against your own
+                          wording before using it.
+                        </p>
                       )}
-                    </span>
-                  </label>
-                </li>
-              ))}
+                      <input
+                        value={draft.description}
+                        onChange={e => setDrafts(d => ({ ...d, [p.id]: { ...draft, description: e.target.value } }))}
+                        placeholder="Line name"
+                        className="w-full mt-1.5 text-[11px] text-navy-900 bg-white border border-red-200 rounded px-2 py-1 focus:outline-none focus:border-red-400"
+                      />
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] text-gray-500 shrink-0">
+                          {p.quantity} {p.uom} ×
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={draft.unit_cost}
+                          onChange={e => setDrafts(d => ({ ...d, [p.id]: { ...draft, unit_cost: e.target.value } }))}
+                          placeholder="Unit cost"
+                          className="flex-1 min-w-0 text-[11px] text-navy-900 bg-white border border-red-200 rounded px-2 py-1 focus:outline-none focus:border-red-400 tabular-nums"
+                        />
+                        <button
+                          onClick={() => saveName(p)}
+                          disabled={!draft.description.trim() || savingId === p.id || disabled}
+                          className="shrink-0 text-[10px] font-semibold bg-navy-900 hover:bg-navy-800 text-white px-2 py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {savingId === p.id ? <Loader2 size={10} className="animate-spin" /> : 'Save'}
+                        </button>
+                      </div>
+                    </li>
+                  )
+                }
+
+                return (
+                  <li key={p.id} className="px-3 py-2">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(p.id)}
+                        onChange={() => toggle(p.id)}
+                        className="mt-0.5 shrink-0 accent-gold-500"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[11px] font-medium text-navy-900 leading-snug">
+                          {p.description}
+                        </span>
+                        <span className="block text-[10px] text-gray-500 mt-0.5">
+                          {p.quantity} {p.uom} × {fmt(p.unit_cost)}
+                          {p.markup_pct > 0 && ` + ${p.markup_pct}%`}
+                          {' = '}
+                          <span className="font-medium text-navy-700">{fmt(proposalTotal(p))}</span>
+                        </span>
+                        {/* The whole point of the review step: where the name and number came from. */}
+                        <span className="block text-[10px] text-gray-400 mt-0.5">
+                          {p.comp_label
+                            ? `from ${p.comp_label}`
+                            : p.cost_code
+                              ? `from cost code ${p.cost_code}`
+                              : 'named by hand'}
+                        </span>
+                        {p.ai_rationale && (
+                          <span className="block text-[10px] text-gray-400 italic mt-0.5 leading-snug">
+                            {p.ai_rationale}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
             </ul>
 
             <div className="px-3 py-2 border-t border-gold-200 flex items-center gap-2">

@@ -234,7 +234,7 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'add_estimate_lines',
-    description: 'Append line items to an existing estimate. Use after find_comparable_estimates to write the estimate you built. Lines are appended, never replacing what is already there. When the estimator has the Estimate Builder open, these are staged for their approval rather than added straight away — the response says which happened, so report it as it comes back rather than assuming the lines landed.',
+    description: 'Append line items to an existing estimate. Use after find_comparable_estimates or find_line_pricing. Every line must cite where its name came from: pass line_id from those tools, or a cost_code from the cost book. The description is copied from that row — anything you type is discarded, so do not reword a line name. JDC reuses a fixed vocabulary of about 700 line names and a paraphrase reads as a different, unknown item. A line you cannot cite is held back blank for the estimator to name; it is refused outright outside the Estimate Builder. Lines are appended, never replacing what is there. When the estimator has the builder open these are staged for approval rather than added — the response says which happened, so report it as it comes back rather than assuming the lines landed.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -245,16 +245,15 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
           items: {
             type: 'object' as const,
             properties: {
-              description: { type: 'string' },
+              line_id:     { type: 'string', description: 'The id of the past line this came from, exactly as returned by find_comparable_estimates or find_line_pricing. This is what names the line — always send it when you have it.' },
+              description: { type: 'string', description: 'Ignored when line_id or cost_code resolves; the stored name is used instead. Only send it for a line you cannot cite, as a suggestion for the estimator.' },
               phase:       { type: 'string', description: 'e.g. Demo, Plumbing, Tile, Painting' },
-              cost_code:   { type: 'string', description: "JDC's own code from a comparable, e.g. \"14.1320.010\". Omit for a line no comparable covered." },
+              cost_code:   { type: 'string', description: "JDC's own code, e.g. \"14.1320.010\". Names the line from the cost book when you have no line_id. Omit when you have neither." },
               uom:         { type: 'string', description: 'EA, SF, LF, HR, LS, … (default EA)' },
               quantity:    { type: 'number' },
               unit_cost:   { type: 'number' },
               markup_pct:  { type: 'number' },
-              source:      { type: 'string', enum: ['comp', 'market'], description: '"comp" when priced from a comparable job, "market" when no comparable covered it and you inferred the rate.' },
-              comp_estimate_id: { type: 'string', description: 'When source is "comp", the estimate_id of the comparable this line came from, as returned by find_comparable_estimates.' },
-              rationale:   { type: 'string', description: 'One sentence. For comp lines, which job and how you reasoned the quantity. For market lines, why no comparable covered it.' },
+              rationale:   { type: 'string', description: 'One sentence: which job it came from and how you reasoned the quantity, or why nothing covered it.' },
             },
             required: ['description'],
           },

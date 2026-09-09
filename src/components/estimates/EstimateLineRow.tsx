@@ -44,19 +44,36 @@ function lineTotal(line: EstimateLine): number {
 }
 
 /**
- * Marks a line Fixer priced. The comp it came from is recorded on the row, so the
- * attribution outlives the chat thread that produced it.
+ * Marks a line Fixer priced, and says where the name came from. Fixer never authors a
+ * line name — it cites a past line or a cost code and the server copies the wording
+ * from there — so the badge can always name a real origin.
+ *
+ * Keyed on source_line_id rather than comp_job_id: 84 of the 188 imported historical
+ * estimates have no job link, so a comp line would otherwise read as "cost book".
  */
 function AiSourceBadge({ line }: { line: EstimateLine }) {
   if (line.source !== 'ai_comp' && line.source !== 'ai_market') return null
-  const title = line.ai_rationale
-    ?? (line.source === 'ai_market' ? 'Fixer priced this at market rate' : 'Fixer priced this from a past JDC job')
+
+  const fromComp = !!(line.source_line_id || line.comp_label || line.comp_job_id)
+
+  const label = fromComp
+    ? 'Fixer · comp'
+    : line.cost_code
+      ? 'Fixer · cost book'
+      : 'Fixer · you named it'
+
+  const origin = fromComp
+    ? (line.comp_label ? `Priced from ${line.comp_label}` : 'Priced from a past JDC job')
+    : line.cost_code
+      ? `Named and priced from cost code ${line.cost_code}`
+      : 'Fixer could not source this one; you named it'
+
   return (
     <span
-      title={title}
+      title={line.ai_rationale ? `${origin} — ${line.ai_rationale}` : origin}
       className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded whitespace-nowrap"
     >
-      {line.source === 'ai_market' ? 'Fixer · market' : 'Fixer · comp'}
+      {label}
     </span>
   )
 }
