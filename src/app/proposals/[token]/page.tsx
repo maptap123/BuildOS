@@ -7,6 +7,7 @@ import {
   clientLineTotal,
   type ProposalDisplay,
 } from '@/lib/estimates/proposalDisplay'
+import { comparePhases } from '@/lib/estimates/divisions'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
@@ -71,7 +72,9 @@ function groupedLines(lines: ProposalLine[], grouped: boolean) {
     const phase = grouped ? (line.phase ?? 'Project') : ''
     map.set(phase, [...(map.get(phase) ?? []), line])
   }
-  return Array.from(map.entries())
+  // Cost book order — 01 Plans and Permits down to 25 Clean-Up — so what the client sees
+  // matches the builder and the printed proposal.
+  return Array.from(map.entries()).sort((a, b) => comparePhases(a[0], b[0]))
 }
 
 function responseDate(value: string | null) {

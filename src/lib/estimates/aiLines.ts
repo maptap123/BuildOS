@@ -7,6 +7,7 @@ import {
   type CostBreakdown,
 } from './costBreakdown'
 import { costCodeVariants, normalizeCostCode } from './costCodes'
+import { divisionPhase } from './divisions'
 
 /**
  * Turning what Fixer cites into priced estimate lines
@@ -33,7 +34,8 @@ export interface AiEstimateLineDraft {
   name_status: 'sourced' | 'unsourced'
   /** What the model would have called it. A hint for the estimator, never the name. */
   suggested_description: string | null
-  phase: string | null
+  /** Always the line's cost code division, e.g. "02 Tear-Out and Demolition". Never typed. */
+  phase: string
   cost_code: string | null
   uom: string
   quantity: number
@@ -156,7 +158,7 @@ export async function buildAiEstimateLines(
   )]
 
   const empty = { data: [] as Record<string, unknown>[] }
-  const HIST_SELECT = 'id, historical_estimate_id, row_number, description, cost_code, uom'
+  const HIST_SELECT = 'id, historical_estimate_id, row_number, description, cost_code, division_num, division_name, uom'
 
   const [sourceLines, catalogItems, typedHist, typedCatalog] = await Promise.all([
     lineIds.length
@@ -164,7 +166,7 @@ export async function buildAiEstimateLines(
       : Promise.resolve(empty),
     codes.length
       ? admin.from('cost_catalog')
-          .select('id, cost_code, title, uom, unit_cost, labor_cost, material_cost, sub_cost')
+          .select('id, cost_code, division_num, division_name, title, uom, unit_cost, labor_cost, material_cost, sub_cost')
           // Both spellings: the cost book writes `14.3000.`, the workbooks `14.3040`.
           .in('cost_code', costCodeVariants(codes))
       : Promise.resolve(empty),
@@ -178,7 +180,7 @@ export async function buildAiEstimateLines(
           .limit(1000)
       : Promise.resolve(empty),
     typed.length
-      ? admin.from('cost_catalog').select('id, cost_code, title, uom').in('title', typed)
+      ? admin.from('cost_catalog').select('id, cost_code, division_num, division_name, title, uom').in('title', typed)
       : Promise.resolve(empty),
   ])
 
@@ -304,13 +306,23 @@ export async function buildAiEstimateLines(
 
     const blank = splitOrDefault(0, null)
 
+    // The stored code wins over the cited one — it carries the cost book's spelling, and
+    // it is what the phase is derived from.
+    const lineCostCode = (resolved ? str(resolved.cost_code as string) : null) ?? citedCode
+
     return {
       // An unsourced line carries no name at all rather than a plausible-looking guess.
       description: canonicalName,
       name_status: (canonicalName ? 'sourced' : 'unsourced') as 'sourced' | 'unsourced',
       suggested_description: canonicalName ? null : citedName,
-      phase: str(l.phase),
-      cost_code: (resolved ? str(resolved.cost_code as string) : null) ?? citedCode,
+      // The grouping is the cost code's division, not something the model names. Whatever
+      // it sent as `phase` is discarded — see lib/estimates/divisions.ts.
+      phase: divisionPhase(
+        resolved ? str(resolved.division_num as string) : null,
+        lineCostCode,
+        resolved ? str(resolved.division_name as string) : null
+      ),
+      cost_code: lineCostCode,
       uom: (resolved ? str(resolved.uom as string) : null) ?? str(l.uom) ?? 'EA',
       quantity: num(l.quantity, 1),
       // An unnamed line gets no price either — a number beside a blank name invites

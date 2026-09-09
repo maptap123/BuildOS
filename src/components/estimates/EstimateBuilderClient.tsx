@@ -28,6 +28,7 @@ import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow, EstimateLineCard } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
 import { EstimateFixerPanel } from './EstimateFixerPanel'
+import { comparePhases, divisionPhase, UNASSIGNED_PHASE } from '@/lib/estimates/divisions'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
 import { resolveProposalDisplay, type ProposalDisplay } from '@/lib/estimates/proposalDisplay'
 
@@ -59,21 +60,28 @@ function lineTotal(l: EstimateLine) {
   return l.quantity * l.unit_cost * (1 + l.markup_pct / 100)
 }
 
+/**
+ * Lines under their cost code division, divisions in cost book order — 01 Plans and
+ * Permits down to 25 Clean-Up, then Unassigned. The map is rebuilt sorted rather than
+ * left in row order: lines arrive by sort_order, so a division Fixer priced in two
+ * passes would otherwise show up as two separate headers.
+ */
 function groupByPhase(lines: EstimateLine[]): Map<string, EstimateLine[]> {
   const map = new Map<string, EstimateLine[]>()
   for (const l of lines) {
-    const key = l.phase ?? 'Unassigned'
+    const key = l.phase?.trim() || UNASSIGNED_PHASE
     const arr = map.get(key) ?? []
     arr.push(l)
     map.set(key, arr)
   }
-  return map
+  return new Map([...map.entries()].sort((a, b) => comparePhases(a[0], b[0])))
 }
 
 // ── Assembly definitions ───────────────────────────────────────────────────
 interface AssemblyLine {
   description: string
-  phase: string
+  /** Cost book division number. The phase label is derived from it, same as every other line. */
+  division: string
   uom: string
   quantity: number
   unit_cost: number
@@ -93,10 +101,10 @@ const ASSEMBLIES: Assembly[] = [
     name: 'Standard Bathroom Remodel',
     description: 'Demo, tile work, fixture install, plumbing rough',
     lines: [
-      { description: 'Demolition & Disposal', phase: 'Demo', uom: 'EA', quantity: 1, unit_cost: 850, markup_pct: 15 },
-      { description: 'Tile Work — Floor & Shower Surround', phase: 'Finishes', uom: 'SF', quantity: 80, unit_cost: 12, markup_pct: 20 },
-      { description: 'Fixture Installation (toilet, vanity, shower)', phase: 'Finishes', uom: 'EA', quantity: 1, unit_cost: 1200, markup_pct: 15 },
-      { description: 'Plumbing Rough-In', phase: 'Plumbing', uom: 'HR', quantity: 8, unit_cost: 95, markup_pct: 15 },
+      { description: 'Demolition & Disposal', division: '02', uom: 'EA', quantity: 1, unit_cost: 850, markup_pct: 15 },
+      { description: 'Tile Work — Floor & Shower Surround', division: '23', uom: 'SF', quantity: 80, unit_cost: 12, markup_pct: 20 },
+      { description: 'Fixture Installation (toilet, vanity, shower)', division: '14', uom: 'EA', quantity: 1, unit_cost: 1200, markup_pct: 15 },
+      { description: 'Plumbing Rough-In', division: '14', uom: 'HR', quantity: 8, unit_cost: 95, markup_pct: 15 },
     ],
   },
   {
@@ -104,8 +112,8 @@ const ASSEMBLIES: Assembly[] = [
     name: 'Interior Door Install',
     description: 'Pre-hung door with hardware and labor',
     lines: [
-      { description: 'Pre-Hung Interior Door + Hardware', phase: 'Finishes', uom: 'EA', quantity: 1, unit_cost: 185, markup_pct: 20 },
-      { description: 'Door Installation Labor', phase: 'Finishes', uom: 'HR', quantity: 2, unit_cost: 75, markup_pct: 15 },
+      { description: 'Pre-Hung Interior Door + Hardware', division: '20', uom: 'EA', quantity: 1, unit_cost: 185, markup_pct: 20 },
+      { description: 'Door Installation Labor', division: '20', uom: 'HR', quantity: 2, unit_cost: 75, markup_pct: 15 },
     ],
   },
   {
@@ -113,9 +121,9 @@ const ASSEMBLIES: Assembly[] = [
     name: 'Deck Construction — 200 sqft',
     description: 'Framing, decking boards, and finish work',
     lines: [
-      { description: 'Deck Framing — Posts, Beams, Joists', phase: 'Framing', uom: 'SF', quantity: 200, unit_cost: 8, markup_pct: 15 },
-      { description: 'Composite Decking Boards', phase: 'Finishes', uom: 'SF', quantity: 200, unit_cost: 14, markup_pct: 20 },
-      { description: 'Railing, Trim & Finish', phase: 'Finishes', uom: 'LF', quantity: 60, unit_cost: 35, markup_pct: 20 },
+      { description: 'Deck Framing — Posts, Beams, Joists', division: '10', uom: 'SF', quantity: 200, unit_cost: 8, markup_pct: 15 },
+      { description: 'Composite Decking Boards', division: '10', uom: 'SF', quantity: 200, unit_cost: 14, markup_pct: 20 },
+      { description: 'Railing, Trim & Finish', division: '10', uom: 'LF', quantity: 60, unit_cost: 35, markup_pct: 20 },
     ],
   },
   {
@@ -123,8 +131,8 @@ const ASSEMBLIES: Assembly[] = [
     name: 'Kitchen Cabinet Install',
     description: 'Semi-custom cabinets and installation labor',
     lines: [
-      { description: 'Semi-Custom Kitchen Cabinets', phase: 'Finishes', uom: 'EA', quantity: 1, unit_cost: 4500, markup_pct: 20 },
-      { description: 'Cabinet Installation Labor', phase: 'Finishes', uom: 'HR', quantity: 16, unit_cost: 75, markup_pct: 15 },
+      { description: 'Semi-Custom Kitchen Cabinets', division: '21', uom: 'EA', quantity: 1, unit_cost: 4500, markup_pct: 20 },
+      { description: 'Cabinet Installation Labor', division: '21', uom: 'HR', quantity: 16, unit_cost: 75, markup_pct: 15 },
     ],
   },
   {
@@ -132,8 +140,8 @@ const ASSEMBLIES: Assembly[] = [
     name: 'Exterior Paint — 2000 sqft',
     description: 'Two-coat exterior paint system with labor',
     lines: [
-      { description: 'Exterior Paint & Primer Materials', phase: 'Exterior', uom: 'SF', quantity: 2000, unit_cost: 0.85, markup_pct: 20 },
-      { description: 'Exterior Painting Labor', phase: 'Exterior', uom: 'HR', quantity: 40, unit_cost: 60, markup_pct: 15 },
+      { description: 'Exterior Paint & Primer Materials', division: '24', uom: 'SF', quantity: 2000, unit_cost: 0.85, markup_pct: 20 },
+      { description: 'Exterior Painting Labor', division: '24', uom: 'HR', quantity: 40, unit_cost: 60, markup_pct: 15 },
     ],
   },
 ]
@@ -291,7 +299,7 @@ export function EstimateBuilderClient({
           lead_id:      lead.id,
           cost_item_id: item.id,
           description:  item.title,
-          phase:        item.phase ?? item.division_name,
+          phase:        divisionPhase(item.division_num, item.cost_code, item.division_name),
           cost_code:    item.cost_code,
           uom:          item.uom,
           quantity:     1,
@@ -359,7 +367,7 @@ export function EstimateBuilderClient({
               estimate_id: activeEstimate.id,
               lead_id:     lead.id,
               description: al.description,
-              phase:       al.phase,
+              phase:       divisionPhase(al.division),
               uom:         al.uom,
               quantity:    al.quantity,
               unit_cost:   al.unit_cost,

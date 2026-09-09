@@ -8,6 +8,7 @@ import {
   clientUnitPrice,
   type ProposalDisplay,
 } from '@/lib/estimates/proposalDisplay'
+import { comparePhases } from '@/lib/estimates/divisions'
 
 type ProposalLineGroup = {
   phase: string
@@ -39,11 +40,15 @@ function groupLines(lines: EstimateLine[], grouped: boolean): ProposalLineGroup[
     const phase = grouped ? (line.phase?.trim() || 'General Conditions') : ''
     groups.set(phase, [...(groups.get(phase) ?? []), line])
   }
-  return Array.from(groups.entries()).map(([phase, groupLines]) => {
-    const subtotal = groupLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
-    const markup = groupLines.reduce((sum, line) => sum + lineMarkup(line), 0)
-    return { phase, lines: groupLines, subtotal, markup, total: subtotal + markup }
-  })
+  // Divisions run in cost book order — 01 Plans and Permits through 25 Clean-Up — so the
+  // proposal reads the same way every time regardless of the order lines were priced in.
+  return Array.from(groups.entries())
+    .sort((a, b) => comparePhases(a[0], b[0]))
+    .map(([phase, groupLines]) => {
+      const subtotal = groupLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
+      const markup = groupLines.reduce((sum, line) => sum + lineMarkup(line), 0)
+      return { phase, lines: groupLines, subtotal, markup, total: subtotal + markup }
+    })
 }
 
 const CSS = `
