@@ -9,19 +9,15 @@
  * Here the answer comes back in the response body, so there is no 2000-character
  * message cap, no polling, and no heuristics.
  *
- * Requires two env vars; without them callers fall back to the old relay:
- *   HERMES_API_URL  — public origin of the Hermes gateway, e.g. https://fixer.jdcfixer.cloud
+ * This is the only transport. Both env vars are required — without them every
+ * call throws, which is deliberate: there is no relay left to fall back to.
+ *   HERMES_API_URL  — public origin of the Hermes gateway, e.g. https://fixer-api.jdcfixer.cloud
  *   HERMES_API_KEY  — the gateway's API_SERVER_KEY
  */
 
 export interface FixerMessage {
   role: 'user' | 'assistant'
   content: string
-}
-
-/** Whether the HTTP transport is configured. Callers use the relay when false. */
-export function fixerApiConfigured(): boolean {
-  return Boolean(process.env.HERMES_API_URL && process.env.HERMES_API_KEY)
 }
 
 interface ChatCompletionResponse {
