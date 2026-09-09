@@ -395,6 +395,16 @@ export function EstimateFixerPanel({
                           {' = '}
                           <span className="font-medium text-navy-700">{fmt(proposalTotal(p))}</span>
                         </span>
+                        {/* How the unit cost splits — the estimate carries it through. */}
+                        {(p.labor_cost !== null || p.material_cost !== null || p.sub_cost !== null) && (
+                          <span className="block text-[10px] text-gray-400 mt-0.5">
+                            {[
+                              p.labor_cost !== null && `labor ${fmt(p.labor_cost)}`,
+                              p.material_cost !== null && `matl ${fmt(p.material_cost)}`,
+                              p.sub_cost !== null && `sub ${fmt(p.sub_cost)}`,
+                            ].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
                         {/* The whole point of the review step: where the name and number came from. */}
                         <span className="block text-[10px] text-gray-400 mt-0.5">
                           {p.comp_label

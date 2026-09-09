@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { BREAKDOWN_FIELDS, toCost, unitCostFrom, withDerivedUnitCost } from '@/lib/estimates/costBreakdown'
 
 // GET /api/estimate-lines?estimate_id=<uuid>
 export async function GET(request: Request) {
@@ -52,7 +53,13 @@ export async function POST(request: Request) {
     phase, cost_code, uom = 'EA',
     quantity = 1, unit_cost = 0, markup_pct = 0,
     sort_order = 0, notes,
+    labor_cost, material_cost, sub_cost,
   } = body
+
+  // When the caller sends buckets, they decide the unit cost — a catalog pick carries
+  // labor and material across and the total has to follow them, not the other way round.
+  const breakdown = { labor_cost: toCost(labor_cost), material_cost: toCost(material_cost), sub_cost: toCost(sub_cost) }
+  const derivedUnitCost = unitCostFrom(breakdown)
 
   if (!estimate_id || !lead_id || !description) {
     return NextResponse.json({ error: 'estimate_id, lead_id, description required' }, { status: 400 })
@@ -70,7 +77,10 @@ export async function POST(request: Request) {
       cost_code:     cost_code     ?? null,
       uom,
       quantity:      Number(quantity),
-      unit_cost:     Number(unit_cost),
+      unit_cost:     derivedUnitCost ?? Number(unit_cost),
+      labor_cost:    breakdown.labor_cost,
+      material_cost: breakdown.material_cost,
+      sub_cost:      breakdown.sub_cost,
       markup_pct:    Number(markup_pct),
       sort_order:    Number(sort_order),
       notes:         notes?.trim() ?? null,
@@ -101,7 +111,7 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
   const body = await request.json()
-  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes']
+  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes', ...BREAKDOWN_FIELDS]
   const updates: Record<string, unknown> = {}
   for (const k of allowed) {
     if (k in body) {
@@ -112,9 +122,20 @@ export async function PATCH(request: Request) {
   }
 
   const admin = createAdminClient()
+
+  let merged = updates
+  if (BREAKDOWN_FIELDS.some(f => f in updates)) {
+    const { data: current } = await admin
+      .from('estimate_lines')
+      .select('labor_cost, material_cost, sub_cost')
+      .eq('id', id)
+      .maybeSingle()
+    merged = withDerivedUnitCost(updates, current ?? undefined)
+  }
+
   const { data, error } = await admin
     .from('estimate_lines')
-    .update(updates)
+    .update(merged)
     .eq('id', id)
     .select()
     .single()

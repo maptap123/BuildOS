@@ -621,7 +621,12 @@ export interface EstimateLine {
   cost_code: string | null
   uom: string
   quantity: number
+  /** Always labor + material + sub when any of them is set. */
   unit_cost: number
+  /** Null on a line priced as one number, with no breakdown. */
+  labor_cost: number | null
+  material_cost: number | null
+  sub_cost: number | null
   markup_pct: number
   sort_order: number
   notes: string | null
@@ -659,6 +664,9 @@ export interface EstimateLineProposal {
   uom: string
   quantity: number
   unit_cost: number
+  labor_cost: number | null
+  material_cost: number | null
+  sub_cost: number | null
   markup_pct: number
   sort_order: number
   source: 'ai_comp' | 'ai_market' | null

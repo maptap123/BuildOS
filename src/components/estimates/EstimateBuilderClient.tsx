@@ -197,6 +197,9 @@ export function EstimateBuilderClient({
               uom:           l.uom,
               quantity:      l.quantity,
               unit_cost:     l.unit_cost,
+              labor_cost:    l.labor_cost,
+              material_cost: l.material_cost,
+              sub_cost:      l.sub_cost,
               markup_pct:    l.markup_pct,
               sort_order:    l.sort_order,
               notes:         l.notes,
@@ -291,7 +294,11 @@ export function EstimateBuilderClient({
           cost_code:    item.cost_code,
           uom:          item.uom,
           quantity:     1,
+          // The cost book already splits every entry (unit_cost = labor + material
+          // across all 5,388 rows), so carry the split rather than flattening it.
           unit_cost:    item.unit_cost,
+          labor_cost:    item.labor_cost,
+          material_cost: item.material_cost,
           markup_pct:   activeEstimate.markup_pct ?? 0,
           sort_order:   lines.length,
         }),
@@ -421,6 +428,9 @@ export function EstimateBuilderClient({
               uom:           l.uom,
               quantity:      l.quantity,
               unit_cost:     l.unit_cost,
+              labor_cost:    l.labor_cost,
+              material_cost: l.material_cost,
+              sub_cost:      l.sub_cost,
               markup_pct:    l.markup_pct,
               sort_order:    l.sort_order,
               notes:         l.notes,
@@ -1022,7 +1032,10 @@ export function EstimateBuilderClient({
                         <th className="px-2 py-2.5 text-left w-28 hidden md:table-cell">Phase</th>
                         <th className="px-2 py-2.5 text-center w-16 hidden md:table-cell">UOM</th>
                         <th className="px-2 py-2.5 text-right w-20">Qty</th>
-                        <th className="px-2 py-2.5 text-right w-28">Unit Cost</th>
+                        <th className="px-2 py-2.5 text-right w-24">Labor</th>
+                        <th className="px-2 py-2.5 text-right w-24">Matl</th>
+                        <th className="px-2 py-2.5 text-right w-24">Sub</th>
+                        <th className="px-2 py-2.5 text-right w-28" title="Labor + material + sub">Unit Cost</th>
                         <th className="px-2 py-2.5 text-right w-28">Cost</th>
                         <th className="px-2 py-2.5 text-right w-20 hidden md:table-cell">Markup</th>
                         <th className="px-2 py-2.5 text-right w-28">Price</th>
@@ -1047,7 +1060,7 @@ export function EstimateBuilderClient({
                                   : <ChevronDown  size={12} className="text-gray-400" />
                                 }
                               </td>
-                              <td colSpan={6} className="px-2 py-2">
+                              <td colSpan={9} className="px-2 py-2">
                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                                   {phase}
                                 </span>
@@ -1086,7 +1099,7 @@ export function EstimateBuilderClient({
 
                     <tfoot>
                       <tr className="border-t-2 border-gray-200 bg-gray-50">
-                        <td colSpan={7} className="px-5 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
+                        <td colSpan={10} className="px-5 py-3 text-xs text-gray-500 font-medium uppercase tracking-wide">
                           Grand Total
                         </td>
                         <td className="px-2 py-3 text-right">

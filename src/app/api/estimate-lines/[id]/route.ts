@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { BREAKDOWN_FIELDS, withDerivedUnitCost } from '@/lib/estimates/costBreakdown'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -20,7 +21,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes', 'client_visible', 'internal_note']
+  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes', 'client_visible', 'internal_note', ...BREAKDOWN_FIELDS]
   const numericFields = ['quantity', 'unit_cost', 'markup_pct', 'sort_order']
   const updates: Record<string, unknown> = {}
   for (const k of allowed) {
@@ -30,9 +31,22 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const admin = createAdminClient()
+
+  // A partial update can set labor without mentioning material, so the stored buckets
+  // are needed to recompute unit_cost from the whole line rather than half of it.
+  let merged = updates
+  if (BREAKDOWN_FIELDS.some(f => f in updates)) {
+    const { data: current } = await admin
+      .from('estimate_lines')
+      .select('labor_cost, material_cost, sub_cost')
+      .eq('id', id)
+      .maybeSingle()
+    merged = withDerivedUnitCost(updates, current ?? undefined)
+  }
+
   const { data, error } = await admin
     .from('estimate_lines')
-    .update(updates)
+    .update(merged)
     .eq('id', id)
     .select()
     .single()

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Search, Loader2 } from 'lucide-react'
 import type { EstimateLine } from '@/types'
+import { hasBreakdown, unitCostFrom } from '@/lib/estimates/costBreakdown'
 
 interface Props {
   line: EstimateLine
@@ -37,6 +38,38 @@ const fmt = (n: number) =>
 
 function lineBuilderCost(line: EstimateLine): number {
   return line.quantity * line.unit_cost
+}
+
+/**
+ * One of the three cost buckets. Empty rather than 0 when unset, so a line that only
+ * has labor does not read as though its material cost was priced at nothing.
+ */
+function CostInput({
+  value, onChange, canEdit, placeholder,
+}: {
+  value: number | null
+  onChange: (v: string) => void
+  canEdit: boolean
+  placeholder?: string
+}) {
+  if (!canEdit) {
+    return (
+      <span className="text-sm text-right text-navy-700 tabular-nums block">
+        {value === null ? '—' : fmt(value)}
+      </span>
+    )
+  }
+  return (
+    <input
+      type="number"
+      min="0"
+      step="0.01"
+      value={value ?? ''}
+      placeholder={placeholder ?? '—'}
+      onChange={e => onChange(e.target.value)}
+      className="w-full text-sm text-right text-navy-700 bg-transparent border-0 border-b border-transparent focus:border-gold-400 focus:outline-none py-0.5 tabular-nums placeholder-gray-300"
+    />
+  )
 }
 
 function lineTotal(line: EstimateLine): number {
@@ -181,6 +214,8 @@ function PriceLookupSection({ line, onChange }: Pick<Props, 'line' | 'onChange'>
 
 export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }: Props) {
   const [expanded, setExpanded] = useState(false)
+  // Once a line is priced in buckets, the unit cost is their sum and is not typed.
+  const split = hasBreakdown(line)
 
   const builderCost = lineBuilderCost(line)
   const total       = lineTotal(line)
@@ -277,9 +312,23 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
           )}
         </td>
 
-        {/* unit cost */}
+        {/* labor / material / sub */}
+        <td className={`px-2 py-2.5 w-24${isHidden ? ' opacity-50' : ''}`}>
+          <CostInput value={line.labor_cost} canEdit={canEdit}
+            onChange={v => onChange(line.id, 'labor_cost', v)} />
+        </td>
+        <td className={`px-2 py-2.5 w-24${isHidden ? ' opacity-50' : ''}`}>
+          <CostInput value={line.material_cost} canEdit={canEdit}
+            onChange={v => onChange(line.id, 'material_cost', v)} />
+        </td>
+        <td className={`px-2 py-2.5 w-24${isHidden ? ' opacity-50' : ''}`}>
+          <CostInput value={line.sub_cost} canEdit={canEdit}
+            onChange={v => onChange(line.id, 'sub_cost', v)} />
+        </td>
+
+        {/* unit cost — the sum once any bucket is filled in, typed directly otherwise */}
         <td className={`px-2 py-2.5 w-28${isHidden ? ' opacity-50' : ''}`}>
-          {canEdit ? (
+          {canEdit && !split ? (
             <div className="relative">
               <span className="absolute left-0 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
               <input
@@ -292,7 +341,12 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
               />
             </div>
           ) : (
-            <span className="text-sm text-right text-navy-700 tabular-nums block">{fmt(line.unit_cost)}</span>
+            <span
+              className="text-sm text-right text-navy-700 tabular-nums block"
+              title={split ? 'Labor + material + sub' : undefined}
+            >
+              {fmt(split ? unitCostFrom(line) ?? line.unit_cost : line.unit_cost)}
+            </span>
           )}
         </td>
 
@@ -341,7 +395,7 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
       {/* Expanded notes + price lookup row */}
       {expanded && (
         <tr className="bg-gray-50">
-          <td colSpan={11} className="px-10 pb-3 pt-1 space-y-2">
+          <td colSpan={14} className="px-10 pb-3 pt-1 space-y-2">
             {canEdit ? (
               <>
                 <input
@@ -377,6 +431,7 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
 // ── Mobile card — same data as the table row, no horizontal scrolling ──────
 export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const split = hasBreakdown(line)
 
   const builderCost = lineBuilderCost(line)
   const total       = lineTotal(line)
@@ -455,7 +510,7 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
         </label>
         <label className="block">
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Unit $</span>
-          {canEdit ? (
+          {canEdit && !split ? (
             <input
               type="number"
               min="0"
@@ -465,7 +520,9 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
               className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums"
             />
           ) : (
-            <span className="block text-sm text-navy-700 tabular-nums py-1.5">{fmt(line.unit_cost)}</span>
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">
+              {fmt(split ? unitCostFrom(line) ?? line.unit_cost : line.unit_cost)}
+            </span>
           )}
         </label>
         <label className="block">
@@ -481,6 +538,58 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
             />
           ) : (
             <span className="block text-sm text-navy-700 tabular-nums py-1.5">{line.markup_pct}%</span>
+          )}
+        </label>
+      </div>
+
+      {/* Labor / material / sub — the buckets the unit cost above adds up to */}
+      <div className={`grid grid-cols-3 gap-2 mt-2${isHidden ? ' opacity-50' : ''}`}>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Labor $</span>
+          {canEdit ? (
+            <input
+              type="number" min="0" step="0.01"
+              value={line.labor_cost ?? ''}
+              placeholder="—"
+              onChange={e => onChange(line.id, 'labor_cost', e.target.value)}
+              className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums placeholder-gray-300"
+            />
+          ) : (
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">
+              {line.labor_cost === null ? '—' : fmt(line.labor_cost)}
+            </span>
+          )}
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Matl $</span>
+          {canEdit ? (
+            <input
+              type="number" min="0" step="0.01"
+              value={line.material_cost ?? ''}
+              placeholder="—"
+              onChange={e => onChange(line.id, 'material_cost', e.target.value)}
+              className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums placeholder-gray-300"
+            />
+          ) : (
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">
+              {line.material_cost === null ? '—' : fmt(line.material_cost)}
+            </span>
+          )}
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sub $</span>
+          {canEdit ? (
+            <input
+              type="number" min="0" step="0.01"
+              value={line.sub_cost ?? ''}
+              placeholder="—"
+              onChange={e => onChange(line.id, 'sub_cost', e.target.value)}
+              className="w-full text-sm text-navy-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-gold-400 tabular-nums placeholder-gray-300"
+            />
+          ) : (
+            <span className="block text-sm text-navy-700 tabular-nums py-1.5">
+              {line.sub_cost === null ? '—' : fmt(line.sub_cost)}
+            </span>
           )}
         </label>
       </div>

@@ -32,7 +32,13 @@ export async function GET(request: Request) {
 
   if (division) query = query.eq('division_num', division)
   if (phase)    query = query.eq('phase', phase)
-  if (q)        query = query.ilike('title', `%${q}%`)
+  if (q) {
+    // Searching only the title meant a cost code found nothing — typing "01.0020"
+    // returned an empty list even though that item exists. Commas and parens are the
+    // or() filter's own delimiters, so they are stripped rather than passed through.
+    const safe = q.replace(/[(),]/g, ' ').trim()
+    if (safe) query = query.or(`title.ilike.%${safe}%,cost_code.ilike.%${safe}%`)
+  }
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -16,6 +16,7 @@ import {
 import { NextResponse } from 'next/server'
 import { timingSafeEqual, randomUUID } from 'crypto'
 import { findLinePricing } from '@/lib/estimates/linePricing'
+import { mergeCostTypeRows, toCost, unitCostFrom } from '@/lib/estimates/costBreakdown'
 
 // The gateway calls back into this route for every tool an estimating turn needs, and
 // all of those round-trips run inside the caller's own window. Left unset it ran on the
@@ -695,7 +696,7 @@ export async function POST(request: Request) {
             .select('id, display_name, client_name, source_year, total_cost, areas')
             .in('id', ids),
           admin.from('historical_estimate_lines')
-            .select('id, historical_estimate_id, cost_code, division_name, cost_type, area, description, uom, quantity, unit_cost, markup_pct')
+            .select('id, historical_estimate_id, row_number, cost_code, division_name, cost_type, area, description, uom, quantity, unit_cost, markup_pct')
             .in('historical_estimate_id', ids)
             .order('row_number'),
         ])
@@ -715,17 +716,10 @@ export async function POST(request: Request) {
               year:        e.source_year,
               total_cost:  Number(e.total_cost),
               areas:       e.areas,
-              lines: (lines ?? [])
-                .filter(l => l.historical_estimate_id === id)
-                .map(l => ({
-                  line_id: l.id,
-                  cost_code: l.cost_code, division: l.division_name, cost_type: l.cost_type,
-                  area: l.area, description: l.description, uom: l.uom,
-                  quantity: Number(l.quantity), unit_cost: Number(l.unit_cost), markup_pct: Number(l.markup_pct),
-                })),
+              lines: groupWorkbookLines((lines ?? []).filter(l => l.historical_estimate_id === id)),
             }]
           }),
-          guidance: 'Build the new estimate from these line items. Pass each line back to add_estimate_lines with its line_id — the description and cost_code are taken from that row, so do not retype or reword them. JDC reuses a fixed vocabulary of line names and a paraphrase is treated as a different, unknown item. Adjust only quantity to the new scope. If the scope needs work no comparable covers, send that line with no line_id and no cost_code: it is held back for the estimator to name and price rather than guessed at.',
+          guidance: 'Each line shows what JDC charged per unit split into labor, material and sub — reuse that split, do not merge it into one number. Build the new estimate from these line items. Pass each line back to add_estimate_lines with its line_id — the description and cost_code are taken from that row, so do not retype or reword them. JDC reuses a fixed vocabulary of line names and a paraphrase is treated as a different, unknown item. Adjust only quantity to the new scope. If the scope needs work no comparable covers, send that line with no line_id and no cost_code: it is held back for the estimator to name and price rather than guessed at.',
         })
       }
 
@@ -787,6 +781,9 @@ export async function POST(request: Request) {
               uom:         d.uom,
               quantity:    d.quantity,
               unit_cost:   d.unit_cost,
+              labor_cost:  d.labor_cost,
+              material_cost: d.material_cost,
+              sub_cost:    d.sub_cost,
               markup_pct:  d.markup_pct,
               sort_order:  d.sort_order,
               source:      d.source,
@@ -839,6 +836,9 @@ export async function POST(request: Request) {
             uom:         d.uom,
             quantity:    d.quantity,
             unit_cost:   d.unit_cost,
+            labor_cost:  d.labor_cost,
+            material_cost: d.material_cost,
+            sub_cost:    d.sub_cost,
             markup_pct:  d.markup_pct,
             sort_order:  d.sort_order,
             source:      d.source,
@@ -1006,6 +1006,45 @@ function inviteFacts(ctx: AssignmentContext) {
 }
 
 /**
+ * The importer kept every cost type as its own row sharing a row_number, so a single
+ * workbook line reaches here as up to three rows — the same description and quantity
+ * with a labor price and a material price. Handing Fixer both halves made one item look
+ * like two, so they are put back together before it ever sees them.
+ */
+function groupWorkbookLines(rows: Record<string, unknown>[]) {
+  const groups = new Map<string, Record<string, unknown>[]>()
+  for (const row of rows) {
+    const key = String(row.row_number ?? row.id)
+    const bucket = groups.get(key)
+    if (bucket) bucket.push(row)
+    else groups.set(key, [row])
+  }
+
+  return [...groups.values()].map(group => {
+    const first = group[0]
+    const costs = mergeCostTypeRows(group.map(r => ({
+      cost_type: r.cost_type as string | null,
+      unit_cost: r.unit_cost as number,
+    })))
+    return {
+      // Any row of the group identifies it; add_estimate_lines re-reads its siblings.
+      line_id:    first.id,
+      cost_code:  first.cost_code,
+      division:   first.division_name,
+      area:       first.area,
+      description: first.description,
+      uom:        first.uom,
+      quantity:   Number(first.quantity),
+      labor_cost:    costs.labor_cost,
+      material_cost: costs.material_cost,
+      sub_cost:      costs.sub_cost,
+      unit_cost:  costs.unit_cost,
+      markup_pct: Number(first.markup_pct),
+    }
+  })
+}
+
+/**
  * One shape for a line Fixer priced, whether it is about to be staged for review or
  * written straight onto the estimate. Both paths build it here so an approved proposal
  * and a direct write can never disagree about coercion or provenance.
@@ -1021,7 +1060,11 @@ interface AiEstimateLineDraft {
   cost_code: string | null
   uom: string
   quantity: number
+  /** Always the sum of the three buckets when any is set. */
   unit_cost: number
+  labor_cost: number | null
+  material_cost: number | null
+  sub_cost: number | null
   markup_pct: number
   sort_order: number
   source: 'ai_comp' | 'ai_market'
@@ -1096,17 +1139,19 @@ async function buildAiEstimateLines(
   const [sourceLines, catalogItems, typedHist, typedCatalog] = await Promise.all([
     lineIds.length
       ? admin.from('historical_estimate_lines')
-          .select('id, historical_estimate_id, description, cost_code, uom')
+          .select('id, historical_estimate_id, row_number, description, cost_code, uom')
           .in('id', lineIds)
       : Promise.resolve(empty),
     codes.length
-      ? admin.from('cost_catalog').select('id, cost_code, title, uom').in('cost_code', codes)
+      ? admin.from('cost_catalog')
+          .select('id, cost_code, title, uom, unit_cost, labor_cost, material_cost')
+          .in('cost_code', codes)
       : Promise.resolve(empty),
     // Last resort: the model retyped a name that really is in the vocabulary. Accept it,
     // but snap to the stored spelling so the estimate stays internally consistent.
     typed.length
       ? admin.from('historical_estimate_lines')
-          .select('id, historical_estimate_id, description, cost_code, uom')
+          .select('id, historical_estimate_id, row_number, description, cost_code, uom')
           .in('description', typed)
       : Promise.resolve(empty),
     typed.length
@@ -1136,6 +1181,32 @@ async function buildAiEstimateLines(
   }
   for (const r of [...rows(sourceLines), ...rows(typedHist)]) {
     if (r.historical_estimate_id) compIds.add(r.historical_estimate_id as string)
+  }
+
+  // A cited line is one row of a workbook line the importer split by cost type, so
+  // its siblings carry the rest of the price. Without them a joist line would come
+  // across with its labor and no material.
+  const splitByGroup = new Map<string, { labor_cost: number | null; material_cost: number | null; sub_cost: number | null; unit_cost: number }>()
+  const cited = [...rows(sourceLines), ...rows(typedHist)]
+  if (cited.length > 0) {
+    const { data: sibs } = await admin
+      .from('historical_estimate_lines')
+      .select('historical_estimate_id, row_number, cost_type, unit_cost')
+      .in('historical_estimate_id', [...new Set(cited.map(r => r.historical_estimate_id as string))])
+      .in('row_number', [...new Set(cited.map(r => r.row_number as number))])
+
+    const wanted = new Set(cited.map(r => `${r.historical_estimate_id}:${r.row_number}`))
+    const grouped = new Map<string, { cost_type: string | null; unit_cost: number }[]>()
+    for (const r of (sibs ?? []) as Record<string, unknown>[]) {
+      // Two `in` filters are a cross product; keep only the pairs actually cited.
+      const key = `${r.historical_estimate_id}:${r.row_number}`
+      if (!wanted.has(key)) continue
+      const entry = { cost_type: r.cost_type as string | null, unit_cost: Number(r.unit_cost) }
+      const bucket = grouped.get(key)
+      if (bucket) bucket.push(entry)
+      else grouped.set(key, [entry])
+    }
+    for (const [key, group] of grouped) splitByGroup.set(key, mergeCostTypeRows(group))
   }
 
   const compById = new Map<string, { jobId: string | null; label: string | null }>()
@@ -1179,6 +1250,31 @@ async function buildAiEstimateLines(
     const isHistorical = !!(fromHistorical?.historical_estimate_id)
     const catalogRow = catalogItem ?? (namedMatch && namedMatch.title ? namedMatch : undefined)
 
+    // Where the split comes from, in order: what Fixer sent (it may be adjusting a
+    // rate), then the cited workbook line, then the cost book entry. The unit cost is
+    // never typed — it is whatever the three buckets add up to.
+    const sent = {
+      labor_cost: toCost(l.labor_cost),
+      material_cost: toCost(l.material_cost),
+      sub_cost: toCost(l.sub_cost),
+    }
+    const groupSplit = fromHistorical
+      ? splitByGroup.get(`${fromHistorical.historical_estimate_id}:${fromHistorical.row_number}`)
+      : undefined
+    const catalogSplit = catalogRow
+      ? { labor_cost: toCost(catalogRow.labor_cost), material_cost: toCost(catalogRow.material_cost), sub_cost: null }
+      : undefined
+
+    const split = unitCostFrom(sent) !== null ? sent : (groupSplit ?? catalogSplit)
+    const derived = split ? unitCostFrom(split) : null
+
+    const priced = {
+      labor_cost: split?.labor_cost ?? null,
+      material_cost: split?.material_cost ?? null,
+      sub_cost: split?.sub_cost ?? null,
+      unit_cost: derived ?? num(l.unit_cost, 0),
+    }
+
     return {
       // An unsourced line carries no name at all rather than a plausible-looking guess.
       description: canonicalName,
@@ -1190,7 +1286,7 @@ async function buildAiEstimateLines(
       quantity: num(l.quantity, 1),
       // An unnamed line gets no price either — a number beside a blank name invites
       // approving it unread.
-      unit_cost: canonicalName ? num(l.unit_cost, 0) : 0,
+      ...(canonicalName ? priced : { unit_cost: 0, labor_cost: null, material_cost: null, sub_cost: null }),
       markup_pct: canonicalName ? num(l.markup_pct, 0) : 0,
       sort_order: startOrder + i,
       // source is constrained to manual|catalog|assembly|ai_comp|ai_market.

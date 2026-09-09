@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { mergeCostTypeRows } from './costBreakdown'
 
 /**
  * Line-level pricing lookup
@@ -23,10 +24,14 @@ export interface LinePricingRow {
   job_name:    string | null
   year:        string | null
   cost_code:   string | null
-  cost_type:   string | null
   description: string
   uom:         string
   quantity:    number
+  /** The workbook line's split. Null where that line had no cost of that kind. */
+  labor_cost:    number | null
+  material_cost: number | null
+  sub_cost:      number | null
+  /** labor + material + sub. */
   unit_cost:   number
   markup_pct:  number
 }
@@ -50,11 +55,13 @@ function sanitize(word: string): string {
 }
 
 const SELECT =
-  'id, description, cost_code, cost_type, uom, quantity, unit_cost, markup_pct, ' +
+  'id, historical_estimate_id, row_number, description, cost_code, cost_type, uom, quantity, unit_cost, markup_pct, ' +
   'historical_estimates(display_name, source_year)'
 
 interface RawRow {
   id: string
+  historical_estimate_id: string
+  row_number: number
   description: string
   cost_code: string | null
   cost_type: string | null
@@ -64,6 +71,9 @@ interface RawRow {
   markup_pct: number
   historical_estimates: { display_name: string | null; source_year: string | null } | null
 }
+
+/** Identifies one workbook line across the rows the importer split it into. */
+const groupKey = (r: RawRow) => `${r.historical_estimate_id}:${r.row_number}`
 
 export async function findLinePricing(
   admin: SupabaseClient,
@@ -102,8 +112,6 @@ export async function findLinePricing(
     for (let i = 0; i < words.length; i++) {
       const subset = words.filter((_, j) => j !== i)
       for (const row of await andQuery(subset)) {
-        // Keyed by row id now that the id is what gets cited back — two identical
-        // looking lines on different jobs are still two different sources.
         const key = row.id
         if (!seen.has(key)) { seen.add(key); raw.push(row) }
       }
@@ -124,19 +132,50 @@ export async function findLinePricing(
 
   raw = scored.filter(s => s.score === best).map(s => s.row)
 
-  const rows: LinePricingRow[] = raw
-    .map(r => ({
-      line_id:     r.id,
-      job_name:    r.historical_estimates?.display_name ?? null,
-      year:        r.historical_estimates?.source_year ?? null,
-      cost_code:   r.cost_code,
-      cost_type:   r.cost_type,
-      description: r.description,
-      uom:         r.uom,
-      quantity:    Number(r.quantity),
-      unit_cost:   Number(r.unit_cost),
-      markup_pct:  Number(r.markup_pct),
-    }))
+  // A search for "joists" matches the labor row and the material row of the same
+  // workbook line. Pull in every sibling of every winner so each one is priced whole
+  // rather than as two half-priced duplicates.
+  const winners = new Map<string, RawRow>()
+  for (const r of raw) if (!winners.has(groupKey(r))) winners.set(groupKey(r), r)
+
+  const siblings = new Map<string, RawRow[]>()
+  if (winners.size > 0) {
+    const estimateIds = [...new Set([...winners.values()].map(r => r.historical_estimate_id))]
+    const rowNumbers = [...new Set([...winners.values()].map(r => r.row_number))]
+    const { data: sibRows } = await admin
+      .from('historical_estimate_lines')
+      .select(SELECT)
+      .in('historical_estimate_id', estimateIds)
+      .in('row_number', rowNumbers)
+    // The two `in` filters are a cross product, so keep only the exact pairs wanted.
+    for (const r of (sibRows ?? []) as unknown as RawRow[]) {
+      const key = groupKey(r)
+      if (!winners.has(key)) continue
+      const bucket = siblings.get(key)
+      if (bucket) bucket.push(r)
+      else siblings.set(key, [r])
+    }
+  }
+
+  const rows: LinePricingRow[] = [...winners.entries()]
+    .map(([key, r]) => {
+      const group = siblings.get(key) ?? [r]
+      const costs = mergeCostTypeRows(group.map(g => ({ cost_type: g.cost_type, unit_cost: g.unit_cost })))
+      return {
+        line_id:     r.id,
+        job_name:    r.historical_estimates?.display_name ?? null,
+        year:        r.historical_estimates?.source_year ?? null,
+        cost_code:   r.cost_code,
+        description: r.description,
+        uom:         r.uom,
+        quantity:    Number(r.quantity),
+        labor_cost:    costs.labor_cost,
+        material_cost: costs.material_cost,
+        sub_cost:      costs.sub_cost,
+        unit_cost:   costs.unit_cost,
+        markup_pct:  Number(r.markup_pct),
+      }
+    })
     .filter(r => r.unit_cost > 0)
     .sort((a, b) => (b.year ?? '').localeCompare(a.year ?? '') || b.unit_cost - a.unit_cost)
 
