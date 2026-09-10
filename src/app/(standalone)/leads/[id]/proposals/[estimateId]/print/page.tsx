@@ -9,6 +9,7 @@ import {
   type ProposalDisplay,
 } from '@/lib/estimates/proposalDisplay'
 import { comparePhases } from '@/lib/estimates/divisions'
+import ProposalPrintControls from '@/components/estimates/ProposalPrintControls'
 
 type ProposalLineGroup = {
   phase: string
@@ -85,18 +86,16 @@ function groupLines(lines: EstimateLine[], grouped: boolean): ProposalLineGroup[
 
 /**
  * The internal worksheet carries three more money columns than the client proposal
- * (labor, material, sub), which will not fit on portrait letter. Everything else about
- * the two views is identical, so only the page box and the max width change.
+ * (labor, material, sub), so its screen preview uses a wider, denser table.
+ * ProposalPrintControls owns the paper orientation and portrait print adjustments.
  */
 const INTERNAL_CSS = `
-  @page { size: letter landscape; margin: 0.45in; }
   .print-root { max-width: 1180px; }
   table { font-size: 12px; }
   th, td { padding: 7px 6px; }
 `
 
 const CSS = `
-  @page { size: letter; margin: 0.55in; }
   @media print {
     .no-print { display: none !important; }
     body { margin: 0; padding: 0; max-width: none; }
@@ -117,11 +116,11 @@ const CSS = `
     line-height: 1.45;
   }
   .toolbar {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
     margin-bottom: 28px; padding: 12px 14px;
     border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb;
   }
-  .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+  .toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .print-btn, .accept-link {
     display: inline-flex; align-items: center; justify-content: center;
     min-height: 38px; border-radius: 7px; border: 0; padding: 0 14px;
@@ -314,11 +313,8 @@ export default async function PrintProposalPage({
                 {typedEstimate.status === 'approved' ? 'View accepted proposal' : 'Accept online'}
               </a>
             )}
-            <button className="print-btn" onClick={undefined} suppressHydrationWarning>
-              Print / Save as PDF
-            </button>
+            <ProposalPrintControls internal={isInternalView} />
           </div>
-          <script dangerouslySetInnerHTML={{ __html: `document.querySelector('.print-btn').addEventListener('click',()=>window.print())` }} />
         </div>
 
         {isInternalView && (
