@@ -15,7 +15,8 @@
     "test:fixer": "tsx scripts/test-fixer.ts",
     "test:fixer:routes": "tsx scripts/test-fixer-routes.ts",
     "test:fixer:browser": "tsx scripts/test-fixer-browser.ts",
-    "test:fixer:fixture": "tsx scripts/fixer-browser-fixture.ts"
+    "test:fixer:fixture": "tsx scripts/fixer-browser-fixture.ts",
+    "test:contact-links": "tsx scripts/verify-contact-links.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
