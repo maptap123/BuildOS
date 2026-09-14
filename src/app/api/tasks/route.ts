@@ -60,6 +60,7 @@ export async function POST(request: Request) {
   const {
     job_id, title, description,
     status = 'todo', priority = 'medium',
+    assigned_to,
     due_date, estimated_hours, actual_hours, tags = [], schedule_item_id,
   } = body
   if (!job_id || !title?.trim()) {
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
       description: description?.trim() || null,
       status,
       priority,
+      assigned_to: assigned_to || null,
       due_date: due_date || null,
       estimated_hours: estimated_hours ?? null,
       actual_hours: actual_hours ?? null,
@@ -86,6 +88,18 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Assigning on creation notifies the same way reassigning later does.
+  if (data.assigned_to && data.assigned_to !== user.id) {
+    await notify({
+      admin,
+      userIds: [data.assigned_to],
+      type: 'task_assigned',
+      title: `You were assigned: ${data.title}`,
+      link: `/jobs/${data.job_id}/tasks`,
+    })
+  }
+
   return NextResponse.json(data, { status: 201 })
 }
 

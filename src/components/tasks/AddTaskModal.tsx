@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Tag, Clock } from 'lucide-react'
+import { X, Tag, Clock, User } from 'lucide-react'
 import type { Task, TaskStatus, TaskPriority } from '@/types'
 import { TaskComments } from './TaskComments'
+import { useUsers } from '@/hooks/useUsers'
 
 interface Props {
   jobId: string
@@ -18,6 +19,7 @@ type FormState = {
   description: string
   status: TaskStatus
   priority: TaskPriority
+  assigned_to: string
   due_date: string
   estimated_hours: string
   actual_hours: string
@@ -29,6 +31,7 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details')
+  const { users } = useUsers()
 
   // Derive initial tags without 'punch', and whether 'punch' is present
   const initialTagsWithoutPunch = task?.tags?.filter(t => t !== 'punch') ?? []
@@ -41,6 +44,7 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
     description:     task?.description ?? '',
     status:          task?.status ?? 'todo',
     priority:        task?.priority ?? 'medium',
+    assigned_to:     task?.assigned_to ?? '',
     due_date:        task?.due_date ?? '',
     estimated_hours: task?.estimated_hours != null ? String(task.estimated_hours) : '',
     actual_hours:    task?.actual_hours    != null ? String(task.actual_hours)    : '',
@@ -72,6 +76,7 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
         description:     form.description.trim() || null,
         status:          form.status,
         priority:        form.priority,
+        assigned_to:     form.assigned_to || null,
         due_date:        form.due_date || null,
         estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
         actual_hours:    form.actual_hours    ? Number(form.actual_hours)    : null,
@@ -202,6 +207,33 @@ export function AddTaskModal({ jobId, task, currentUserId, onClose, onSaved }: P
                   <option value="archived">Archived</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1.5">
+                <User size={12} />
+                Assigned To
+              </label>
+              <select
+                value={form.assigned_to}
+                onChange={e => set('assigned_to', e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400 bg-white"
+              >
+                <option value="">Unassigned</option>
+                {currentUserId && (
+                  <option value={currentUserId}>Me</option>
+                )}
+                {users
+                  .filter(u => u.id !== currentUserId)
+                  .map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.full_name?.trim() || u.email}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1">
+                An assigned task shows up in that person&apos;s My Tasks and notifies them.
+              </p>
             </div>
 
             <div>

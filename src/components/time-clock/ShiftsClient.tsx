@@ -47,6 +47,8 @@ interface Props {
   users: SimpleUser[]
   jobs: SimpleJob[]
   currentRange: ShiftRange
+  /** Shifts matching the date range in the database, before the row cap. */
+  totalCount: number
 }
 
 type ApprovalFilter = 'all' | 'open' | 'pending' | 'approved' | 'rejected'
@@ -82,7 +84,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 type ManagerView = 'shifts' | 'employees'
 
-export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Props) {
+export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalCount }: Props) {
   const router = useRouter()
   const [entries, setEntries] = useState<EntryRow[]>(initialEntries)
   const [filterStatus, setFilterStatus] = useState<ApprovalFilter>('all')
@@ -113,6 +115,10 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
       return true
     })
   }, [entries, filterStatus, filterUser, filterJob])
+
+  // Totals below are summed from the rows actually loaded. If the database held
+  // more than the page could fetch, say so rather than showing a short total.
+  const truncated = totalCount > entries.length
 
   // -- Summary for filtered set ------------------------------------------------
   const summary = useMemo(() => ({
@@ -282,6 +288,13 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange }: Prop
                 </span>
               )}
             </p>
+            {truncated && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-1.5">
+                Showing the {entries.length.toLocaleString()} most recent of{' '}
+                {totalCount.toLocaleString()}{' '}shifts in this range — totals cover
+                only what&apos;s shown. Narrow the date range for a complete figure.
+              </p>
+            )}
           </div>
         </div>
 

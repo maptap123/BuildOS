@@ -57,16 +57,26 @@ export default async function ShiftsPage({
 
   const cutoff = computeCutoff(range)
 
-  const [{ data: entries }, { data: users }, { data: jobs }] = await Promise.all([
+  // Hours and labor cost are summed from whatever rows come back, so a silent
+  // row cap means a manager approves payroll against understated totals.
+  // Supabase enforces its own db-max-rows (1000 by default) on top of this
+  // range, so asking for more does not guarantee more — the exact count is what
+  // lets the client say how much of the range it is actually showing.
+  const ROW_CAP = 5000
+
+  const [{ data: entries, count: totalCount }, { data: users }, { data: jobs }] = await Promise.all([
     (() => {
       let q = admin
         .from('time_entries')
         // Hint the FK to use — time_entries has 3 FKs to users (user_id, created_by, approved_by)
         // Without the hint PostgREST returns null data with an ambiguous relationship error
-        .select('*, user:users!user_id(id, full_name, avatar_url, hourly_rate), job:jobs!job_id(id, name, job_number)')
+        .select(
+          '*, user:users!user_id(id, full_name, avatar_url, hourly_rate), job:jobs!job_id(id, name, job_number)',
+          { count: 'exact' },
+        )
         .order('clock_in', { ascending: false })
       if (cutoff) q = q.gte('clock_in', cutoff)
-      return q
+      return q.range(0, ROW_CAP - 1)
     })(),
 
     admin
@@ -88,6 +98,7 @@ export default async function ShiftsPage({
       users={users ?? []}
       jobs={jobs ?? []}
       currentRange={range}
+      totalCount={totalCount ?? entries?.length ?? 0}
     />
   )
 }
