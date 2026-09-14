@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { UserPlus, Search, Star, Phone, Mail, Briefcase, Pencil, Trash2, AlertCircle } from 'lucide-react'
 import { AddContactModal } from './AddContactModal'
 import type { Contact } from '@/types'
+import { telHref, smsHref } from '@/lib/contactLinks'
 
 interface Permissions {
   can_create: boolean
@@ -167,15 +168,36 @@ export function ContactsClient({ initialContacts, permissions }: Props) {
                             {contact.jobs.name}
                           </p>
                         )}
+                        {/* Phone column is hidden on phones — put tap-to-call
+                            right under the name so the crew can actually dial. */}
+                        {telHref(contact.phone) && (
+                          <div className="flex items-center gap-2 mt-1 sm:hidden">
+                            <a
+                              href={telHref(contact.phone)!}
+                              className="flex items-center gap-1.5 -ml-1.5 px-1.5 min-h-[44px] rounded-lg text-xs font-medium text-navy-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                            >
+                              <Phone size={14} className="text-gray-400 shrink-0" />
+                              {contact.phone}
+                            </a>
+                            <a
+                              href={smsHref(contact.phone)!}
+                              className="flex items-center shrink-0 text-[11px] font-semibold text-navy-600 border border-navy-200 rounded-xl px-4 min-h-[44px] hover:border-navy-400 hover:bg-navy-50 active:bg-navy-100 transition-colors"
+                            >
+                              Text
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <div className="space-y-0.5">
-                      {contact.phone && (
+                      {telHref(contact.phone) && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Phone size={11} className="text-gray-400 shrink-0" />
-                          <span>{contact.phone}</span>
+                          <a href={telHref(contact.phone)!} className="hover:text-navy-900">
+                            {contact.phone}
+                          </a>
                         </div>
                       )}
                       {contact.email && (

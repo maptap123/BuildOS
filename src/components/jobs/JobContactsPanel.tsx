@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Phone, Mail, Star, UserPlus, Users } from 'lucide-react'
 import { AddContactModal } from '@/components/contacts/AddContactModal'
 import type { Contact } from '@/types'
+import { telHref, smsHref } from '@/lib/contactLinks'
 
 interface Props {
   jobId: string
@@ -80,18 +81,18 @@ export function JobContactsPanel({ jobId, initialContacts, canCreate }: Props) {
                     )}
                   </div>
                   <div className="mt-0.5 space-y-0.5">
-                    {contact.phone && (
+                    {telHref(contact.phone) && (
                       <div className="flex items-center gap-2">
                         <a
-                          href={`tel:${contact.phone}`}
-                          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy-900 transition-colors"
+                          href={telHref(contact.phone)!}
+                          className="flex items-center gap-1.5 -ml-1.5 px-1.5 py-1.5 min-h-[44px] rounded-lg text-xs text-gray-500 hover:text-navy-900 hover:bg-gray-50 active:bg-gray-100 transition-colors"
                         >
-                          <Phone size={11} className="text-gray-400 shrink-0" />
+                          <Phone size={14} className="text-gray-400 shrink-0" />
                           {contact.phone}
                         </a>
                         <a
-                          href={`sms:${contact.phone}`}
-                          className="text-[11px] font-semibold text-navy-600 border border-navy-200 rounded-full px-2 py-0.5 hover:border-navy-400 hover:bg-navy-50 transition-colors"
+                          href={smsHref(contact.phone)!}
+                          className="flex items-center shrink-0 text-[11px] font-semibold text-navy-600 border border-navy-200 rounded-xl px-4 min-h-[44px] hover:border-navy-400 hover:bg-navy-50 active:bg-navy-100 transition-colors"
                         >
                           Text
                         </a>

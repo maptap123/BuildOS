@@ -8,6 +8,7 @@ import { CloseoutPanel } from '@/components/jobs/CloseoutPanel'
 import { JobContactsPanel } from '@/components/jobs/JobContactsPanel'
 import { ConnectedSystemsCard } from '@/components/jobs/ConnectedSystemsCard'
 import { JobFilesPanel } from '@/components/jobs/JobFilesPanel'
+import { telHref, smsHref, directionsHref } from '@/lib/contactLinks'
 
 type JobDetail = Job & {
   pm: { full_name: string | null } | null
@@ -135,9 +136,11 @@ export default async function JobDetailPage({
   const totalCommitted = budgetLines.reduce((s, l) => s + l.committed_cost, 0)
   const budgetVariance = totalBudget - totalForecast
 
-  const addressParts = [job.site_address, job.city, job.state, job.postal_code].filter(Boolean)
-  // Directions deep link — opens turn-by-turn from the crew's current location
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressParts.join(', '))}`
+  // Directions deep link — opens turn-by-turn from the crew's current location.
+  // Null when the job has no address, so we don't hand the crew an empty map.
+  const mapsUrl = directionsHref([job.site_address, job.city, job.state, job.postal_code])
+  const clientTel = telHref(job.client_phone)
+  const clientSms = smsHref(job.client_phone)
 
   const isOverdue = (due: string | null) => {
     if (!due) return false
@@ -151,39 +154,46 @@ export default async function JobDetailPage({
       <div className="bg-white rounded-xl border border-border p-5">
         <h3 className="font-display font-semibold text-navy-900 mb-4 text-base">Job Info</h3>
         <div className="space-y-3 text-sm">
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-start gap-2.5 text-navy-700 hover:text-gold-600 transition-colors group"
-          >
-            <MapPin size={14} className="mt-0.5 text-gray-400 group-hover:text-gold-500 shrink-0" />
-            <span className="leading-relaxed">
-              {job.site_address}
-              {(job.city || job.state || job.postal_code) && (
-                <><br />{[job.city, job.state, job.postal_code].filter(Boolean).join(', ')}</>
-              )}
-            </span>
-          </a>
+          {mapsUrl ? (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-2.5 -mx-2 px-2 py-2 min-h-[44px] rounded-lg text-navy-700 hover:text-gold-600 hover:bg-gold-50/60 active:bg-gold-50 transition-colors group"
+            >
+              <MapPin size={16} className="mt-0.5 text-gray-400 group-hover:text-gold-500 shrink-0" />
+              <span className="leading-relaxed">
+                {job.site_address}
+                {(job.city || job.state || job.postal_code) && (
+                  <><br />{[job.city, job.state, job.postal_code].filter(Boolean).join(', ')}</>
+                )}
+              </span>
+            </a>
+          ) : (
+            <div className="flex items-start gap-2.5 text-gray-400">
+              <MapPin size={16} className="mt-0.5 shrink-0" />
+              <span className="leading-relaxed italic">No site address on file</span>
+            </div>
+          )}
 
           <div className="flex items-center gap-2.5">
             <Users size={14} className="text-gray-400 shrink-0" />
             <span className="text-navy-700">{job.client_name}</span>
           </div>
-          {job.client_phone && (
+          {clientTel && clientSms && (
             <div className="flex items-center gap-2 pl-[22px]">
               <a
-                href={`tel:${job.client_phone}`}
-                className="flex items-center gap-2 text-navy-700 hover:text-gold-600 transition-colors"
+                href={clientTel}
+                className="flex items-center gap-2 -ml-2 px-2 py-2 min-h-[44px] rounded-lg font-medium text-navy-700 hover:text-gold-600 hover:bg-gold-50/60 active:bg-gold-50 transition-colors"
               >
-                <Phone size={13} className="text-gray-400 shrink-0" />
+                <Phone size={16} className="text-gray-400 shrink-0" />
                 {job.client_phone}
               </a>
               <a
-                href={`sms:${job.client_phone}`}
-                className="flex items-center gap-1 text-xs font-semibold text-navy-600 border border-navy-200 rounded-full px-2.5 py-1 hover:border-navy-400 hover:bg-navy-50 transition-colors"
+                href={clientSms}
+                className="flex items-center gap-1.5 shrink-0 text-xs font-semibold text-navy-600 border border-navy-200 rounded-xl px-4 min-h-[44px] hover:border-navy-400 hover:bg-navy-50 active:bg-navy-100 transition-colors"
               >
-                <MessageSquare size={11} className="text-gold-500" />
+                <MessageSquare size={13} className="text-gold-500" />
                 Text
               </a>
             </div>

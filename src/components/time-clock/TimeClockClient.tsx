@@ -16,6 +16,7 @@ interface Job {
   name: string
   job_number: string
   status: string
+  client_name?: string | null
 }
 
 interface UserProfile {
@@ -232,7 +233,7 @@ export function TimeClockClient({
   weekTotalHours,
 }: Props) {
   // Active job context — shared with the layout picker
-  const { activeJob, activeJobId } = useActiveJob()
+  const { activeJob, activeJobId, setActiveJob } = useActiveJob()
 
   const [entries, setEntries] = useState<EntryWithJob[]>(initialEntries)
   const [step, setStep] = useState<Step>(() =>
@@ -242,6 +243,10 @@ export function TimeClockClient({
     () => initialEntries.find((e) => !e.clock_out) ?? null,
   )
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  // True while the picker is open to move a *running* shift to another job.
+  // The old shift stays open until a new job is actually chosen, so backing
+  // out of the picker can never leave someone silently off the clock.
+  const [switchingJob, setSwitchingJob] = useState(false)
   const [jobSearch, setJobSearch] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -314,6 +319,18 @@ export function TimeClockClient({
       await refresh()
       setStep('active')
       setClockInLoc({ status: 'idle' })
+      // The job you're clocked into is the job you're working on — keep the
+      // app-wide context in step so switching jobs here also moves the header,
+      // daily log, documents and the next clock-in.
+      if (job.id !== activeJobId) {
+        setActiveJob({
+          id: job.id,
+          name: job.name,
+          job_number: job.job_number,
+          status: job.status,
+          client_name: job.client_name ?? null,
+        })
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Clock in failed')
       setStep('idle')
@@ -391,7 +408,8 @@ export function TimeClockClient({
     breakMins: number
     notes: string
     loc: LocState
-    thenSwitch?: boolean
+    /** Leave the step alone — the caller is mid-flow (e.g. switching jobs). */
+    keepStep?: boolean
   }): Promise<boolean> {
     if (!activeEntry) return false
     setLoading(true)
@@ -415,14 +433,7 @@ export function TimeClockClient({
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Clock out failed')
       await refresh()
-      if (opts.thenSwitch) {
-        // Switch job: immediately start a new clock-in flow
-        setStep('picking-job')
-        setSelectedJob(null)
-        setJobSearch('')
-        setClockInLoc({ status: 'requesting' })
-        captureLocation().then(setClockInLoc)
-      } else {
+      if (!opts.keepStep) {
         setStep('idle')
         setClockOutLoc({ status: 'idle' })
         setBreakMinutes(0)
@@ -438,13 +449,39 @@ export function TimeClockClient({
   }
 
   // ── Switch job ──────────────────────────────────────────────────────────────
-  async function switchJob() {
-    await performClockOut({
-      breakMins: 0,
-      notes: '',
-      loc: { status: 'skipped' },
-      thenSwitch: true,
-    })
+  // Only opens the picker. The running shift is closed in `pickJob` once a new
+  // job is actually chosen — cancelling here leaves the crew still clocked in.
+  function switchJob() {
+    setSwitchingJob(true)
+    setStep('picking-job')
+    setJobSearch('')
+    setClockInLoc({ status: 'requesting' })
+    captureLocation().then(setClockInLoc)
+  }
+
+  // ── Picker selection ────────────────────────────────────────────────────────
+  // Closes the running shift first when switching, then clocks in to the new job.
+  async function pickJob(job: Job) {
+    if (switchingJob && activeEntry) {
+      const closed = await performClockOut({
+        breakMins: 0,
+        notes: '',
+        loc: { status: 'skipped' },
+        keepStep: true,
+      })
+      // Clock-out failed — stay on the old shift rather than losing the time.
+      if (!closed) return
+    }
+    setSwitchingJob(false)
+    setSelectedJob(job)
+    await clockIn(job, '')
+  }
+
+  // ── Leave the picker without changing anything ──────────────────────────────
+  function cancelJobPicker() {
+    const wasSwitching = switchingJob
+    setSwitchingJob(false)
+    setStep(wasSwitching && activeEntry ? 'active' : 'idle')
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
@@ -751,11 +788,17 @@ export function TimeClockClient({
         <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
           <div className="px-4 py-4 border-b border-border flex items-center justify-between">
             <div>
-              <h2 className="font-bold text-navy-900 text-base">Select Job</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Which job are you clocking in to?</p>
+              <h2 className="font-bold text-navy-900 text-base">
+                {switchingJob ? 'Switch Job' : 'Select Job'}
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {switchingJob
+                  ? "Pick the job you're moving to — you stay clocked in until you do."
+                  : 'Which job are you clocking in to?'}
+              </p>
             </div>
             <button
-              onClick={() => setStep('idle')}
+              onClick={cancelJobPicker}
               className="text-sm text-gray-400 hover:text-gray-700 font-medium px-2 py-1"
             >
               Cancel
@@ -782,10 +825,7 @@ export function TimeClockClient({
             {filteredJobs.map((job) => (
               <button
                 key={job.id}
-                onClick={() => {
-                  setSelectedJob(job)
-                  clockIn(job, '')
-                }}
+                onClick={() => pickJob(job)}
                 disabled={loading}
                 className={`w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between gap-3 disabled:opacity-50 ${
                   job.id === activeJobId ? 'bg-gold-50' : ''

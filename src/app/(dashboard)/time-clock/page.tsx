@@ -41,7 +41,7 @@ export default async function TimeClockPage() {
     // Active / presale jobs crew can clock into
     admin
       .from('jobs')
-      .select('id, name, job_number, status')
+      .select('id, name, job_number, status, client_name')
       .in('status', ['active', 'presale'])
       .order('name', { ascending: true }),
 
