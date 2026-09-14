@@ -1147,6 +1147,15 @@ export function ScheduleList({ items, jobId, canCreate, crewByItem, onAdd, onEdi
   const [filters, setFilters] = useState<Filters>({ search: '', statuses: [], trades: [] })
   const [showFilters, setShowFilters] = useState(false)
 
+  // A Gantt chart does not fit a phone — the bars sit off-screen behind a
+  // horizontal scroll, so a crew checking the week sees an empty grid. Open on
+  // the list instead, which reads at 390px. Desktop keeps the Gantt.
+  // This is state rather than layout, so it can't be a Tailwind breakpoint;
+  // running it after mount keeps the server and client markup identical.
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 767px)').matches) setView('list')
+  }, [])
+
   const allTrades = useMemo(() => {
     const set = new Set(items.map(i => i.trade).filter((t): t is string => Boolean(t)))
     return Array.from(set).sort()

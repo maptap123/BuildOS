@@ -571,12 +571,16 @@ export function BudgetLineTable({ lines, actuals, permissions, onAddLine, onAddA
 
           return (
             <div key={line.id} className={isOverBudget ? 'bg-red-50/40' : ''}>
-              <button
-                onClick={() => toggleExpanded(line.id)}
-                className="w-full text-left px-4 py-4"
-              >
+              {/* The expand control and the edit control are siblings. Nesting
+                  the edit button inside a row button is invalid HTML — it broke
+                  hydration and browsers hoisted it out of the row. */}
+              <div className="px-4 py-4">
                 <div className="flex items-start justify-between gap-3 mb-1">
-                  <div className="min-w-0">
+                  <button
+                    onClick={() => toggleExpanded(line.id)}
+                    aria-expanded={isExpanded}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <p className="text-[11px] font-mono text-gray-400 mb-0.5">
                       {line.cost_code} · {line.category}
                       {line.phase && <span className="ml-1 uppercase tracking-wider">· {line.phase}</span>}
@@ -585,22 +589,30 @@ export function BudgetLineTable({ lines, actuals, permissions, onAddLine, onAddA
                       {line.description}
                       {isOverBudget && <AlertTriangle size={11} className="inline ml-1.5 text-red-400" />}
                     </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
                     <StatusBadge status={line.status} />
                     {permissions.can_edit && (
                       <button
-                        onClick={e => { e.stopPropagation(); onEdit?.(line) }}
-                        className="text-gray-300 hover:text-gold-500 transition-colors"
+                        onClick={() => onEdit?.(line)}
+                        className="flex items-center justify-center w-11 h-11 -my-2 rounded-lg text-gray-300 hover:text-gold-500 active:bg-gray-100 transition-colors"
                         title="Edit line"
+                        aria-label={`Edit ${line.description}`}
                       >
-                        <Pencil size={13} />
+                        <Pencil size={15} />
                       </button>
                     )}
-                    {isExpanded
-                      ? <ChevronDown size={14} className="text-gray-400" />
-                      : <ChevronRight size={14} className="text-gray-300" />
-                    }
+                    <button
+                      onClick={() => toggleExpanded(line.id)}
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? 'Hide actuals' : 'Show actuals'}
+                      className="flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-lg active:bg-gray-100 transition-colors"
+                    >
+                      {isExpanded
+                        ? <ChevronDown size={16} className="text-gray-400" />
+                        : <ChevronRight size={16} className="text-gray-300" />
+                      }
+                    </button>
                   </div>
                 </div>
 
@@ -630,7 +642,7 @@ export function BudgetLineTable({ lines, actuals, permissions, onAddLine, onAddA
                     {lineActuals.length} actual{lineActuals.length !== 1 ? 's' : ''} · committed {fmt(line.committed_cost)}
                   </p>
                 )}
-              </button>
+              </div>
 
               {isExpanded && (
                 <ActualsList
