@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { MapPin, Phone, MessageSquare, Calendar, Users, Plus, FileText, CheckSquare, CalendarDays, DollarSign, AlertCircle, TrendingUp, Tag } from 'lucide-react'
+import { Calendar, Users, Plus, FileText, CheckSquare, CalendarDays, DollarSign, AlertCircle, TrendingUp, Tag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Job, DailyLog, Task, ScheduleItem, Contact } from '@/types'
@@ -8,7 +8,6 @@ import { CloseoutPanel } from '@/components/jobs/CloseoutPanel'
 import { JobContactsPanel } from '@/components/jobs/JobContactsPanel'
 import { ConnectedSystemsCard } from '@/components/jobs/ConnectedSystemsCard'
 import { JobFilesPanel } from '@/components/jobs/JobFilesPanel'
-import { telHref, smsHref, directionsHref } from '@/lib/contactLinks'
 
 type JobDetail = Job & {
   pm: { full_name: string | null } | null
@@ -136,12 +135,6 @@ export default async function JobDetailPage({
   const totalCommitted = budgetLines.reduce((s, l) => s + l.committed_cost, 0)
   const budgetVariance = totalBudget - totalForecast
 
-  // Directions deep link — opens turn-by-turn from the crew's current location.
-  // Null when the job has no address, so we don't hand the crew an empty map.
-  const mapsUrl = directionsHref([job.site_address, job.city, job.state, job.postal_code])
-  const clientTel = telHref(job.client_phone)
-  const clientSms = smsHref(job.client_phone)
-
   const isOverdue = (due: string | null) => {
     if (!due) return false
     return new Date(due + 'T23:59:59') < new Date()
@@ -150,56 +143,13 @@ export default async function JobDetailPage({
   return (
     <div className="grid gap-4 md:grid-cols-2 md:gap-6">
 
-      {/* Card 1 — Job Info */}
+      {/* Card 1 — Schedule, team and tags.
+          Client name, phone and site address live in the JobContactBar at the
+          top of every job tab, so they are deliberately not repeated here. */}
       <div className="bg-white rounded-xl border border-border p-5">
-        <h3 className="font-display font-semibold text-navy-900 mb-4 text-base">Job Info</h3>
+        <h3 className="font-display font-semibold text-navy-900 mb-4 text-base">Details</h3>
         <div className="space-y-3 text-sm">
-          {mapsUrl ? (
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-start gap-2.5 -mx-2 px-2 py-2 min-h-[44px] rounded-lg text-navy-700 hover:text-gold-600 hover:bg-gold-50/60 active:bg-gold-50 transition-colors group"
-            >
-              <MapPin size={16} className="mt-0.5 text-gray-400 group-hover:text-gold-500 shrink-0" />
-              <span className="leading-relaxed">
-                {job.site_address}
-                {(job.city || job.state || job.postal_code) && (
-                  <><br />{[job.city, job.state, job.postal_code].filter(Boolean).join(', ')}</>
-                )}
-              </span>
-            </a>
-          ) : (
-            <div className="flex items-start gap-2.5 text-gray-400">
-              <MapPin size={16} className="mt-0.5 shrink-0" />
-              <span className="leading-relaxed italic">No site address on file</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2.5">
-            <Users size={14} className="text-gray-400 shrink-0" />
-            <span className="text-navy-700">{job.client_name}</span>
-          </div>
-          {clientTel && clientSms && (
-            <div className="flex items-center gap-2 pl-[22px]">
-              <a
-                href={clientTel}
-                className="flex items-center gap-2 -ml-2 px-2 py-2 min-h-[44px] rounded-lg font-medium text-navy-700 hover:text-gold-600 hover:bg-gold-50/60 active:bg-gold-50 transition-colors"
-              >
-                <Phone size={16} className="text-gray-400 shrink-0" />
-                {job.client_phone}
-              </a>
-              <a
-                href={clientSms}
-                className="flex items-center gap-1.5 shrink-0 text-xs font-semibold text-navy-600 border border-navy-200 rounded-xl px-4 min-h-[44px] hover:border-navy-400 hover:bg-navy-50 active:bg-navy-100 transition-colors"
-              >
-                <MessageSquare size={13} className="text-gold-500" />
-                Text
-              </a>
-            </div>
-          )}
-
-          <div className="flex items-start gap-2.5 pt-2 border-t border-gray-100">
+          <div className="flex items-start gap-2.5">
             <Calendar size={14} className="mt-0.5 text-gray-400 shrink-0" />
             <div className="space-y-0.5 text-gray-500">
               <p>Start: <span className="text-navy-700">{fmtDate(job.start_date)}</span></p>

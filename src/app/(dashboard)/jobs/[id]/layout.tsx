@@ -4,6 +4,8 @@ import { ChevronLeft, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { JobStatusSelect } from '@/components/jobs'
+import { JobContactBar } from '@/components/jobs/JobContactBar'
+import { getJobClientContact } from '@/lib/jobClientContact'
 import type { JobStatus } from '@/types'
 
 export default async function JobLayout({
@@ -20,9 +22,10 @@ export default async function JobLayout({
 
   const admin = createAdminClient()
 
-  const [{ data: job }, { data: perm }] = await Promise.all([
+  const [{ data: job }, { data: perm }, clientContact] = await Promise.all([
     admin.from('jobs').select('id, job_number, name, status').eq('id', id).single(),
     admin.from('user_permissions').select('can_edit').eq('user_id', user.id).eq('module', 'jobs').single(),
+    getJobClientContact(id),
   ])
 
   if (!job) notFound()
@@ -64,6 +67,14 @@ export default async function JobLayout({
           )}
         </div>
       </div>
+
+      {/* Call / text / directions, reachable from every tab inside the job */}
+      <JobContactBar
+        jobNumber={job.job_number}
+        jobName={job.name}
+        contact={clientContact}
+      />
+
       {children}
     </div>
   )
