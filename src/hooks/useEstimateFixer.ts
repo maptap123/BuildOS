@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FixerChatMessage } from './useFixerChat'
 
 interface SavedRequest {
@@ -48,11 +48,21 @@ export function useEstimateFixer(estimateId: string, onComplete: () => void) {
       if (!disposed) timer = setTimeout(poll, 4000)
     }
     void poll()
-    const clock = setInterval(() => setNow(Date.now()), 1000)
-    return () => { disposed = true; clearTimeout(timer); clearInterval(clock); scope.current = '' }
+    return () => { disposed = true; clearTimeout(timer); scope.current = '' }
   }, [estimateId, refresh])
 
   const active = rows.find(r => r.status === 'queued' || r.status === 'running')
+  const activeId = active?.id ?? null
+
+  // The elapsed-time clock only needs to tick while a request is actually running.
+  // Ticking it forever re-rendered the panel once a second with nothing new to show,
+  // which was enough on its own to keep retriggering the conversation autoscroll.
+  useEffect(() => {
+    if (!activeId) return
+    setNow(Date.now())
+    const clock = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(clock)
+  }, [activeId])
   const send = useCallback(async (text: string) => {
     const message = text.trim()
     if (!message || sending.current || !ready || active) return
@@ -77,12 +87,14 @@ export function useEstimateFixer(estimateId: string, onComplete: () => void) {
     }
   }, [active, ready, estimateId, refresh])
 
-  const messages: FixerChatMessage[] = rows.flatMap(r => [
-    { role: 'user', content: r.message },
-    { role: 'assistant', content: r.status === 'completed' ? r.result ?? '' : r.status === 'failed'
+  // Rebuilt only when the rows change. Handed out fresh on every render it became a
+  // dependency that never compared equal, so effects keyed on it fired constantly.
+  const messages: FixerChatMessage[] = useMemo(() => rows.flatMap(r => [
+    { role: 'user' as const, content: r.message },
+    { role: 'assistant' as const, content: r.status === 'completed' ? r.result ?? '' : r.status === 'failed'
       ? r.error ?? 'Fixer could not finish. Review proposed lines before trying again.' : r.progress,
     failed: r.status === 'failed' },
-  ])
+  ]), [rows])
   return { messages, input, setInput, send, error: error ?? loadError, ready,
     loading: submitting || !!active || !ready,
     elapsedMs: active ? Math.max(0, now - Date.parse(active.started_at ?? active.created_at)) : 0,

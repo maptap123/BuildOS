@@ -35,7 +35,8 @@ export function HermesChatPanel() {
 
   const [open, setOpen] = useState(false)
 
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const lastScrollKey = useRef('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const handleNavigate = useCallback((url: string) => {
@@ -82,8 +83,17 @@ export function HermesChatPanel() {
     return () => window.removeEventListener(OPEN_FIXER_EVENT, onOpenRequest)
   }, [setInput])
 
+  // Scroll this panel's own list, not the page behind it. scrollIntoView() walks every
+  // scrollable ancestor, so it moved the page under the overlay while Fixer was talking.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = scrollerRef.current
+    if (!el) return
+    const last = messages[messages.length - 1]
+    const key = `${messages.length}|${last?.content ?? ''}`
+    if (key === lastScrollKey.current) return
+    lastScrollKey.current = key
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > 120) return
+    el.scrollTop = el.scrollHeight
   }, [messages])
 
   useEffect(() => {
@@ -163,7 +173,7 @@ export function HermesChatPanel() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+        <div ref={scrollerRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 min-h-0">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-8">
               <div className="w-12 h-12 rounded-full bg-navy-50 flex items-center justify-center">
@@ -220,7 +230,6 @@ export function HermesChatPanel() {
             </div>
           ))}
 
-          <div ref={bottomRef} />
         </div>
 
         {/* Persistent quick chips */}

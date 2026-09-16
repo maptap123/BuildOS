@@ -73,8 +73,10 @@ export function EstimateFixerPanel({
   const [drafts, setDrafts] = useState<Record<string, { description: string; unit_cost: string }>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
 
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  /** Signature of the last conversation state we scrolled for. */
+  const lastScrollKey = useRef('')
 
 
   const loadProposals = useCallback(async () => {
@@ -109,8 +111,26 @@ export function EstimateFixerPanel({
   // Anything left over from a previous visit is still waiting to be reviewed.
   useEffect(() => { void loadProposals() }, [loadProposals])
 
+  /**
+   * Keep the conversation pinned to the newest turn without touching the page scroll.
+   *
+   * scrollIntoView() scrolls every scrollable ancestor, and this panel sits in the normal
+   * page flow — so the window came along for the ride. Once Fixer answered and the panel
+   * grew tall, each repeat call dragged the estimate back down and restarted a smooth
+   * animation that cancelled whatever scroll the user had started. The page read as frozen.
+   *
+   * So: write this container's own scrollTop, only when the conversation actually changed,
+   * and only while the reader is already parked at the bottom.
+   */
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = scrollerRef.current
+    if (!el) return
+    const last = messages[messages.length - 1]
+    const key = `${messages.length}|${last?.content ?? ''}|${proposals.length}`
+    if (key === lastScrollKey.current) return
+    lastScrollKey.current = key
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > 120) return
+    el.scrollTop = el.scrollHeight
   }, [messages, proposals])
 
   useEffect(() => {
@@ -236,7 +256,7 @@ export function EstimateFixerPanel({
       </div>
 
       {/* Conversation */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-[220px] max-h-[420px]">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 space-y-3 min-h-[220px] max-h-[420px]">
         {messages.length === 0 && (
           <div className="text-center py-6 px-2">
             <Sparkles size={22} className="text-gold-400 mx-auto" />
@@ -428,8 +448,6 @@ export function EstimateFixerPanel({
             {panelError}
           </p>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
       {/* Step chips */}
