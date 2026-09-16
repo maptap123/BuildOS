@@ -3,9 +3,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, X, Plus, Loader2 } from 'lucide-react'
 import type { CostCatalogItem } from '@/types'
+import { DIVISION_NAMES } from '@/lib/estimates/divisions'
 
 interface Props {
   onSelect: (item: CostCatalogItem) => void
+}
+
+interface DivisionOption {
+  division_num: string
+  division_name: string
+  item_count: number
 }
 
 const fmt = (n: number) =>
@@ -16,21 +23,24 @@ export function CostCatalogSearch({ onSelect }: Props) {
   const [division, setDivision]     = useState('')
   const [results, setResults]       = useState<CostCatalogItem[]>([])
   const [loading, setLoading]       = useState(false)
-  const [divisions, setDivisions]   = useState<{ num: string; name: string }[]>([])
+  const [divisions, setDivisions]   = useState<DivisionOption[]>([])
   const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load distinct divisions once for the filter dropdown
+  // The dropdown's options come from their own endpoint, not from the items below it.
+  // Deriving them from a page of items only ever found 01 and 02: the catalog is ordered
+  // by division and those two alone cover the first 390 of 2,284 rows.
   useEffect(() => {
-    fetch('/api/cost-catalog?limit=200')
-      .then(r => r.json())
-      .then((items: CostCatalogItem[]) => {
-        const seen = new Map<string, string>()
-        for (const item of items) {
-          if (!seen.has(item.division_num)) seen.set(item.division_num, item.division_name)
-        }
-        setDivisions(Array.from(seen.entries()).map(([num, name]) => ({ num, name })))
-        setResults(items.slice(0, 50))
-      })
+    fetch('/api/cost-catalog?facet=divisions')
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: DivisionOption[]) => setDivisions(Array.isArray(rows) ? rows : []))
+      .catch(() => {})
+  }, [])
+
+  // First page of items
+  useEffect(() => {
+    fetch('/api/cost-catalog?limit=50')
+      .then(r => (r.ok ? r.json() : []))
+      .then((items: CostCatalogItem[]) => setResults(Array.isArray(items) ? items : []))
       .catch(() => {})
   }, [])
 
@@ -69,8 +79,8 @@ export function CostCatalogSearch({ onSelect }: Props) {
       {/* Search bar */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 space-y-3">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Cost Catalog</h3>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        <div className="space-y-2">
+          <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
             <input
               type="text"
@@ -91,11 +101,13 @@ export function CostCatalogSearch({ onSelect }: Props) {
           <select
             value={division}
             onChange={e => handleDivisionChange(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400 bg-white min-w-0 max-w-[160px]"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400 bg-white"
           >
             <option value="">All divisions</option>
             {divisions.map(d => (
-              <option key={d.num} value={d.num}>{d.num} — {d.name}</option>
+              <option key={d.division_num} value={d.division_num}>
+                {d.division_num} — {DIVISION_NAMES[d.division_num] ?? d.division_name} ({d.item_count})
+              </option>
             ))}
           </select>
         </div>

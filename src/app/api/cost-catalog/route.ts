@@ -22,6 +22,15 @@ export async function GET(request: Request) {
   const limit    = Math.min(parseInt(searchParams.get('limit') ?? '50', 10), 200)
 
   const admin = createAdminClient()
+
+  // The filter dropdown's options. The DISTINCT runs in the database because PostgREST
+  // caps any response at 1000 rows and the catalog is bigger than that — deriving the
+  // list from a page of items is what limited the dropdown to divisions 01 and 02.
+  if (searchParams.get('facet') === 'divisions') {
+    const { data, error } = await admin.rpc('cost_catalog_divisions')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data ?? [])
+  }
   let query = admin
     .from('cost_catalog')
     .select('id, cost_code, division_num, division_name, phase, title, uom, unit_cost, labor_cost, material_cost, sub_cost, cost_type')
