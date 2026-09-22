@@ -30,7 +30,12 @@ import { EstimateTotals } from './EstimateTotals'
 import { EstimateFixerPanel } from './EstimateFixerPanel'
 import { comparePhases, divisionPhase, UNASSIGNED_PHASE } from '@/lib/estimates/divisions'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
-import { resolveProposalDisplay, type ProposalDisplay } from '@/lib/estimates/proposalDisplay'
+import {
+  resolveProposalDisplay,
+  DEFAULT_PROPOSAL_DISPLAY,
+  DEFAULT_TERMS,
+  type ProposalDisplay,
+} from '@/lib/estimates/proposalDisplay'
 
 interface Permissions {
   can_create: boolean
@@ -143,6 +148,52 @@ const ASSEMBLIES: Assembly[] = [
       { description: 'Exterior Paint & Primer Materials', division: '24', uom: 'SF', quantity: 2000, unit_cost: 0.85, markup_pct: 20 },
       { description: 'Exterior Painting Labor', division: '24', uom: 'HR', quantity: 40, unit_cost: 60, markup_pct: 15 },
     ],
+  },
+]
+
+/**
+ * Starting points for the proposal display toggles. Each one is a complete
+ * ProposalDisplay, so picking a preset resets every option rather than layering
+ * on whatever was set before — the custom terms text is the one thing carried over.
+ */
+const PROPOSAL_PRESETS: { name: string; hint: string; display: ProposalDisplay }[] = [
+  {
+    name: 'Standard',
+    hint: 'Itemized proposal with phases and totals. No terms or signature lines.',
+    display: DEFAULT_PROPOSAL_DISPLAY,
+  },
+  {
+    name: 'Simple',
+    hint: 'Item names and line totals only — no cost codes, quantities or unit prices.',
+    display: {
+      ...DEFAULT_PROPOSAL_DISPLAY,
+      showCostCode: false,
+      showQtyUnit: false,
+      showUnitPrice: false,
+      showSummaryBar: false,
+      showProposalMeta: false,
+    },
+  },
+  {
+    name: 'Total only',
+    hint: 'Scope and a single price. No line items at all.',
+    display: {
+      ...DEFAULT_PROPOSAL_DISPLAY,
+      mode: 'total_only',
+      showProposalMeta: false,
+      showTotalsBlock: false,
+    },
+  },
+  {
+    name: 'Contract',
+    hint: 'Full itemized proposal with line numbers, terms and signature lines.',
+    display: {
+      ...DEFAULT_PROPOSAL_DISPLAY,
+      showLineNumbers: true,
+      showCostCode: true,
+      showTerms: true,
+      showSignature: true,
+    },
   },
 ]
 
@@ -860,6 +911,25 @@ export function EstimateBuilderClient({
             <div className="mt-4 space-y-5">
               <p className="text-xs text-gray-400">These settings control what the client sees on both the printed proposal and the shared client link.</p>
 
+              {/* Presets — a starting point for the toggles below, not a separate mode. */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Presets</p>
+                <div className="flex flex-wrap gap-2">
+                  {PROPOSAL_PRESETS.map(preset => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => saveProposalDisplay({ ...preset.display, termsText: disp.termsText })}
+                      title={preset.hint}
+                      className="text-xs font-semibold text-navy-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">Applies a full set of options below. Adjust anything afterwards.</p>
+              </div>
+
               {/* What the client sees at all — itemized vs total only */}
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Proposal layout</p>
@@ -899,6 +969,7 @@ export function EstimateBuilderClient({
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Columns shown to client</p>
                     <div className="flex flex-col gap-2.5">
+                      <Toggle checked={disp.showLineNumbers} onChange={v => saveProposalDisplay({ showLineNumbers: v })} title="Line numbers" hint="Numbers each item 1, 2, 3 down the proposal" />
                       <Toggle checked={disp.showItemTitle}   onChange={v => saveProposalDisplay({ showItemTitle: v })}   title="Item name" />
                       <Toggle checked={disp.showDescription} onChange={v => saveProposalDisplay({ showDescription: v })} title="Description / notes" />
                       <Toggle checked={disp.showCostCode}    onChange={v => saveProposalDisplay({ showCostCode: v })}    title="Cost code" />
@@ -928,6 +999,57 @@ export function EstimateBuilderClient({
                   </div>
                 </>
               )}
+
+              {/* Sections of the document — everything outside the line item table */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sections on the proposal</p>
+                <div className="flex flex-col gap-2.5">
+                  <Toggle checked={disp.showLetterhead}   onChange={v => saveProposalDisplay({ showLetterhead: v })}   title="Letterhead" hint="JDC Construction masthead and PROPOSAL title" />
+                  <Toggle checked={disp.showStatusBadge}  disabled={!disp.showLetterhead} indent onChange={v => saveProposalDisplay({ showStatusBadge: v })} title="Status badge" hint="Draft / sent / accepted pill" />
+                  <Toggle checked={disp.showClientInfo}   onChange={v => saveProposalDisplay({ showClientInfo: v })}   title="Prepared For card" hint="Client name, email, phone" />
+                  <Toggle checked={disp.showProjectInfo}  onChange={v => saveProposalDisplay({ showProjectInfo: v })}  title="Project card" hint="Project title, address, job type" />
+                  <Toggle checked={disp.showProposalMeta} onChange={v => saveProposalDisplay({ showProposalMeta: v })} title="Proposal details card" hint="Dates and line item count" />
+                  <Toggle checked={disp.showSummaryBar}   onChange={v => saveProposalDisplay({ showSummaryBar: v })}   title="Summary bar" hint="Subtotal / markup / total across the top" />
+                  <Toggle checked={disp.showScope}        onChange={v => saveProposalDisplay({ showScope: v })}        title="Scope summary" hint="The scope of work block" />
+                  <Toggle checked={disp.showNotes}        onChange={v => saveProposalDisplay({ showNotes: v })}        title="Notes" hint="The estimate notes block" />
+                  <Toggle checked={disp.showHeaderText}   onChange={v => saveProposalDisplay({ showHeaderText: v })}   title="Header text" hint="The custom intro text below" />
+                  <Toggle checked={disp.showFooterText}   onChange={v => saveProposalDisplay({ showFooterText: v })}   title="Footer text" hint="The custom closing text below" />
+                  <Toggle checked={disp.showTotalsBlock}  onChange={v => saveProposalDisplay({ showTotalsBlock: v })}  title="Totals box" hint="The totals panel under the line items" />
+                  <Toggle checked={disp.showGrandTotal}   onChange={v => saveProposalDisplay({ showGrandTotal: v })}   title="Grand total" hint="Off hides every proposal total — use for scope-only documents" />
+                  <Toggle checked={disp.showPageFooter}   onChange={v => saveProposalDisplay({ showPageFooter: v })}   title="Page footer" hint="The small print line at the very bottom" />
+                </div>
+              </div>
+
+              {/* Terms and signature — off by default, turned on per proposal */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Terms and signature</p>
+                <div className="flex flex-col gap-2.5">
+                  <Toggle checked={disp.showTerms}     onChange={v => saveProposalDisplay({ showTerms: v })}     title="Terms and acceptance" hint="Off by default" />
+                  <Toggle checked={disp.showSignature} onChange={v => saveProposalDisplay({ showSignature: v })} title="Signature lines" hint="Off by default — signature, printed name, date" />
+                </div>
+                {disp.showTerms && (
+                  <div className="space-y-1 pt-1">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Terms text</label>
+                    {/* Uncontrolled and saved on blur: every save rewrites the whole display
+                        object, so saving per keystroke would race with itself. */}
+                    <textarea
+                      key={`terms-${activeEstimate.id}`}
+                      defaultValue={disp.termsText ?? DEFAULT_TERMS.join('\n')}
+                      onBlur={e => {
+                        const next = e.target.value.trim()
+                        const current = (disp.termsText ?? DEFAULT_TERMS.join('\n')).trim()
+                        if (next === current) return
+                        // Blank or unchanged-from-standard stores null, so the proposal keeps
+                        // tracking the standard terms if they are ever revised.
+                        saveProposalDisplay({ termsText: next && next !== DEFAULT_TERMS.join('\n') ? next : null })
+                      }}
+                      rows={5}
+                      className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gold-400 resize-y"
+                    />
+                    <p className="text-xs text-gray-400">One bullet per line. Clear it to go back to the standard JDC terms.</p>
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Header text</label>

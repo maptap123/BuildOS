@@ -5,6 +5,7 @@ import {
   resolveProposalDisplay,
   clientUnitPrice,
   clientLineTotal,
+  splitTerms,
   type ProposalDisplay,
 } from '@/lib/estimates/proposalDisplay'
 import { comparePhases } from '@/lib/estimates/divisions'
@@ -165,6 +166,9 @@ export default async function PublicProposalPage({
   // Client only ever sees lines flagged visible, rendered per the estimate's display config.
   const disp = resolveProposalDisplay(proposal)
   const visibleLines = proposal.lines.filter(l => l.client_visible !== false)
+  const termsLines = splitTerms(disp.termsText)
+  // A running number across the whole proposal, not restarted per phase.
+  let lineNo = 0
   const total = visibleLines.reduce((sum, line) => sum + lineTotal(line), 0)
   const statusLabel = proposal.status === 'approved' ? 'Accepted' : proposal.status === 'rejected' ? 'Declined' : proposal.status
 
@@ -188,26 +192,34 @@ export default async function PublicProposalPage({
                   </p>
                   <h2 className="text-white text-2xl font-bold leading-snug">{title}</h2>
                 </div>
-                <span className="inline-flex w-fit items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold capitalize text-white ring-1 ring-white/20">
-                  {statusLabel}
-                </span>
+                {disp.showStatusBadge && (
+                  <span className="inline-flex w-fit items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold capitalize text-white ring-1 ring-white/20">
+                    {statusLabel}
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="px-6 py-6 space-y-6">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="bg-gray-50 rounded-xl p-4 text-sm">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">Prepared For</p>
-                  <p className="font-semibold text-gray-700">{clientName}</p>
-                  {proposal.lead?.address && <p className="text-gray-500 mt-1">{proposal.lead.address}</p>}
+              {(disp.showClientInfo || disp.showGrandTotal) && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {disp.showClientInfo && (
+                    <div className="bg-gray-50 rounded-xl p-4 text-sm">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">Prepared For</p>
+                      <p className="font-semibold text-gray-700">{clientName}</p>
+                      {proposal.lead?.address && <p className="text-gray-500 mt-1">{proposal.lead.address}</p>}
+                    </div>
+                  )}
+                  {disp.showGrandTotal && (
+                    <div className="bg-gray-50 rounded-xl p-4 text-sm">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">Proposal Total</p>
+                      <p className="text-2xl font-bold text-[#0f2a4a] tabular-nums">{fmt(total)}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="bg-gray-50 rounded-xl p-4 text-sm">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">Proposal Total</p>
-                  <p className="text-2xl font-bold text-[#0f2a4a] tabular-nums">{fmt(total)}</p>
-                </div>
-              </div>
+              )}
 
-              {proposal.proposal_header_text && (
+              {disp.showHeaderText && proposal.proposal_header_text && (
                 <section>
                   <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
                     {proposal.proposal_header_text}
@@ -215,7 +227,7 @@ export default async function PublicProposalPage({
                 </section>
               )}
 
-              {proposal.scope_text && (
+              {disp.showScope && proposal.scope_text && (
                 <section>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Scope</p>
                   <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{proposal.scope_text}</p>
@@ -255,7 +267,12 @@ export default async function PublicProposalPage({
                                 return (
                                   <div key={line.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
                                     <div>
-                                      {disp.showItemTitle && <p className="text-sm font-medium text-gray-800">{line.description}</p>}
+                                      {disp.showItemTitle && (
+                                        <p className="text-sm font-medium text-gray-800">
+                                          {disp.showLineNumbers && <span className="text-gray-400 tabular-nums mr-1.5">{++lineNo}.</span>}
+                                          {line.description}
+                                        </p>
+                                      )}
                                       {disp.showDescription && line.notes && (
                                         <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-wrap">{line.notes}</p>
                                       )}
@@ -274,22 +291,24 @@ export default async function PublicProposalPage({
                         )
                       })
                     )}
-                    <div className="flex items-center justify-between bg-[#0f2a4a] px-4 py-3 text-white">
-                      <span className="text-sm font-semibold uppercase tracking-wide">Total</span>
-                      <span className="text-xl font-bold tabular-nums">{fmt(total)}</span>
-                    </div>
+                    {disp.showGrandTotal && (
+                      <div className="flex items-center justify-between bg-[#0f2a4a] px-4 py-3 text-white">
+                        <span className="text-sm font-semibold uppercase tracking-wide">Total</span>
+                        <span className="text-xl font-bold tabular-nums">{fmt(total)}</span>
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
 
-              {proposal.notes && (
+              {disp.showNotes && proposal.notes && (
                 <section>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Notes</p>
                   <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{proposal.notes}</p>
                 </section>
               )}
 
-              {proposal.proposal_footer_text && (
+              {disp.showFooterText && proposal.proposal_footer_text && (
                 <section>
                   <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                     {proposal.proposal_footer_text}
@@ -297,6 +316,17 @@ export default async function PublicProposalPage({
                 </section>
               )}
             </div>
+
+            {disp.showTerms && (
+              <div className="border-t border-gray-100 px-6 py-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Terms</p>
+                <ul className="list-disc pl-5 space-y-1.5">
+                  {termsLines.map((term, i) => (
+                    <li key={i} className="text-sm text-gray-600 leading-relaxed">{term}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="border-t border-gray-100 px-6 py-6">
               {proposal.status === 'approved' || proposal.client_approved_at ? (

@@ -6,6 +6,8 @@ import type { Estimate, EstimateLine, Lead } from '@/types'
 import {
   resolveProposalDisplay,
   clientUnitPrice,
+  splitTerms,
+  INTERNAL_PROPOSAL_DISPLAY,
   type ProposalDisplay,
 } from '@/lib/estimates/proposalDisplay'
 import { comparePhases } from '@/lib/estimates/divisions'
@@ -242,13 +244,15 @@ export default async function PrintProposalPage({
   // Client display config. The internal view forces everything on so the estimator
   // always sees the full picture regardless of what the client is set to see.
   const clientDisplay = resolveProposalDisplay(typedEstimate)
+  // Terms and the signature block are client-facing boilerplate, so even the internal
+  // view follows whatever the estimator chose for this proposal.
   const disp: ProposalDisplay = isInternalView
     ? {
-        mode: 'itemized',
-        showItemTitle: true, showDescription: true, showCostCode: true,
-        showQtyUnit: true, showUnitPrice: true, showLineTotal: true,
-        showPhases: true, showPhaseSubtotals: true,
-        showUnitCost: true, showMarkup: true,
+        ...INTERNAL_PROPOSAL_DISPLAY,
+        showLineNumbers: clientDisplay.showLineNumbers,
+        showTerms: clientDisplay.showTerms,
+        showSignature: clientDisplay.showSignature,
+        termsText: clientDisplay.termsText,
       }
     : clientDisplay
 
@@ -260,18 +264,21 @@ export default async function PrintProposalPage({
   const showSplit = isInternalView
   // Columns before the labor/material/sub trio, and the price columns after it. The phase
   // header row spans them so its subtotals line up under the columns they total.
-  const leadColCount = 1 /* item */ + (disp.showCostCode ? 1 : 0) + (disp.showQtyUnit ? 2 : 0)
+  const leadColCount =
+    (disp.showLineNumbers ? 1 : 0) + 1 /* item */ + (disp.showCostCode ? 1 : 0) + (disp.showQtyUnit ? 2 : 0)
   const midColCount =
     (disp.showUnitCost ? 1 : 0) + (disp.showUnitPrice ? 1 : 0) + (disp.showMarkup ? 1 : 0)
   const detailColCount =
-    1 /* item */ +
-    (disp.showCostCode ? 1 : 0) +
-    (disp.showQtyUnit ? 2 : 0) +
+    leadColCount +
     (showSplit ? 3 : 0) +
-    (disp.showUnitCost ? 1 : 0) +
-    (disp.showUnitPrice ? 1 : 0) +
-    (disp.showMarkup ? 1 : 0) +
+    midColCount +
     (disp.showLineTotal ? 1 : 0)
+  // Which of the three header cards are on — an empty row would leave a gap, and one or
+  // two cards should stretch rather than sit in a three-up grid.
+  const infoCards = [disp.showClientInfo, disp.showProjectInfo, disp.showProposalMeta].filter(Boolean).length
+  const termsLines = splitTerms(disp.termsText)
+  // A running number across the whole proposal, not restarted per phase.
+  let lineNo = 0
 
   const groups = groupLines(visibleLines, disp.showPhases)
   const subtotal = visibleLines.reduce((sum, line) => sum + lineSubtotal(line), 0)
@@ -323,56 +330,66 @@ export default async function PrintProposalPage({
           </div>
         )}
 
-        {typedEstimate.proposal_header_text && (
+        {disp.showHeaderText && typedEstimate.proposal_header_text && (
           <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '14px 16px', marginBottom: '20px', fontSize: '13px', whiteSpace: 'pre-wrap', color: '#0c4a6e' }}>
             {typedEstimate.proposal_header_text}
           </div>
         )}
 
-        <header className="letterhead">
-          <div>
-            <div className="company-name">JDC Construction</div>
-            <div className="company-sub">General Contractor</div>
-          </div>
-          <div className="doc-meta">
-            <div className="doc-title">Proposal</div>
-            <div className="muted">Estimate v{typedEstimate.version}</div>
-            <span className="status-badge">{statusLabel}</span>
-          </div>
-        </header>
+        {disp.showLetterhead && (
+          <header className="letterhead">
+            <div>
+              <div className="company-name">JDC Construction</div>
+              <div className="company-sub">General Contractor</div>
+            </div>
+            <div className="doc-meta">
+              <div className="doc-title">Proposal</div>
+              <div className="muted">Estimate v{typedEstimate.version}</div>
+              {disp.showStatusBadge && <span className="status-badge">{statusLabel}</span>}
+            </div>
+          </header>
+        )}
 
-        <section className="info-grid">
-          <div className="info-card">
-            <div className="label">Prepared For</div>
-            <div className="value">
-              <strong>{typedLead.client_name || 'Client'}</strong>
-              {typedLead.client_email && <><br />{typedLead.client_email}</>}
-              {typedLead.client_phone && <><br />{typedLead.client_phone}</>}
-            </div>
-          </div>
-          <div className="info-card">
-            <div className="label">Project</div>
-            <div className="value">
-              <strong>{proposalTitle}</strong>
-              {typedLead.address && <><br />{typedLead.address}</>}
-              {typedEstimate.job_type && <><br /><span className="muted">{typedEstimate.job_type}</span></>}
-            </div>
-          </div>
-          <div className="info-card">
-            <div className="label">Proposal Details</div>
-            <div className="value">
-              <strong>{fmtDate(typedEstimate.updated_at || typedEstimate.created_at)}</strong>
-              <br />Created {fmtDate(typedEstimate.created_at)}
-              <br />{visibleLines.length} line item{visibleLines.length === 1 ? '' : 's'}
-              {isInternalView && allLines.length !== visibleLines.length && (
-                <> ({allLines.length} total incl. internal)</>
-              )}
-            </div>
-          </div>
-        </section>
+        {infoCards > 0 && (
+          <section className="info-grid" style={{ gridTemplateColumns: `repeat(${infoCards}, 1fr)` }}>
+            {disp.showClientInfo && (
+              <div className="info-card">
+                <div className="label">Prepared For</div>
+                <div className="value">
+                  <strong>{typedLead.client_name || 'Client'}</strong>
+                  {typedLead.client_email && <><br />{typedLead.client_email}</>}
+                  {typedLead.client_phone && <><br />{typedLead.client_phone}</>}
+                </div>
+              </div>
+            )}
+            {disp.showProjectInfo && (
+              <div className="info-card">
+                <div className="label">Project</div>
+                <div className="value">
+                  <strong>{proposalTitle}</strong>
+                  {typedLead.address && <><br />{typedLead.address}</>}
+                  {typedEstimate.job_type && <><br /><span className="muted">{typedEstimate.job_type}</span></>}
+                </div>
+              </div>
+            )}
+            {disp.showProposalMeta && (
+              <div className="info-card">
+                <div className="label">Proposal Details</div>
+                <div className="value">
+                  <strong>{fmtDate(typedEstimate.updated_at || typedEstimate.created_at)}</strong>
+                  <br />Created {fmtDate(typedEstimate.created_at)}
+                  <br />{visibleLines.length} line item{visibleLines.length === 1 ? '' : 's'}
+                  {isInternalView && allLines.length !== visibleLines.length && (
+                    <> ({allLines.length} total incl. internal)</>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
-        {showCostColumns ? (
-          <section className="summary-bar">
+        {disp.showSummaryBar && (showCostColumns ? (
+          <section className="summary-bar" style={disp.showGrandTotal ? undefined : { gridTemplateColumns: '1fr 1fr' }}>
             <div className="summary-cell">
               <div className="label">Subtotal</div>
               <div className="summary-amount">{fmtMoney(subtotal)}</div>
@@ -381,19 +398,21 @@ export default async function PrintProposalPage({
               <div className="label">Markup</div>
               <div className="summary-amount">{fmtMoney(markup)}</div>
             </div>
-            <div className="summary-cell total">
-              <div className="label">Proposal Total</div>
-              <div className="summary-amount">{fmtMoney(total)}</div>
-            </div>
+            {disp.showGrandTotal && (
+              <div className="summary-cell total">
+                <div className="label">Proposal Total</div>
+                <div className="summary-amount">{fmtMoney(total)}</div>
+              </div>
+            )}
           </section>
-        ) : (
+        ) : disp.showGrandTotal ? (
           <section className="summary-bar" style={{ gridTemplateColumns: '1fr' }}>
             <div className="summary-cell total">
               <div className="label">Proposal Total</div>
               <div className="summary-amount">{fmtMoney(total)}</div>
             </div>
           </section>
-        )}
+        ) : null)}
 
         {showSplit && (
           <section className="summary-bar breakdown">
@@ -416,10 +435,10 @@ export default async function PrintProposalPage({
           </section>
         )}
 
-        {(typedEstimate.scope_text || typedEstimate.notes) && (
+        {disp.showScope && typedEstimate.scope_text && (
           <section className="section">
             <h2 className="section-title">Scope Summary</h2>
-            <div className="scope-box">{typedEstimate.scope_text || typedEstimate.notes}</div>
+            <div className="scope-box">{typedEstimate.scope_text}</div>
           </section>
         )}
 
@@ -429,6 +448,7 @@ export default async function PrintProposalPage({
             <table>
               <thead>
                 <tr>
+                  {disp.showLineNumbers && <th className="num" style={{ width: '34px' }}>#</th>}
                   <th>{disp.showItemTitle ? 'Description' : 'Item'}</th>
                   {disp.showCostCode && <th style={{ width: '76px' }}>Code</th>}
                   {disp.showQtyUnit && <th className="num" style={{ width: '64px' }}>Qty</th>}
@@ -473,6 +493,7 @@ export default async function PrintProposalPage({
                         const isLineHidden = line.client_visible === false
                         return (
                           <tr key={line.id} style={isLineHidden ? { background: '#fef9c3' } : {}}>
+                            {disp.showLineNumbers && <td className="num muted">{++lineNo}</td>}
                             <td>
                               {disp.showItemTitle && <span>{line.description}</span>}
                               {isLineHidden && (
@@ -505,18 +526,27 @@ export default async function PrintProposalPage({
                 )}
               </tbody>
             </table>
-            <div className="totals">
-              {showSplit && <div className="totals-row"><span>Labor</span><strong>{fmtMoney(costs.labor)}</strong></div>}
-              {showSplit && <div className="totals-row"><span>Material</span><strong>{fmtMoney(costs.material)}</strong></div>}
-              {showSplit && <div className="totals-row"><span>Sub</span><strong>{fmtMoney(costs.sub)}</strong></div>}
-              {showCostColumns && <div className="totals-row"><span>Subtotal</span><strong>{fmtMoney(subtotal)}</strong></div>}
-              {showCostColumns && <div className="totals-row"><span>Markup</span><strong>{fmtMoney(markup)}</strong></div>}
-              <div className="totals-row grand"><span>Total</span><span>{fmtMoney(total)}</span></div>
-            </div>
+            {disp.showTotalsBlock && (
+              <div className="totals">
+                {showSplit && <div className="totals-row"><span>Labor</span><strong>{fmtMoney(costs.labor)}</strong></div>}
+                {showSplit && <div className="totals-row"><span>Material</span><strong>{fmtMoney(costs.material)}</strong></div>}
+                {showSplit && <div className="totals-row"><span>Sub</span><strong>{fmtMoney(costs.sub)}</strong></div>}
+                {showCostColumns && <div className="totals-row"><span>Subtotal</span><strong>{fmtMoney(subtotal)}</strong></div>}
+                {showCostColumns && <div className="totals-row"><span>Markup</span><strong>{fmtMoney(markup)}</strong></div>}
+                {disp.showGrandTotal && <div className="totals-row grand"><span>Total</span><span>{fmtMoney(total)}</span></div>}
+              </div>
+            )}
           </section>
         )}
 
-        {typedEstimate.proposal_footer_text && (
+        {disp.showNotes && typedEstimate.notes && (
+          <section className="section">
+            <h2 className="section-title">Notes</h2>
+            <div className="scope-box">{typedEstimate.notes}</div>
+          </section>
+        )}
+
+        {disp.showFooterText && typedEstimate.proposal_footer_text && (
           <section className="section">
             <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '14px 16px', fontSize: '13px', whiteSpace: 'pre-wrap', color: '#374151' }}>
               {typedEstimate.proposal_footer_text}
@@ -524,54 +554,61 @@ export default async function PrintProposalPage({
           </section>
         )}
 
-        <section className="section page-break">
-          <h2 className="section-title">Terms and Acceptance</h2>
-          <div className="terms-grid">
-            <div className="terms-box">
-              <div className="label">Proposal Terms</div>
-              <ul>
-                <li>Proposal pricing is based on the scope and line items shown in this document.</li>
-                <li>Changes outside this scope may require a written change order.</li>
-                <li>Permits, allowances, taxes, and owner selections are included only where specifically listed.</li>
-                <li>Schedule and start date are subject to final approval, material availability, and contract execution.</li>
-              </ul>
-            </div>
-            <div className="terms-box">
-              <div className="label">Acceptance</div>
-              {clientResponseDate ? (
-                <p>
-                  Client response recorded on {fmtDate(clientResponseDate)}
-                  {typedEstimate.client_name ? ` by ${typedEstimate.client_name}` : ''}.
-                  {typedEstimate.client_signature ? ` Signature: ${typedEstimate.client_signature}.` : ''}
-                  {typedEstimate.client_response_note ? ` Note: ${typedEstimate.client_response_note}` : ''}
-                </p>
-              ) : (
-                <p>
-                  By signing below, the client authorizes JDC Construction to proceed with preparing the work
-                  described in this proposal. Online acceptance can be completed through the public proposal
-                  review link when available.
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="signature-grid">
-            <div>
-              <div className="sig-line">Client Signature</div>
-              <div style={{ height: '34px' }} />
-              <div className="sig-line">Printed Name</div>
-            </div>
-            <div>
-              <div className="sig-line">Date</div>
-              <div style={{ height: '34px' }} />
-              <div className="sig-line">JDC Construction Representative</div>
-            </div>
-          </div>
-        </section>
+        {(disp.showTerms || disp.showSignature) && (
+          <section className="section page-break">
+            <h2 className="section-title">
+              {disp.showTerms && disp.showSignature ? 'Terms and Acceptance' : disp.showTerms ? 'Terms' : 'Acceptance'}
+            </h2>
+            {disp.showTerms && (
+              <div className="terms-grid">
+                <div className="terms-box">
+                  <div className="label">Proposal Terms</div>
+                  <ul>
+                    {termsLines.map((term, i) => <li key={i}>{term}</li>)}
+                  </ul>
+                </div>
+                <div className="terms-box">
+                  <div className="label">Acceptance</div>
+                  {clientResponseDate ? (
+                    <p>
+                      Client response recorded on {fmtDate(clientResponseDate)}
+                      {typedEstimate.client_name ? ` by ${typedEstimate.client_name}` : ''}.
+                      {typedEstimate.client_signature ? ` Signature: ${typedEstimate.client_signature}.` : ''}
+                      {typedEstimate.client_response_note ? ` Note: ${typedEstimate.client_response_note}` : ''}
+                    </p>
+                  ) : (
+                    <p>
+                      By signing below, the client authorizes JDC Construction to proceed with preparing the work
+                      described in this proposal. Online acceptance can be completed through the public proposal
+                      review link when available.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {disp.showSignature && (
+              <div className="signature-grid">
+                <div>
+                  <div className="sig-line">Client Signature</div>
+                  <div style={{ height: '34px' }} />
+                  <div className="sig-line">Printed Name</div>
+                </div>
+                <div>
+                  <div className="sig-line">Date</div>
+                  <div style={{ height: '34px' }} />
+                  <div className="sig-line">JDC Construction Representative</div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
-        <footer>
-          JDC Construction - Proposal for {typedLead.title}. This printable page is intended for client review,
-          signature, and browser Save as PDF workflows.
-        </footer>
+        {disp.showPageFooter && (
+          <footer>
+            JDC Construction - Proposal for {typedLead.title}. This printable page is intended for client review,
+            signature, and browser Save as PDF workflows.
+          </footer>
+        )}
       </div>
     </>
   )
