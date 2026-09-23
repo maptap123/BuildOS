@@ -106,12 +106,18 @@ npx tsx scripts/bt-link-job-contacts.ts --apply
 
 ## Known gaps
 
-**Change orders and purchase orders cannot be imported.** `POST /api/ChangeOrders/Grid`
-and `POST /api/PurchaseOrders/Grid` returned HTTP 500 for all 238 jobs on the May
-extract and were never fixed. Both tables are currently empty. If JDC needs this
-history, the endpoints have to be rediscovered — run `scripts/bt-capture-manual.ts`,
-click through a change order in the BT UI by hand, and read the captured request
-out of `bt-export/diagnostics/`.
+**Change orders and purchase orders are not a gap — ignore the 500s.**
+`POST /api/ChangeOrders/Grid` and `POST /api/PurchaseOrders/Grid` return HTTP 500
+for every job, on both the May and September extracts. JDC does not use either
+module in BuilderTrend (confirmed by August, 2026-09-23), so there is nothing
+there to export and nothing to recover. `bt-migrate.ts` still calls both and
+still writes `{"_error":500}` for each; that is expected output, not a failure,
+and the two empty BuildOS tables are correct. Do not spend time rediscovering
+those endpoints.
+
+BuildOS's own change-order feature is unaffected — it is a native module with
+its own `CO-001` numbering, and it starts empty because JDC has never recorded
+one anywhere.
 
 **`bt-export/` on disk is from 14 May** — 859 MB, 238 job directories. Step 1
 above refreshes it. If you skip step 1 you will load four-month-old data.
@@ -134,8 +140,8 @@ runs immediately after, to repair what the seeder got wrong.
 | Calendar | `GET /api/Calendar?jobId=` | works |
 | Documents | `GET /api/Documents?jobId=` | works |
 | Time clock | `POST /api/TimeClock/Grid?gridType=29` | works |
-| Change orders | `POST /api/ChangeOrders/Grid` | **500 on all jobs** |
-| Purchase orders | `POST /api/PurchaseOrders/Grid` | **500 on all jobs** |
+| Change orders | `POST /api/ChangeOrders/Grid` | 500 — module unused at JDC, nothing to export |
+| Purchase orders | `POST /api/PurchaseOrders/Grid` | 500 — module unused at JDC, nothing to export |
 
 Two traps worth knowing:
 
