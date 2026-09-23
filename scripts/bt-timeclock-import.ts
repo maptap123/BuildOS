@@ -231,19 +231,53 @@ async function resolveJob(btJobId: number, btJobName: string): Promise<string | 
 
 /** Fetch all BT job IDs visible to this account */
 async function fetchBtJobIds(page: Page): Promise<number[]> {
+  // The short {searchTerm, showTemplates, showGeneral} payload does not work --
+  // it comes back with success:false, and the caller's fallback then quietly
+  // imported 7 hardcoded jobs out of 281, which looked like a successful run
+  // that found only 118 shifts. Use the full payload bt-migrate.ts uses; the
+  // '3' filter is what includes closed, warranty and presale jobs.
   const resp: BTJobPickerResp = await page.evaluate(
-    async ([url]: [string]) => {
+    async ([url, builderId]: [string, string]) => {
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'portaltype': '1' },
-        body: JSON.stringify({ searchTerm: '', showTemplates: false, showGeneral: true }),
+        body: JSON.stringify({
+          filters: JSON.stringify({ '1': '', '2': '', '3': '5,1,7,2', '7': '' }),
+          displayMode: 2,
+          jobSortChoice: 1,
+          selectedJobId: 0,
+          isExpanded: true,
+          templatesOnly: false,
+          selectMode: 2,
+          useJobInSession: false,
+          allowGlobalJob: false,
+          includeGeneralJob: false,
+          builderId,
+          includeCounts: false,
+        }),
       })
       return r.json()
     },
-    [BT_JOBPICKER_URL] as [string]
+    [BT_JOBPICKER_URL, '69084'] as [string, string]
   )
-  if (!resp.success) throw new Error('Failed to fetch BT job list')
-  return resp.data.jobs.map(j => j.jobId).filter(id => id > 0)
+
+  const ids = (resp?.data?.jobs ?? []).map(j => j.jobId).filter(id => id > 0)
+  if (ids.length) return ids
+
+  // Fall back to the job list the extract already wrote, not to a hardcoded
+  // handful -- and if that is missing too, fail loudly rather than silently
+  // importing a fraction of the book.
+  const exportPath = path.resolve(__dirname, '../bt-export/jobs.json')
+  if (fs.existsSync(exportPath)) {
+    const fromExport = (JSON.parse(fs.readFileSync(exportPath, 'utf-8')) as Array<{ jobId: number }>)
+      .map(j => j.jobId)
+      .filter(id => id > 0)
+    if (fromExport.length) {
+      console.log(`    ℹ  Job picker returned nothing; using ${fromExport.length} ids from bt-export/jobs.json`)
+      return fromExport
+    }
+  }
+  throw new Error('Could not determine the BT job list (job picker failed and bt-export/jobs.json is unusable)')
 }
 
 /** Fetch one page of shifts from BT */
@@ -472,16 +506,13 @@ async function main() {
 
     console.log('✅  BT session active\n')
 
+    // No silent fallback here. This used to swallow the error and continue with
+    // 7 hardcoded job ids, so a failed lookup produced a run that reported
+    // success having imported shifts for 7 jobs out of 281. fetchBtJobIds now
+    // falls back to bt-export/jobs.json and otherwise throws.
     console.log('📋  Fetching BT job list…')
-    let jobIds: number[]
-    try {
-      jobIds = await fetchBtJobIds(page)
-      console.log(`    Found ${jobIds.length} jobs: ${jobIds.join(', ')}\n`)
-    } catch {
-      // Fallback to known job IDs if job picker API fails
-      jobIds = [27087080, 43587803, 39174515, 44477710, 44678885, 41939994, 44914837]
-      console.warn(`    ⚠  Job picker failed, using ${jobIds.length} known job IDs\n`)
-    }
+    const jobIds = await fetchBtJobIds(page)
+    console.log(`    Found ${jobIds.length} jobs\n`)
 
     let pageNum = 1
     let totalShifts = 0
