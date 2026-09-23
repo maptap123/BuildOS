@@ -45,6 +45,41 @@ DROP INDEX IF EXISTS idx_daily_logs_bt_log_id;
 CREATE UNIQUE INDEX IF NOT EXISTS daily_logs_bt_log_id_key
   ON public.daily_logs (bt_log_id);
 
+-- ─── 3b. contacts.job_id must not CASCADE ─────────────────────────────────────
+-- 004 declared `job_id UUID REFERENCES jobs(id) ON DELETE CASCADE`. That was
+-- harmless while job_id was NULL on all 740 rows, but bt-link-job-contacts.ts
+-- now populates it, so deleting a job would silently delete the client's entry
+-- from the company address book -- and because the rule is CASCADE rather than
+-- RESTRICT, the delete would not even be blocked by the 23503 guard in
+-- src/app/api/jobs/[id]/route.ts. A contact is a person who happens to be
+-- attached to a job; the person should outlive the job.
+-- Drop whatever the FK is actually called rather than assuming the default
+-- name -- if the name differed, a blind DROP IF EXISTS would no-op and we would
+-- end up with two FKs on the column, the CASCADE one still winning.
+DO $$
+DECLARE c RECORD;
+BEGIN
+  FOR c IN
+    SELECT con.conname
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      JOIN pg_namespace ns ON ns.oid = rel.relnamespace
+     WHERE ns.nspname = 'public'
+       AND rel.relname = 'contacts'
+       AND con.contype = 'f'
+       AND con.conkey = ARRAY[(
+             SELECT attnum FROM pg_attribute
+              WHERE attrelid = rel.oid AND attname = 'job_id'
+           )]::smallint[]
+  LOOP
+    EXECUTE format('ALTER TABLE public.contacts DROP CONSTRAINT %I', c.conname);
+  END LOOP;
+END $$;
+
+ALTER TABLE public.contacts
+  ADD CONSTRAINT contacts_job_id_fkey
+  FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE SET NULL;
+
 -- ─── 4. Already unique on the live DB -- asserted here so the repo matches ─────
 -- jobs.job_number          UNIQUE (001)
 -- log_photos.bt_photo_id   unique live, never captured in a migration

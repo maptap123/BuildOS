@@ -46,6 +46,13 @@ It adds `schedule_items.bt_event_id` plus unique indexes on that,
 `contacts.bt_contact_id` and `daily_logs.bt_log_id`. All three were verified
 duplicate-free on the live DB first, so it applies without cleaning data.
 
+It also changes `contacts.job_id` from `ON DELETE CASCADE` to `ON DELETE SET NULL`.
+That FK was harmless while `job_id` was NULL on every contact, but
+`bt-link-job-contacts.ts` now populates it on 156 rows — and under CASCADE,
+deleting a job would silently delete the client out of the company address book
+without even tripping the 23503 guard in `src/app/api/jobs/[id]/route.ts`.
+**Until 050 is applied, avoid deleting jobs through the UI.**
+
 Why `daily_logs` needs it: migration 007 created a *partial* unique index
 (`WHERE bt_log_id IS NOT NULL`). Postgres will not accept a partial index as an
 `ON CONFLICT` target unless the statement repeats the predicate, which
