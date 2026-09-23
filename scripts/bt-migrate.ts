@@ -98,13 +98,24 @@ async function main() {
 
   const page = await browser.newPage();
   await page.goto(BT_URL);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(2000);
 
   if (!page.url().includes('/app/')) {
+    // Poll for the login rather than blocking on stdin: this script is often
+    // launched without an interactive terminal, and there is then no way to
+    // press Enter. Watching the URL needs no input at all.
     console.log('\nNot logged in. Please log in to BuilderTrend in the browser window.');
-    console.log('Press Enter here once you are logged in...');
-    await new Promise<void>((r) => process.stdin.once('data', () => r()));
-    await page.waitForLoadState('networkidle');
+    console.log('Waiting up to 10 minutes for you to finish; no keypress needed.');
+    try {
+      await page.waitForURL('**/app/**', { timeout: 10 * 60_000 });
+    } catch {
+      console.error('\nTimed out waiting for login. Re-run once you are signed in.');
+      await browser.close();
+      process.exit(1);
+    }
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(2000);
   }
 
   console.log('\nLogged in. Starting extraction...\n');

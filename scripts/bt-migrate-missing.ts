@@ -193,12 +193,27 @@ async function fetchAllLogs(page: Page, jobId: number): Promise<unknown> {
   if (first?._error) return first;
 
   const logs = [...(first.data ?? [])];
-  const totalPages = first.totalPages ?? 1;
 
-  for (let pageNum = 2; pageNum <= totalPages; pageNum++) {
+  // Do NOT trust `totalPages`. BT derives it from the `totalRowsAllPages` hint
+  // we send in pagingData, which we set to one page's worth -- so it comes back
+  // as 2 no matter how many logs the job really has, and every job silently
+  // truncated to 40 rows. `records` is the true total; page off that instead,
+  // and stop early if a page comes back short.
+  const total = first.records ?? logs.length;
+  const pageSize = first.pageSize ?? LOG_PAGE_SIZE;
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
+
+  for (let pageNum = 2; pageNum <= lastPage; pageNum++) {
     const response = await btMergePatch(page, '/apix/v2/DailyLogs/grid', dailyLogsGridBody(jobId, pageNum)) as DailyLogsGridResponse;
     if (response?._error) return response;
-    logs.push(...(response.data ?? []));
+    const batch = response.data ?? [];
+    logs.push(...batch);
+    if (batch.length < pageSize) break;
+    if (logs.length >= total) break;
+  }
+
+  if (total && logs.length < total) {
+    console.warn(`    ! job ${jobId}: got ${logs.length}/${total} logs`);
   }
 
   return {
@@ -249,11 +264,21 @@ async function main() {
 
   // Verify login
   await page.goto(BT_URL);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(2000);
   if (!page.url().includes('/app/')) {
-    console.log('\nNot logged in — please log in then press Enter...');
-    await new Promise<void>((r) => process.stdin.once('data', () => r()));
-    await page.waitForLoadState('networkidle');
+    // Poll for the login rather than blocking on stdin -- see bt-migrate.ts.
+    console.log('\nNot logged in. Please log in to BuilderTrend in the browser window.');
+    console.log('Waiting up to 10 minutes for you to finish; no keypress needed.');
+    try {
+      await page.waitForURL('**/app/**', { timeout: 10 * 60_000 });
+    } catch {
+      console.error('\nTimed out waiting for login. Re-run once you are signed in.');
+      await browser.close();
+      process.exit(1);
+    }
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(2000);
   }
   console.log(`Logged in.${JOB_LIMIT ? ` Test limit: ${allJobs.length}/${loadedJobs.length} jobs.` : ''}\n`);
 
