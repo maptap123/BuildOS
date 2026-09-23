@@ -46,7 +46,11 @@ if (fs.existsSync(envFile)) {
 
 const SUPABASE_URL      = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SVC_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const BT_SESSION_DIR    = path.resolve(__dirname, '../.bt-session')
+// Use the same browser profile as every other bt-* script. This used to point
+// at its own .bt-session/, which meant logging in for the extract scripts left
+// this one still signed out -- it would open a second login window and time out
+// after five minutes with nobody watching it.
+const BT_SESSION_DIR    = path.resolve(__dirname, '../.bt-profile')
 const MIGRATION_USER_ID = '9f631c7a-3877-4984-9e9b-4ebc18b47fd8' // Migration System
 const JDC_TZ            = 'America/New_York'
 
