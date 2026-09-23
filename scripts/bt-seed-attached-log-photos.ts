@@ -224,8 +224,8 @@ async function main() {
   }
 
   console.log('[6/7] Finding the migration user...');
-  const { data: list } = await withTimeout('Supabase user lookup', supabase.auth.admin.listUsers({ perPage: 1000 }));
-  const migrationUser = list?.users?.find(user => user.email === 'migration@jdc-platform.internal');
+  // auth.admin.listUsers 500s on this project -- read public.users instead.
+  const { data: migrationUser } = await withTimeout('Supabase user lookup', supabase.from('users').select('id').eq('email', 'migration@jdc-platform.internal').maybeSingle());
   if (!migrationUser) throw new Error('Migration user not found. Run bt-seed.ts first.');
 
   console.log(`[7/7] Launching Buildertrend browser for ${jobs.length} job(s)...`);

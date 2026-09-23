@@ -88,8 +88,8 @@ function mimeTypeFor(ext: string) {
 async function main() {
   console.log('\nJDC Platform - seed Buildertrend daily-log photos\n');
 
-  const { data: list } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  const migrationUser = list?.users?.find(user => user.email === 'migration@jdc-platform.internal');
+  // auth.admin.listUsers 500s on this project -- read public.users instead.
+  const { data: migrationUser } = await supabase.from('users').select('id').eq('email', 'migration@jdc-platform.internal').maybeSingle();
   if (!migrationUser) throw new Error('Migration user not found. Run bt-seed.ts first.');
   const uploadedBy = migrationUser.id;
 

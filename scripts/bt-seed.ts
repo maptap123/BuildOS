@@ -74,10 +74,30 @@ type BtJob = {
   state?: string;
   zip?: string;
   isClosed?: boolean;
+  status?: number;
   actualStartDate?: string;
   projectedStartDate?: string;
   projectedClosingDate?: string;
 };
+
+/**
+ * Map a BuilderTrend job status to a BuildOS one.
+ *
+ * Do NOT use `isClosed` -- BT returns it as false on every job, including all
+ * 223 that are genuinely closed, so trusting it marks the entire book active.
+ * `status` is the real field: 0 closed, 1 open, 3 active, 4 presale. BuildOS
+ * has no distinct "open", so 1 and 3 both land on 'active'; the BT distinction
+ * is kept in jobs.tags by bt-sync-job-metadata.ts.
+ */
+function mapJobStatus(j: BtJob): 'closed' | 'presale' | 'active' {
+  switch (j.status) {
+    case 0: return 'closed';
+    case 4: return 'presale';
+    case 1:
+    case 3: return 'active';
+    default: return j.isClosed ? 'closed' : 'active';
+  }
+}
 
 type CalendarResponse = {
   success: boolean;
@@ -94,8 +114,15 @@ type CalendarResponse = {
 async function ensureMigrationUser(): Promise<string> {
   const email = 'migration@jdc-platform.internal';
 
-  const { data: list } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  const existing = list?.users?.find((u) => u.email === email);
+  // Look the user up in public.users, NOT via auth.admin.listUsers -- that
+  // endpoint returns HTTP 500 "Database error finding users" on this project,
+  // so it silently reported no users and we fell through to createUser, which
+  // then failed with "already been registered".
+  const { data: existing } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
   if (existing) {
     console.log(`  Reusing migration user: ${existing.id}`);
     return existing.id;
@@ -131,7 +158,7 @@ async function seedJobs(jobs: BtJob[], createdBy: string): Promise<Map<number, s
     city: j.city || null,
     state: j.state || null,
     postal_code: j.zip || null,
-    status: j.isClosed ? 'closed' : 'active',
+    status: mapJobStatus(j),
     start_date: parseDate(
       j.actualStartDate && !j.actualStartDate.startsWith('0001')
         ? j.actualStartDate

@@ -71,8 +71,8 @@ async function main() {
   console.log('\nJDC Platform — bt-extract photos → Supabase Storage\n');
 
   // Migration user
-  const { data: list } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  const migUser = list?.users?.find(u => u.email === 'migration@jdc-platform.internal');
+  // auth.admin.listUsers 500s on this project -- read public.users instead.
+  const { data: migUser } = await supabase.from('users').select('id').eq('email', 'migration@jdc-platform.internal').maybeSingle();
   if (!migUser) throw new Error('Migration user not found — run bt-seed.ts first');
   const createdBy = migUser.id;
 

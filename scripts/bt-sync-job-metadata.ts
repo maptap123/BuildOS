@@ -38,7 +38,8 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 const APPLY = process.argv.includes('--apply');
 
-type AppJobStatus = 'lead' | 'estimating' | 'scheduled' | 'active' | 'on_hold' | 'completed' | 'closed';
+// Mirrors the jobs_status_check constraint as of migration 015.
+type AppJobStatus = 'lead' | 'presale' | 'active' | 'warranty' | 'closed' | 'archived';
 
 type BtJob = {
   jobId: number;
@@ -62,11 +63,16 @@ type AppJob = {
   target_completion_date: string | null;
 };
 
+// Migration 015 narrowed jobs.status to lead/presale/active/warranty/closed/archived.
+// 'scheduled' and 'estimating' were from the original 001 set and now fail the
+// CHECK constraint, which would have blown up on all 44 status-1 and status-4
+// jobs. BuildOS has no separate "open", so BT 1 and 3 both map to 'active' and
+// the distinction is preserved in btTag instead.
 const STATUS_MAP: Record<number, { appStatus: AppJobStatus; btTag: string; current: boolean }> = {
   0: { appStatus: 'closed', btTag: 'closed', current: false },
-  1: { appStatus: 'scheduled', btTag: 'open', current: true },
+  1: { appStatus: 'active', btTag: 'open', current: true },
   3: { appStatus: 'active', btTag: 'active', current: true },
-  4: { appStatus: 'estimating', btTag: 'presale', current: true },
+  4: { appStatus: 'presale', btTag: 'presale', current: true },
 };
 
 function parseDateOnly(value: string | null | undefined): string | null {

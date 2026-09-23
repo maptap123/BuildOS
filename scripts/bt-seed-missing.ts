@@ -171,10 +171,22 @@ type ExistingLog = {
 // ─── migration user ───────────────────────────────────────────────────────────
 async function getMigrationUserId(): Promise<string> {
   const email = 'migration@jdc-platform.internal';
-  const { data: list } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  const existing = list?.users?.find((u) => u.email === email);
+  // auth.admin.listUsers 500s on this project -- read public.users instead.
+  const { data: existing } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
   if (existing) return existing.id;
   throw new Error('Migration user not found — run bt-seed.ts first');
+}
+
+/** Page past PostgREST's max-rows cap instead of trusting .limit(). */
+async function fetchAllRows<T>(table: string, columns: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from(table).select(columns).range(from, from + 999);
+    if (error) throw new Error(`${table} lookup: ${error.message}`);
+    out.push(...((data ?? []) as unknown as T[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
 }
 
 // ─── seed logs ────────────────────────────────────────────────────────────────
@@ -183,11 +195,14 @@ async function seedLogs(
   jobs: BtJob[],
   createdBy: string
 ): Promise<{ inserted: number; updated: number; skipped: number }> {
-  const { data: existingRows, error: existingError } = await supabase
-    .from('daily_logs')
-    .select('id, job_id, bt_log_id, log_date, author_name, work_performed')
-    .limit(100000);
-  if (existingError) throw new Error(`Existing logs lookup: ${existingError.message}`);
+  // .limit(100000) does NOT work here: PostgREST silently caps a response at
+  // its max-rows setting (1000 on this project), so this read returned a third
+  // of the table, every unseen row looked new, and the insert below collided
+  // with daily_logs_bt_log_id_key. Range-paginate to actually get them all.
+  const existingRows = await fetchAllRows<ExistingLog>(
+    'daily_logs',
+    'id, job_id, bt_log_id, log_date, author_name, work_performed'
+  );
 
   const existingByBtLogId = new Map(
     ((existingRows ?? []) as ExistingLog[])
@@ -252,7 +267,11 @@ async function seedLogs(
   let inserted = 0;
   for (let i = 0; i < inserts.length; i += BATCH) {
     const batch = inserts.slice(i, i + BATCH);
-    const { error } = await supabase.from('daily_logs').insert(batch);
+    // Upsert rather than insert: migration 050 made bt_log_id a real unique
+    // index, so this is now idempotent even if the diff above misjudges.
+    const { error } = await supabase
+      .from('daily_logs')
+      .upsert(batch, { onConflict: 'bt_log_id' });
     if (error) throw new Error(`daily_logs batch ${i}: ${error.message}`);
     inserted += batch.length;
     process.stdout.write(`  ${inserted}/${inserts.length} logs inserted\r`);
@@ -289,14 +308,13 @@ async function seedContacts(
 
   console.log(`  ${byBtId.size} unique contacts found across all jobs`);
 
-  // Find which bt_contact_ids are already in the DB
-  const { data: existingRows } = await supabase
-    .from('contacts')
-    .select('bt_contact_id')
-    .limit(10000);
-  const existingBtIds = new Set(
-    (existingRows ?? []).map((r: { bt_contact_id: string }) => r.bt_contact_id)
+  // Find which bt_contact_ids are already in the DB. Same PostgREST max-rows
+  // trap as the logs read above -- .limit(10000) returns at most 1000.
+  const existingRows = await fetchAllRows<{ bt_contact_id: string | null }>(
+    'contacts',
+    'bt_contact_id'
   );
+  const existingBtIds = new Set(existingRows.map((r) => r.bt_contact_id));
 
   const rows: object[] = [];
   for (const [btId, c] of byBtId) {
@@ -325,7 +343,11 @@ async function seedContacts(
 
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
-    const { error } = await supabase.from('contacts').insert(batch);
+    // Upsert on bt_contact_id -- migration 050 added the unique index, so the
+    // JS-side dedupe above is now a fast path rather than the only guard.
+    const { error } = await supabase
+      .from('contacts')
+      .upsert(batch, { onConflict: 'bt_contact_id' });
     if (error) throw new Error(`contacts batch ${i}: ${error.message}`);
     inserted += batch.length;
     process.stdout.write(`  ${inserted}/${rows.length} contacts inserted\r`);

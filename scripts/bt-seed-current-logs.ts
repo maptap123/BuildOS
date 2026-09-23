@@ -130,9 +130,9 @@ function weatherSummary(log: BtLog) {
 
 async function getMigrationUserId() {
   const email = 'migration@jdc-platform.internal';
-  const { data: list, error } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+  // auth.admin.listUsers 500s on this project -- read public.users instead.
+  const { data: existing, error } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
   if (error) throw new Error(`Migration user lookup: ${error.message}`);
-  const existing = list?.users?.find(user => user.email === email);
   if (!existing) throw new Error('Migration user not found. Run bt-seed.ts first.');
   return existing.id;
 }
