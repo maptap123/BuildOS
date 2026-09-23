@@ -20,7 +20,7 @@ import { join } from 'path';
 // ─── env ──────────────────────────────────────────────────────────────────────
 function loadEnvFile(path: string) {
   if (!existsSync(path)) return;
-  for (const line of readFileSync(path, 'utf-8').split('\n')) {
+  for (const line of readFileSync(path, 'utf-8').split(/\r?\n/)) {
     const m = line.match(/^([^#=\s][^=]*)=(.*)$/);
     if (m && !process.env[m[1].trim()]) process.env[m[1].trim()] = m[2].trim();
   }

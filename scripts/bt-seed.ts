@@ -6,7 +6,9 @@
  *   • schedule_items    (from bt-export/by-job/{id}/calendar.json)
  *
  * Uses the service-role key to bypass RLS.
- * Safe to re-run — jobs are upserted on job_number.
+ * Safe to re-run — jobs are upserted on job_number and schedule items on
+ * bt_event_id. The schedule upsert needs migration 050; before it, this script
+ * plain-INSERTed calendar rows and a second run duplicated all 4,110 of them.
  *
  * Usage:
  *   npx tsx scripts/bt-seed.ts
@@ -19,7 +21,7 @@ import { join } from 'path';
 // ─── env ──────────────────────────────────────────────────────────────────────
 function loadEnvFile(path: string) {
   if (!existsSync(path)) return;
-  for (const line of readFileSync(path, 'utf-8').split('\n')) {
+  for (const line of readFileSync(path, 'utf-8').split(/\r?\n/)) {
     const m = line.match(/^([^#=\s][^=]*)=(.*)$/);
     if (m && !process.env[m[1].trim()]) process.env[m[1].trim()] = m[2].trim();
   }
@@ -176,8 +178,12 @@ async function seedScheduleItems(
       const startDate = parseDate(item.itemStartDate);
       const endDate = parseDate(item.itemEndDate);
       if (!startDate || !endDate) continue;
+      // bt_event_id is the BuilderTrend calendar item id. Carrying it is what
+      // makes this seeder re-runnable -- without it the insert below duplicated
+      // every row on a second run. Requires migration 050.
       items.push({
         job_id: jobUuid,
+        bt_event_id: String(item.id),
         title: item.title || item.name || 'Untitled',
         start_date: startDate,
         end_date: endDate,
@@ -192,10 +198,12 @@ async function seedScheduleItems(
   let inserted = 0;
   for (let i = 0; i < items.length; i += BATCH) {
     const batch = items.slice(i, i + BATCH);
-    const { error } = await supabase.from('schedule_items').insert(batch);
+    const { error } = await supabase
+      .from('schedule_items')
+      .upsert(batch, { onConflict: 'bt_event_id' });
     if (error) throw new Error(`Schedule items batch ${i}: ${error.message}`);
     inserted += batch.length;
-    process.stdout.write(`  ${inserted}/${items.length} schedule items inserted\r`);
+    process.stdout.write(`  ${inserted}/${items.length} schedule items upserted\r`);
   }
 
   return inserted;
