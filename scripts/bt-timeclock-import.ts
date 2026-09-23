@@ -457,13 +457,17 @@ async function main() {
     const page = await context.newPage()
 
     console.log('🌐  Opening BuilderTrend…')
-    await page.goto(BT_HOME_URL, { waitUntil: 'networkidle', timeout: 60_000 })
+    // 'networkidle' never fires on BuilderTrend -- the app polls continuously,
+    // so this always burned the full timeout and aborted the run.
+    await page.goto(BT_HOME_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForTimeout(3000)
 
     if (page.url().includes('login') || page.url().includes('Login')) {
       console.log('\n🔐  Please log in to BuilderTrend in the browser window.')
       console.log('    Waiting up to 5 minutes for login to complete…\n')
       await page.waitForURL('**/app/**', { timeout: 300_000 })
-      await page.goto(BT_HOME_URL, { waitUntil: 'networkidle', timeout: 30_000 })
+      await page.goto(BT_HOME_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+      await page.waitForTimeout(3000)
     }
 
     console.log('✅  BT session active\n')
