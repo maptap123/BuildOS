@@ -66,6 +66,9 @@ type Contact = {
 const norm = (s: string | null | undefined) =>
   (s ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
+/** Compare phone numbers by digits alone -- BT stores 513-633-1221 and 5136331221. */
+const digitsOnly = (s: string | null | undefined) => (s ?? '').replace(/\D/g, '');
+
 /** "Joe and Kim Vogel" -> given names ["joe","kim"], surname "vogel" */
 function nameParts(raw: string | null | undefined) {
   const tokens = norm(raw).split(' ').filter((t) => t && t !== 'and');
@@ -130,6 +133,15 @@ async function main() {
       continue;
     }
     if (exact.length > 1) {
+      // Several contacts share the client's name. That is only genuinely
+      // ambiguous if they disagree about the phone number -- BT's address book
+      // holds plenty of straight duplicates, and picking either of two records
+      // carrying the same number is safe. Only bail when they actually differ.
+      const phones = new Set(exactWithPhone.map((c) => digitsOnly(c.phone)).filter(Boolean));
+      if (phones.size === 1 && exactWithPhone.length > 0) {
+        matches.push({ job, contact: exactWithPhone[0], tier: 'exact' });
+        continue;
+      }
       ambiguous++;
       unmatched.push(job);
       continue;
