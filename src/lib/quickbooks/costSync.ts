@@ -8,11 +8,15 @@
  * QB customer that is linked to a BuildOS job and writes one `actuals` row per
  * line, keyed by (qb_txn_type, qb_txn_id, qb_line_id).
  *
- * Every run is a full pull, not incremental: it's a few dozen API calls, and it
- * means edits, re-tagged lines and deleted transactions in QuickBooks all flow
- * through without change tracking. QB-sourced rows that no longer match a
- * current line are deleted; actuals entered in BuildOS (qb_txn_id NULL) are
- * never touched.
+ * Two paths:
+ *  - syncQuickBooksTransactions: near-real-time. The QB webhook
+ *    (/api/integrations/quickbooks/webhook) names the transactions that changed;
+ *    only those are re-read.
+ *  - syncQuickBooksCosts: the daily full pull (cron) and the safety net for any
+ *    webhook Intuit fails to deliver. A few dozen API calls; edits, re-tagged
+ *    lines and deleted transactions all flow through without change tracking.
+ * QB-sourced rows that no longer match a current line are deleted; actuals
+ * entered in BuildOS (qb_txn_id NULL) are never touched.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -97,6 +101,91 @@ function key(type: string, txnId: string, lineId: string) {
   return `${type}|${txnId}|${lineId}`
 }
 
+/** actuals rows for one QB transaction: one per line tagged to a linked job. */
+function txnRows(entity: Entity, t: QBTxn, jobMap: Map<string, string>, createdBy: string): Record<string, unknown>[] {
+  // Vendor credits and Purchase refunds reduce job cost.
+  const sign = entity === 'VendorCredit' || (entity === 'Purchase' && t.Credit) ? -1 : 1
+  const status = entity === 'Bill' && Number(t.Balance ?? 0) > 0 ? 'approved' : 'paid'
+  const rows: Record<string, unknown>[] = []
+
+  for (const line of t.Line ?? []) {
+    const d = (line[line.DetailType] ?? {}) as LineDetail
+    const jobId = d.CustomerRef ? jobMap.get(d.CustomerRef.value) : undefined
+    if (!jobId || !line.Id || !line.Amount) continue
+
+    const item = d.ItemRef?.name ?? d.AccountRef?.name ?? null
+    rows.push({
+      job_id: jobId,
+      qb_txn_type: entity,
+      qb_txn_id: t.Id,
+      qb_line_id: line.Id,
+      qb_customer_id: d.CustomerRef!.value,
+      qb_item_name: item,
+      cost_class: d.ClassRef?.name ?? null,
+      qb_bill_id: entity === 'Bill' ? t.Id : null,
+      qb_vendor_id: (t.VendorRef ?? t.EntityRef)?.value ?? null,
+      qb_synced: true, // sourced from QB
+      vendor_name: (t.VendorRef ?? t.EntityRef)?.name ?? null,
+      invoice_number: t.DocNumber ?? null,
+      description: line.Description?.trim() || item || `QuickBooks ${entity}`,
+      amount: sign * Number(line.Amount),
+      status,
+      incurred_date: t.TxnDate,
+      payment_method: entity === 'Purchase' ? (PAYMENT_METHOD[t.PaymentType ?? ''] ?? 'other') : null,
+      created_by: createdBy,
+    })
+  }
+  return rows
+}
+
+export const COST_ENTITIES: readonly string[] = ENTITIES
+
+export interface TxnChange { entity: string; id: string; deleted: boolean }
+
+/**
+ * Near-real-time path, driven by the QuickBooks webhook: re-read just the
+ * transactions QB says changed and replace their actuals rows. A deleted (or
+ * voided-to-nothing, or re-tagged to an unlinked customer) transaction ends up
+ * with no rows. The daily full pull still runs as the safety net for any
+ * notification Intuit fails to deliver.
+ */
+export async function syncQuickBooksTransactions(admin: SupabaseClient, changes: TxnChange[]): Promise<{ upserted: number; deleted: number }> {
+  const relevant = changes.filter((c) => (ENTITIES as readonly string[]).includes(c.entity))
+  if (relevant.length === 0) return { upserted: 0, deleted: 0 }
+
+  const tokens = await refreshTokenIfNeeded(admin, await loadTokens(admin))
+  const { qbFetch } = getQBClient(tokens)
+  const [jobMap, createdBy] = await Promise.all([loadJobMap(admin), systemUserId(admin)])
+
+  let upserted = 0, deleted = 0
+  for (const c of relevant) {
+    const entity = c.entity as Entity
+    let rows: Record<string, unknown>[] = []
+    if (!c.deleted) {
+      const res = await qbFetch(`/${entity.toLowerCase()}/${encodeURIComponent(c.id)}?minorversion=65`)
+      if (res.ok) {
+        rows = txnRows(entity, (await res.json())[entity] as QBTxn, jobMap, createdBy)
+      } else if (res.status !== 404 && res.status !== 400) {
+        throw new Error(`QB ${entity} ${c.id} read failed (${res.status}): ${await res.text()}`)
+      } // 400/404: gone since the notification — treat as deleted
+    }
+
+    if (rows.length) {
+      const { error } = await admin.from('actuals').upsert(rows, { onConflict: 'qb_txn_type,qb_txn_id,qb_line_id' })
+      if (error) throw new Error(`Failed to save QuickBooks ${entity} ${c.id}: ${error.message}`)
+      upserted += rows.length
+    }
+
+    // Drop this transaction's rows for lines that no longer exist or no longer point at a linked job.
+    let del = admin.from('actuals').delete({ count: 'exact' }).eq('qb_txn_type', entity).eq('qb_txn_id', c.id)
+    if (rows.length) del = del.not('qb_line_id', 'in', `(${rows.map((r) => `"${r.qb_line_id}"`).join(',')})`)
+    const { error: delErr, count } = await del
+    if (delErr) throw new Error(`Failed to clear stale QuickBooks ${entity} ${c.id}: ${delErr.message}`)
+    deleted += count ?? 0
+  }
+  return { upserted, deleted }
+}
+
 export async function syncQuickBooksCosts(admin: SupabaseClient): Promise<CostSyncResult> {
   const tokens = await refreshTokenIfNeeded(admin, await loadTokens(admin))
   const { qbFetch } = getQBClient(tokens)
@@ -108,40 +197,7 @@ export async function syncQuickBooksCosts(admin: SupabaseClient): Promise<CostSy
   for (const entity of ENTITIES) {
     const txns = await fetchAll(qbFetch, entity)
     transactions[entity] = txns.length
-
-    for (const t of txns) {
-      // Vendor credits and Purchase refunds reduce job cost.
-      const sign = entity === 'VendorCredit' || (entity === 'Purchase' && t.Credit) ? -1 : 1
-      const status = entity === 'Bill' && Number(t.Balance ?? 0) > 0 ? 'approved' : 'paid'
-
-      for (const line of t.Line ?? []) {
-        const d = (line[line.DetailType] ?? {}) as LineDetail
-        const jobId = d.CustomerRef ? jobMap.get(d.CustomerRef.value) : undefined
-        if (!jobId || !line.Id || !line.Amount) continue
-
-        const item = d.ItemRef?.name ?? d.AccountRef?.name ?? null
-        rows.push({
-          job_id: jobId,
-          qb_txn_type: entity,
-          qb_txn_id: t.Id,
-          qb_line_id: line.Id,
-          qb_customer_id: d.CustomerRef!.value,
-          qb_item_name: item,
-          cost_class: d.ClassRef?.name ?? null,
-          qb_bill_id: entity === 'Bill' ? t.Id : null,
-          qb_vendor_id: (t.VendorRef ?? t.EntityRef)?.value ?? null,
-          qb_synced: true, // sourced from QB
-          vendor_name: (t.VendorRef ?? t.EntityRef)?.name ?? null,
-          invoice_number: t.DocNumber ?? null,
-          description: line.Description?.trim() || item || `QuickBooks ${entity}`,
-          amount: sign * Number(line.Amount),
-          status,
-          incurred_date: t.TxnDate,
-          payment_method: entity === 'Purchase' ? (PAYMENT_METHOD[t.PaymentType ?? ''] ?? 'other') : null,
-          created_by: createdBy,
-        })
-      }
-    }
+    for (const t of txns) rows.push(...txnRows(entity, t, jobMap, createdBy))
   }
 
   // Safety stop: an empty pull against a book that already produced costs is an
