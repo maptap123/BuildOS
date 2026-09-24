@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { syncQuickBooksCosts } from '@/lib/quickbooks/costSync'
+import { syncQuickBooksBilling } from '@/lib/quickbooks/billingSync'
 import { NextResponse } from 'next/server'
 
 // A full pull is a few dozen QB calls plus a few thousand upserts.
@@ -10,8 +11,9 @@ export const maxDuration = 300
  * GET  /api/integrations/quickbooks/costs — Vercel cron (see vercel.json), daily.
  * POST /api/integrations/quickbooks/costs — manual "pull costs now", budget editors only.
  *
- * Pulls job costs (bills, checks/card expenses, vendor credits) from QuickBooks
- * into `actuals`. See src/lib/quickbooks/costSync.ts.
+ * Pulls job costs (bills, checks/card expenses, vendor credits) into `actuals`
+ * and client billing (invoices, payments, credit memos) into `job_billing`.
+ * See src/lib/quickbooks/costSync.ts and billingSync.ts.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -40,10 +42,12 @@ export async function POST() {
 async function run() {
   const admin = createAdminClient()
   try {
-    return NextResponse.json({ ok: true, ...(await syncQuickBooksCosts(admin)) })
+    const costs = await syncQuickBooksCosts(admin)
+    const billing = await syncQuickBooksBilling(admin)
+    return NextResponse.json({ ok: true, costs, billing })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await admin.from('integration_settings').update({ sync_error: `Cost sync: ${message}` }).eq('service', 'quickbooks')
+    await admin.from('integration_settings').update({ sync_error: `QuickBooks pull: ${message}` }).eq('service', 'quickbooks')
     const notConnected = message.includes('not connected')
     return NextResponse.json({ error: message, setup_required: notConnected || undefined }, { status: notConnected ? 422 : 500 })
   }

@@ -2,17 +2,19 @@ import { after, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { syncQuickBooksTransactions, type TxnChange } from '@/lib/quickbooks/costSync'
+import { syncQuickBooksBillingTransactions } from '@/lib/quickbooks/billingSync'
 
 export const maxDuration = 60
 
 /**
  * POST /api/integrations/quickbooks/webhook
  *
- * Intuit calls this within seconds of a Bill / Purchase / VendorCredit being
- * created, edited, voided or deleted in QuickBooks (configured in the Intuit
- * developer portal → app → Webhooks, Production). We verify the signature,
+ * Intuit calls this within seconds of a cost (Bill / Purchase / VendorCredit) or
+ * billing document (Invoice / Payment / CreditMemo / SalesReceipt / RefundReceipt)
+ * being created, edited, voided or deleted in QuickBooks (configured in the
+ * Intuit developer portal → app → Webhooks, Production). We verify the signature,
  * answer 200 immediately (Intuit retries slow or failed deliveries), then re-read
- * just the changed transactions from QB into `actuals`. Read-only toward QB.
+ * just the changed transactions from QB into `actuals` / `job_billing`. Read-only toward QB.
  *
  * Accepts both payload formats Intuit sends:
  *  - classic:     { eventNotifications: [{ realmId, dataChangeEvent: { entities: [{ name, id, operation }] } }] }
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
     const mine = changes.filter((c) => !c.realmId || c.realmId === qb?.realm_id)
     try {
       await syncQuickBooksTransactions(admin, mine)
+      await syncQuickBooksBillingTransactions(admin, mine)
     } catch (err) {
       // The daily full pull will reconcile anything missed here.
       const message = err instanceof Error ? err.message : String(err)
@@ -53,6 +56,12 @@ export async function POST(request: Request) {
   })
 
   return NextResponse.json({ ok: true, received: changes.length })
+}
+
+// CloudEvents use lowercase entity names (qbo.vendorcredit.updated.v1).
+const ENTITY_NAMES: Record<string, string> = {
+  bill: 'Bill', purchase: 'Purchase', vendorcredit: 'VendorCredit',
+  invoice: 'Invoice', payment: 'Payment', creditmemo: 'CreditMemo', salesreceipt: 'SalesReceipt', refundreceipt: 'RefundReceipt',
 }
 
 function parseChanges(body: unknown): Array<TxnChange & { realmId: string | null }> {
@@ -64,7 +73,7 @@ function parseChanges(body: unknown): Array<TxnChange & { realmId: string | null
       const [, entity, op] = (e.type ?? '').split('.')
       if (!entity || !e.intuitentityid) continue
       out.push({
-        entity: entity.charAt(0).toUpperCase() + entity.slice(1).replace(/credit$/i, 'Credit'), // bill → Bill, vendorcredit → VendorCredit
+        entity: ENTITY_NAMES[entity.toLowerCase()] ?? entity,
         id: String(e.intuitentityid),
         deleted: op === 'deleted',
         realmId: e.intuitaccountid ?? null,

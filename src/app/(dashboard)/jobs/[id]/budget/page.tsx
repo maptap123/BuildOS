@@ -31,7 +31,7 @@ export default async function JobBudgetPage({
     )
   }
 
-  const [{ data: job }, { data: lines }, { data: actuals }, { data: changeOrders }] = await Promise.all([
+  const [{ data: job }, { data: lines }, { data: actuals }, { data: changeOrders }, { data: billing }] = await Promise.all([
     admin
       .from('jobs')
       .select('id, lead_id, contract_amount, estimated_cost, qb_sync_status, qb_last_synced_at, qb_customer_id')
@@ -53,6 +53,12 @@ export default async function JobBudgetPage({
       .select('*')
       .eq('job_id', id)
       .order('co_number'),
+    // Client invoices/payments mirrored from QuickBooks (read-only)
+    admin
+      .from('job_billing')
+      .select('id, job_id, qb_txn_type, qb_txn_id, doc_number, txn_date, due_date, amount, balance, description, linked_invoice_ids')
+      .eq('job_id', id)
+      .order('txn_date', { ascending: false }),
   ])
 
   if (!job) notFound()
@@ -65,6 +71,7 @@ export default async function JobBudgetPage({
       initialLines={lines ?? []}
       initialActuals={actuals ?? []}
       initialChangeOrders={changeOrders ?? []}
+      qbBilling={billing ?? []}
       permissions={{
         can_create: perm.can_create,
         can_edit: perm.can_edit,

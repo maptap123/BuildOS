@@ -523,6 +523,23 @@ export interface BillingMilestone {
   updated_at: string
 }
 
+/** Client billing mirrored read-only from QuickBooks (job_billing, migration 055). */
+export type JobBillingType = 'Invoice' | 'Payment' | 'CreditMemo' | 'SalesReceipt' | 'RefundReceipt'
+
+export interface JobBillingRecord {
+  id: string
+  job_id: string
+  qb_txn_type: JobBillingType
+  qb_txn_id: string
+  doc_number: string | null
+  txn_date: string
+  due_date: string | null
+  amount: number                 // always positive
+  balance: number | null         // Invoice: open. CreditMemo: unused credit. Payment: deposit not yet applied.
+  description: string | null
+  linked_invoice_ids: string[] | null
+}
+
 export type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
 export type LeadSource = 'referral' | 'website' | 'cold_call' | 'repeat' | 'other'
 

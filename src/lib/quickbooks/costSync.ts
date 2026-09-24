@@ -59,20 +59,20 @@ export interface CostSyncResult {
 
 const PAYMENT_METHOD: Record<string, string> = { Cash: 'cash', Check: 'check', CreditCard: 'credit_card' }
 
-async function fetchAll(qbFetch: (path: string) => Promise<Response>, entity: Entity): Promise<QBTxn[]> {
-  const out: QBTxn[] = []
+export async function fetchAll<T = QBTxn>(qbFetch: (path: string) => Promise<Response>, entity: string): Promise<T[]> {
+  const out: T[] = []
   for (let start = 1; ; start += PAGE) {
     const q = `SELECT * FROM ${entity} STARTPOSITION ${start} MAXRESULTS ${PAGE}`
     const res = await qbFetch(`/query?query=${encodeURIComponent(q)}&minorversion=65`)
     if (!res.ok) throw new Error(`QB ${entity} query failed (${res.status}): ${await res.text()}`)
-    const rows = ((await res.json()).QueryResponse?.[entity] ?? []) as QBTxn[]
+    const rows = ((await res.json()).QueryResponse?.[entity] ?? []) as T[]
     out.push(...rows)
     if (rows.length < PAGE) return out
   }
 }
 
 /** QB customer id → BuildOS job id, from jobs.qb_customer_id plus every linked job_external_links row. */
-async function loadJobMap(admin: SupabaseClient): Promise<Map<string, string>> {
+export async function loadJobMap(admin: SupabaseClient): Promise<Map<string, string>> {
   const map = new Map<string, string>()
   const { data: jobs, error: jobsErr } = await admin.from('jobs').select('id, qb_customer_id').not('qb_customer_id', 'is', null)
   if (jobsErr) throw new Error(`Failed to load jobs: ${jobsErr.message}`)

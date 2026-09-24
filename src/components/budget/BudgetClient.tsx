@@ -15,11 +15,12 @@ import { BillsTable } from './BillsTable'
 import { PurchaseOrderTable } from './PurchaseOrderTable'
 import { AddPOModal } from './AddPOModal'
 import { BillingMilestonesTable } from './BillingMilestonesTable'
+import { QBBillingPanel } from './QBBillingPanel'
 import { WorkOrderTable } from './WorkOrderTable'
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders'
 import { useBillingMilestones } from '@/hooks/useBillingMilestones'
 import { useWorkOrders } from '@/hooks/useWorkOrders'
-import type { Job, BudgetLine, Actual, ChangeOrder, PurchaseOrder, QBSyncStatus } from '@/types'
+import type { Job, BudgetLine, Actual, ChangeOrder, PurchaseOrder, QBSyncStatus, JobBillingRecord } from '@/types'
 
 interface Permissions {
   can_create: boolean
@@ -34,6 +35,7 @@ interface Props {
   initialLines: BudgetLine[]
   initialActuals: Actual[]
   initialChangeOrders: ChangeOrder[]
+  qbBilling: JobBillingRecord[]
   permissions: Permissions
   currentUserId: string
 }
@@ -63,7 +65,7 @@ function QBSyncBadge({ status, lastSynced }: { status: QBSyncStatus; lastSynced:
 }
 
 export function BudgetClient({
-  jobId, job, leadId, initialLines, initialActuals, initialChangeOrders, permissions, currentUserId
+  jobId, job, leadId, initialLines, initialActuals, initialChangeOrders, qbBilling, permissions, currentUserId
 }: Props) {
   const { lines, actuals, loading: budgetLoading, error: budgetError, refresh: refreshBudget } = useBudget(jobId, initialLines, initialActuals)
   const { orders, loading: coLoading, error: coError, refresh: refreshCOs } = useChangeOrders(jobId, initialChangeOrders)
@@ -75,7 +77,7 @@ export function BudgetClient({
   const [qbSyncing, setQbSyncing] = useState(false)
   const [qbError, setQbError] = useState<string | null>(null)
 
-  // QuickBooks is the source of truth: this only pulls job costs from QB, never writes to it.
+  // QuickBooks is the source of truth: this only pulls costs and billing from QB, never writes to it.
   const handlePullFromQB = useCallback(async () => {
     setQbSyncing(true)
     setQbError(null)
@@ -201,7 +203,7 @@ export function BudgetClient({
               ? <RefreshCw size={12} className="animate-spin" />
               : <CloudDownload size={12} />
             }
-            {qbSyncing ? 'Pulling…' : 'Pull costs from QuickBooks'}
+            {qbSyncing ? 'Pulling…' : 'Pull from QuickBooks'}
           </button>
         )}
       </div>
@@ -267,8 +269,8 @@ export function BudgetClient({
             tab === 'billing' ? 'bg-navy-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
           }`}
         >
-          Draw Schedule
-          <span className={`ml-2 text-[11px] ${tab === 'billing' ? 'text-white/70' : 'text-gray-400'}`}>{milestones.length}</span>
+          Billing
+          <span className={`ml-2 text-[11px] ${tab === 'billing' ? 'text-white/70' : 'text-gray-400'}`}>{qbBilling.length + milestones.length}</span>
         </button>
       </div>
 
@@ -281,7 +283,7 @@ export function BudgetClient({
 
       {loading ? (
         <div className="bg-white rounded-xl border border-border p-8 text-center text-gray-400 text-sm">
-          Loading {tab === 'budget' ? 'budget' : tab === 'change_orders' ? 'change orders' : tab === 'purchase_orders' ? 'purchase orders' : tab === 'work_orders' ? 'work orders' : tab === 'billing' ? 'draw schedule' : 'bills'}…
+          Loading {tab === 'budget' ? 'budget' : tab === 'change_orders' ? 'change orders' : tab === 'purchase_orders' ? 'purchase orders' : tab === 'work_orders' ? 'work orders' : tab === 'billing' ? 'billing' : 'bills'}…
         </div>
       ) : tab === 'budget' ? (
         <>
@@ -350,12 +352,18 @@ export function BudgetClient({
           onRefresh={refreshWOs}
         />
       ) : tab === 'billing' ? (
-        <BillingMilestonesTable
-          jobId={jobId}
-          milestones={milestones}
-          permissions={permissions}
-          onRefresh={refreshMilestones}
-        />
+        <div className="space-y-6">
+          <QBBillingPanel records={qbBilling} />
+          <div>
+            <h3 className="text-sm font-semibold text-navy-900 mb-2">Draw schedule</h3>
+            <BillingMilestonesTable
+              jobId={jobId}
+              milestones={milestones}
+              permissions={permissions}
+              onRefresh={refreshMilestones}
+            />
+          </div>
+        </div>
       ) : (
         <>
           {actuals.length > 0 && (
