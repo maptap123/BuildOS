@@ -30,6 +30,11 @@ function formatCurrency(value: number | null): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
 }
 
+/** What the lead is worth: its priced proposal, else the value typed in by hand. */
+function leadAmount(lead: Lead): number | null {
+  return lead.proposal_total ?? lead.estimated_value
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -45,7 +50,7 @@ export function LeadsClient({ initialLeads, permissions }: Props) {
   }
 
   function columnTotal(status: LeadStatus): number {
-    return leadsForStatus(status).reduce((sum, l) => sum + (l.estimated_value ?? 0), 0)
+    return leadsForStatus(status).reduce((sum, l) => sum + (leadAmount(l) ?? 0), 0)
   }
 
   async function moveStatus(lead: Lead, newStatus: LeadStatus) {
@@ -148,9 +153,9 @@ export function LeadsClient({ initialLeads, permissions }: Props) {
                       <p className="text-xs text-gray-500 mt-1 truncate">{lead.client_name}</p>
                     )}
 
-                    {lead.estimated_value != null && (
+                    {leadAmount(lead) != null && (
                       <p className="text-xs font-semibold text-green-700 mt-1.5">
-                        {formatCurrency(lead.estimated_value)}
+                        {formatCurrency(leadAmount(lead))}
                       </p>
                     )}
 

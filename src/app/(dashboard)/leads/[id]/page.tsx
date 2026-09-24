@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LeadDetailClient } from '@/components/leads'
+import { leadProposalTotals } from '@/lib/estimates/leadProposalTotals'
 import type { Lead, LeadActivity } from '@/types'
 
 export const metadata = { title: 'Lead Detail — BuildOS' }
@@ -45,9 +46,11 @@ export default async function LeadDetailPage({
 
   if (leadErr || !lead) notFound()
 
+  const proposalTotals = await leadProposalTotals(admin, [lead.id])
+
   return (
     <LeadDetailClient
-      lead={lead as Lead}
+      lead={{ ...lead, proposal_total: proposalTotals.get(lead.id) ?? null } as Lead}
       initialActivities={(activities ?? []) as LeadActivity[]}
       permissions={{
         can_create: perm?.can_create ?? false,

@@ -535,6 +535,8 @@ export interface Lead {
   source: LeadSource | null
   status: LeadStatus
   estimated_value: number | null
+  /** Computed from the lead's estimate on read, not a column. Wins over estimated_value. */
+  proposal_total?: number | null
   notes: string | null
   address: string | null
   assigned_to: string | null

@@ -154,9 +154,9 @@ export function LeadDetailClient({ lead: initialLead, initialActivities, permiss
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[lead.status]}`}>
                 {STATUS_LABELS[lead.status]}
               </span>
-              {lead.estimated_value != null && (
+              {(lead.proposal_total ?? lead.estimated_value) != null && (
                 <span className="text-sm font-semibold text-green-700">
-                  {formatCurrency(lead.estimated_value)}
+                  {formatCurrency(lead.proposal_total ?? lead.estimated_value)}
                 </span>
               )}
               {lead.source && (

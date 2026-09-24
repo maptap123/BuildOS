@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LeadsClient } from '@/components/leads'
+import { leadProposalTotals } from '@/lib/estimates/leadProposalTotals'
 import type { Lead } from '@/types'
 
 export const metadata = { title: 'Leads — BuildOS' }
@@ -34,9 +35,12 @@ export default async function LeadsPage() {
     .select('*')
     .order('created_at', { ascending: false })
 
+  const proposalTotals = await leadProposalTotals(admin, (leads ?? []).map(l => l.id))
+  const leadsWithTotals = (leads ?? []).map(l => ({ ...l, proposal_total: proposalTotals.get(l.id) ?? null }))
+
   return (
     <LeadsClient
-      initialLeads={(leads ?? []) as Lead[]}
+      initialLeads={leadsWithTotals as Lead[]}
       permissions={{
         can_create: perm?.can_create ?? false,
         can_edit:   perm?.can_edit ?? false,
