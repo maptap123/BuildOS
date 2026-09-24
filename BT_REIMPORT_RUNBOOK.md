@@ -129,16 +129,19 @@ above refreshes it. If you skip step 1 you will load four-month-old data.
 job. `bt-sync-job-metadata.ts` trusts `status` and is correct — which is why it
 runs immediately after, to repair what the seeder got wrong.
 
-**Estimates load as budgets, not BuildOS estimates.** Added 2026-09-24. Only 53
-of 281 jobs have a BT estimate worksheet — JDC started using it recently — and
-46 have real cost lines once selections are dropped: 598 lines, $1.36M. They go
+**Estimates load as budgets, not BuildOS estimates.** Added 2026-09-24. 64 jobs
+have real cost lines once selections are dropped: 1,466 lines, $2.66M.
+**Worksheet groups nest** ("Job" → "1 Plans & Permits" → lines) — the first load
+read only top-level lines and silently missed 899 lines in 21 jobs. Lines can sit
+at any depth; count them recursively. If a job was locked or sent to budget in
+BT after your extract, re-pull just that job with `--job-id <btJobId>`. They go
 into `budget_lines`, because BuildOS `estimate_lines` must hang off a lead and
 must split unit cost into labor/material/sub, which BT does not carry. Worksheet
 `lineItemType` 10 = cost line (loaded), 7 = allowance (loaded, cost backed out of
 the client price), 5 = client selection from BT Selections (skipped — client
 price, $0 cost, not a budget line). The job costing budget endpoint is used only
-where its original budget disagrees with the worksheet (Tighe Garage, Ryan
-Porch); for the other ~156 jobs it holds nothing but the "Buildertrend Flat
+where its original budget disagrees with the worksheet (none, once nested lines
+are read); for the other ~156 jobs it holds nothing but the "Buildertrend Flat
 Rate" committed-cost bucket. BT cost-code ids are company-wide, so the key is
 `(job_id, bt_line_item_id)` — a global key let one job's rows overwrite another's.
 

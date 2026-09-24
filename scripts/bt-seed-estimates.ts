@@ -73,9 +73,21 @@ type BtWorksheet = {
     worksheetLocked?: boolean;
     lockedByName?: string | null;
     lockedByDate?: string | null;
-    formatData?: Array<{ title: string | null; lineItems?: BtLine[] }>;
+    formatData?: BtGroup[];
   };
 };
+// Worksheet groups nest: e.g. Luna is "Job" → "1 Plans & Permits" → lines. Lines can sit at any level.
+type BtGroup = { title: string | null; lineItems?: BtLine[]; subGroups?: BtGroup[] };
+
+function flattenGroups(groups: BtGroup[], path: string[] = []): Array<{ l: BtLine; group: string }> {
+  return groups.flatMap((g) => {
+    const here = [...path, g.title?.trim()].filter((t): t is string => !!t);
+    return [
+      ...(g.lineItems ?? []).map((l) => ({ l, group: here.join(' › ') || 'General' })),
+      ...flattenGroups(g.subGroups ?? [], here),
+    ];
+  });
+}
 
 type BtBudget = {
   totalValues?: { originalBudgetCosts?: number | null };
@@ -105,7 +117,7 @@ function worksheetRows(ws: BtWorksheet): Row[] {
   const locked = d?.worksheetLocked
     ? `BT worksheet locked by ${d.lockedByName ?? 'unknown'} ${d.lockedByDate?.slice(0, 10) ?? ''}`.trim()
     : 'BT worksheet (unlocked)';
-  return (d?.formatData ?? []).flatMap((g) => (g.lineItems ?? []).map((l) => ({ l, group: g.title?.trim() || 'General' })))
+  return flattenGroups(d?.formatData ?? [])
     .filter(({ l }) => l.lineItemType !== SELECTION && (lineCost(l) !== 0 || Number(l.ownerPrice ?? 0) !== 0))
     .map(({ l, group }) => ({
       bt_line_item_id: l.id,
