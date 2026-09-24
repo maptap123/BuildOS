@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/log-check",
       "schedule": "0 20 * * 1-5"
+    },
+    {
+      "path": "/api/integrations/quickbooks/costs",
+      "schedule": "0 10 * * *"
     }
   ]
 }

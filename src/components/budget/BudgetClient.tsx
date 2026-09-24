@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, Clock, CloudUpload, ClipboardList, Download } from 'lucide-react'
+import { AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, Clock, CloudDownload, ClipboardList, Download } from 'lucide-react'
 import { useBudget } from '@/hooks/useBudget'
 import { useChangeOrders } from '@/hooks/useChangeOrders'
 import { BudgetSummary } from './BudgetSummary'
@@ -41,10 +41,10 @@ interface Props {
 type Tab = 'budget' | 'change_orders' | 'bills' | 'purchase_orders' | 'work_orders' | 'billing'
 
 const QB_STATUS: Record<QBSyncStatus, { icon: React.ReactNode; text: string; color: string }> = {
-  not_synced: { icon: <Clock size={12} />,       text: 'Not synced to QuickBooks', color: 'text-gray-400'    },
-  pending:    { icon: <RefreshCw size={12} className="animate-spin" />, text: 'Syncing…', color: 'text-blue-500' },
-  synced:     { icon: <CheckCircle2 size={12} />, text: 'Synced to QuickBooks',     color: 'text-green-600'   },
-  error:      { icon: <AlertTriangle size={12} />,text: 'Sync error',               color: 'text-red-500'     },
+  not_synced: { icon: <Clock size={12} />,       text: 'Not linked to QuickBooks', color: 'text-gray-400'    },
+  pending:    { icon: <RefreshCw size={12} className="animate-spin" />, text: 'Linking…', color: 'text-blue-500' },
+  synced:     { icon: <CheckCircle2 size={12} />, text: 'Linked to QuickBooks',     color: 'text-green-600'   },
+  error:      { icon: <AlertTriangle size={12} />,text: 'QuickBooks link error',    color: 'text-red-500'     },
 }
 
 function QBSyncBadge({ status, lastSynced }: { status: QBSyncStatus; lastSynced: string | null }) {
@@ -75,28 +75,24 @@ export function BudgetClient({
   const [qbSyncing, setQbSyncing] = useState(false)
   const [qbError, setQbError] = useState<string | null>(null)
 
-  const handleSyncToQB = useCallback(async () => {
+  // QuickBooks is the source of truth: this only pulls job costs from QB, never writes to it.
+  const handlePullFromQB = useCallback(async () => {
     setQbSyncing(true)
     setQbError(null)
     try {
-      const res = await fetch('/api/integrations/quickbooks/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entity: 'job', id: jobId }),
-      })
+      const res = await fetch('/api/integrations/quickbooks/costs', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
-        setQbError(data.error ?? 'QuickBooks sync failed')
+        setQbError(data.error ?? 'Could not pull costs from QuickBooks')
       } else {
-        // Refresh job data by reloading the page section
         window.location.reload()
       }
     } catch {
-      setQbError('Network error — could not reach QuickBooks sync endpoint')
+      setQbError('Network error — could not reach QuickBooks')
     } finally {
       setQbSyncing(false)
     }
-  }, [jobId])
+  }, [])
 
   function exportBudgetCSV() {
     const today = new Date().toISOString().slice(0, 10)
@@ -197,15 +193,15 @@ export function BudgetClient({
         </div>
         {permissions.can_edit && (
           <button
-            onClick={handleSyncToQB}
+            onClick={handlePullFromQB}
             disabled={qbSyncing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {qbSyncing
               ? <RefreshCw size={12} className="animate-spin" />
-              : <CloudUpload size={12} />
+              : <CloudDownload size={12} />
             }
-            {qbSyncing ? 'Syncing…' : 'Sync to QuickBooks'}
+            {qbSyncing ? 'Pulling…' : 'Pull costs from QuickBooks'}
           </button>
         )}
       </div>

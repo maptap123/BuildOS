@@ -111,47 +111,7 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Trigger QB sync in the background (non-blocking).
-  // When QB integration is configured, this will create a QB Customer + Project.
-  triggerQBSync(job.id, admin).catch(() => { /* silent — sync status tracked on job row */ })
-
+  // QuickBooks is the source of truth and BuildOS never writes to it. A new job is
+  // linked to its QB customer (created in QB by the office) via Connected Systems.
   return NextResponse.json(job, { status: 201 })
-}
-
-async function triggerQBSync(
-  jobId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: any,
-) {
-  // Check if QuickBooks is configured
-  const { data: integration } = await admin
-    .from('integration_settings')
-    .select('is_connected, realm_id')
-    .eq('service', 'quickbooks')
-    .single()
-
-  if (!integration?.is_connected) {
-    // QB not connected yet — mark as not_synced (default), no-op
-    return
-  }
-
-  // Mark as pending
-  await admin
-    .from('jobs')
-    .update({ qb_sync_status: 'pending' })
-    .eq('id', jobId)
-
-  // TODO: Implement QB OAuth flow + API calls when QB connection is established.
-  // Expected operations:
-  //   1. POST /v3/company/{realmId}/customer  → creates QB Customer, store qb_customer_id
-  //   2. POST /v3/company/{realmId}/project   → creates QB Project linked to customer, store qb_project_id
-  //   3. Update job row: qb_sync_status='synced', qb_last_synced_at=now()
-  //
-  // On error: update qb_sync_status='error', qb_sync_error=message
-
-  // Placeholder: mark error until real QB API is wired up
-  await admin
-    .from('jobs')
-    .update({ qb_sync_status: 'error', qb_sync_error: 'QB API not yet configured' })
-    .eq('id', jobId)
 }
