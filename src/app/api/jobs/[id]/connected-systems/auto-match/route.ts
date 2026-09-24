@@ -105,13 +105,14 @@ export async function POST(
       )
 
       if (action === 'linked') {
-        await admin.from('jobs').update({
+        const { error: jobErr } = await admin.from('jobs').update({
           qb_customer_id: customer.Id,
           qb_project_id: customer.Job ? customer.Id : null,
           qb_sync_status: 'synced',
           qb_last_synced_at: new Date().toISOString(),
           qb_sync_error: null,
         }).eq('id', id)
+        if (jobErr) throw new Error(`Failed to save QuickBooks link on job: ${jobErr.message}`)
       }
 
       results.push({ provider: 'quickbooks', display_name: customer.DisplayName, score, action, external_id: customer.Id })

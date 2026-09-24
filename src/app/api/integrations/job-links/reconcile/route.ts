@@ -100,7 +100,7 @@ export async function POST(req: Request) {
         let applied = false
 
         if (!dryRun) {
-          await admin.from('job_external_links').upsert(
+          const { error: linkErr } = await admin.from('job_external_links').upsert(
             {
               job_id:             job.id,
               provider:           'quickbooks',
@@ -118,14 +118,17 @@ export async function POST(req: Request) {
             { onConflict: 'job_id,provider,external_id' }
           )
 
+          if (linkErr) throw new Error(`Failed to save QuickBooks link: ${linkErr.message}`)
+
           if (action === 'linked') {
-            await admin.from('jobs').update({
+            const { error: jobErr } = await admin.from('jobs').update({
               qb_customer_id: customer.Id,
               qb_project_id: customer.Job ? customer.Id : null,
               qb_sync_status: 'synced',
               qb_last_synced_at: new Date().toISOString(),
               qb_sync_error: null,
             }).eq('id', job.id)
+            if (jobErr) throw new Error(`Failed to save QuickBooks link on job: ${jobErr.message}`)
           }
 
           applied = true
