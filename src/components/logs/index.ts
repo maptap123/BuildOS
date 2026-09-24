@@ -1,3 +1,5 @@
 export { LogClient } from './LogClient'
 export { LogFeed } from './LogFeed'
 export { AddLogModal } from './AddLogModal'
+export { LogsSummaryClient } from './LogsSummaryClient'
+export type { LogSummaryRow, ActiveJobRef } from './LogsSummaryClient'

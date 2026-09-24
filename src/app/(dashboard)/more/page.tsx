@@ -45,10 +45,16 @@ const SECTIONS = [
   },
 ]
 
-// These tools live under /jobs/[id]/… and need a job before they can open.
-// Tapping one uses the persisted active job, or opens the job picker with
-// destination intent — same flow as the bottom-nav Jobs tab.
+// These tools live under /jobs/[id]/…. Tapping one uses the persisted active
+// job; with none set, it opens the all-jobs summary — or, for estimates (no
+// cross-job view), the job picker with destination intent.
 const JOB_SCOPED_TOOLS = new Set(['budget', 'profitability', 'estimates', 'logs', 'schedule'])
+const ALL_JOBS_ROUTES: Record<string, string> = {
+  budget:        '/finance',
+  profitability: '/finance',
+  logs:          '/logs',
+  schedule:      '/schedule',
+}
 
 export default function MorePage() {
   const router = useRouter()
@@ -90,6 +96,8 @@ export default function MorePage() {
   function openJobTool(tab: string) {
     if (activeJobId) {
       router.push(`/jobs/${activeJobId}/${tab}`)
+    } else if (ALL_JOBS_ROUTES[tab]) {
+      router.push(ALL_JOBS_ROUTES[tab])
     } else {
       setPickerFor(tab)
     }

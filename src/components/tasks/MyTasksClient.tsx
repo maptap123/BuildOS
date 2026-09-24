@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   CheckCircle2, Circle, Clock, AlertCircle, Flag, ClipboardList, Loader2, RefreshCw,
@@ -8,12 +8,31 @@ import {
 import { usePermissions } from '@/hooks/usePermissions'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import type { Task, TaskPriority } from '@/types'
+import {
+  StatGrid, StatTile, FilterPanel, FilterSelect, SearchBox, FilterSummary, addDays,
+  type ActiveFilter,
+} from '@/components/summary/SummaryKit'
 
 type TaskWithJob = Task & {
   job: { id: string; name: string; status: string } | null
 }
 
 type Filter = 'mine' | 'all'
+type DueFilter = 'any' | 'overdue' | 'today' | 'week' | 'blocked'
+
+const DUE_LABEL: Record<Exclude<DueFilter, 'any'>, string> = {
+  overdue: 'Overdue',
+  today:   'Due today',
+  week:    'Due in 7 days',
+  blocked: 'Blocked',
+}
+
+const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high',   label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low',    label: 'Low' },
+]
 
 const PRIORITY_DOT: Record<TaskPriority, string> = {
   low:    'bg-gray-300',
@@ -70,7 +89,7 @@ export function MyTasksClient() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
-  const filterTouchedRef = useRef(false)
+  const [filterTouched, setFilterTouched] = useState(false)
   // Tasks just marked done — kept visible briefly with a strikethrough
   const [justDone, setJustDone] = useState<Set<string>>(new Set())
 
@@ -97,14 +116,72 @@ export function MyTasksClient() {
 
   // Default to "Mine" once we know the user has assigned tasks (unless they've toggled)
   useEffect(() => {
-    if (filterTouchedRef.current || !user) return
+    if (filterTouched || !user) return
     if (tasks.some(t => t.assigned_to === user.id)) setFilter('mine')
-  }, [tasks, user])
+  }, [tasks, user, filterTouched])
+
+  const [due, setDue] = useState<DueFilter>('any')
+  const [jobId, setJobId] = useState('')
+  const [priority, setPriority] = useState('')
+  const [search, setSearch] = useState('')
 
   const myCount = user ? tasks.filter(t => t.assigned_to === user.id).length : 0
-  const visible = filter === 'mine' && user
-    ? tasks.filter(t => t.assigned_to === user.id)
-    : tasks
+  const userId = user?.id
+  const today = todayStr()
+
+  // Everyone-vs-me, job, priority and search — the tiles count against this
+  // set so each one says what tapping it would show.
+  const q = search.trim().toLowerCase()
+  const scoped = tasks.filter(t =>
+    (filter !== 'mine' || !userId || t.assigned_to === userId)
+    && (!jobId || t.job_id === jobId)
+    && (!priority || t.priority === priority)
+    && (!q || t.title.toLowerCase().includes(q) || (t.job?.name ?? '').toLowerCase().includes(q)),
+  )
+
+  const weekEnd = addDays(today, 6)
+  function matchesDue(t: TaskWithJob, d: DueFilter) {
+    if (d === 'any') return true
+    if (d === 'blocked') return t.status === 'blocked'
+    if (!t.due_date) return false
+    if (d === 'overdue') return t.due_date < today
+    if (d === 'today') return t.due_date === today
+    return t.due_date >= today && t.due_date <= weekEnd
+  }
+  const dueCounts = {
+    overdue: scoped.filter(t => matchesDue(t, 'overdue')).length,
+    today:   scoped.filter(t => matchesDue(t, 'today')).length,
+    week:    scoped.filter(t => matchesDue(t, 'week')).length,
+    blocked: scoped.filter(t => matchesDue(t, 'blocked')).length,
+  }
+  const visible = scoped.filter(t => matchesDue(t, due))
+
+  const jobOptions = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of tasks) if (t.job) m.set(t.job.id, t.job.name)
+    return [...m].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label))
+  }, [tasks])
+
+  const activeFilters: ActiveFilter[] = []
+  if (filter === 'mine') activeFilters.push({ key: 'mine', label: 'Assigned to me', onRemove: showAll })
+  if (due !== 'any') activeFilters.push({ key: 'due', label: DUE_LABEL[due], onRemove: () => setDue('any') })
+  if (jobId) activeFilters.push({ key: 'job', label: jobOptions.find(o => o.value === jobId)?.label ?? 'Job', onRemove: () => setJobId('') })
+  if (priority) activeFilters.push({ key: 'priority', label: `${priority[0].toUpperCase()}${priority.slice(1)} priority`, onRemove: () => setPriority('') })
+  if (search.trim()) activeFilters.push({ key: 'q', label: `“${search.trim()}”`, onRemove: () => setSearch('') })
+
+  function showAll() {
+    setFilterTouched(true)
+    setFilter('all')
+  }
+
+  function clearAll() {
+    setFilterTouched(true)
+    setFilter('all'); setDue('any'); setJobId(''); setPriority(''); setSearch('')
+  }
+
+  function toggleDue(d: DueFilter) {
+    setDue(prev => prev === d ? 'any' : d)
+  }
 
   // ── Optimistic actions ──────────────────────────────────────────────────────
   async function patchTask(id: string, updates: Partial<Task>): Promise<boolean> {
@@ -164,11 +241,10 @@ export function MyTasksClient() {
   }
 
   const groups = groupTasks(visible)
-  const today = todayStr()
 
   return (
     <div
-      className="max-w-lg mx-auto pb-24"
+      className="max-w-3xl mx-auto pb-24"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -187,10 +263,13 @@ export function MyTasksClient() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4 px-1">
-        <h1 className="font-display text-2xl font-bold text-navy-900">My Tasks</h1>
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.15em] text-gold-600 uppercase">All Jobs</p>
+          <h1 className="font-display text-2xl font-bold text-navy-900 leading-tight">Tasks</h1>
+        </div>
         <div className="flex gap-1.5">
           <button
-            onClick={() => { filterTouchedRef.current = true; setFilter('mine') }}
+            onClick={() => { setFilterTouched(true); setFilter('mine') }}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               filter === 'mine' ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-600'
             }`}
@@ -198,7 +277,7 @@ export function MyTasksClient() {
             Mine{myCount > 0 ? ` (${myCount})` : ''}
           </button>
           <button
-            onClick={() => { filterTouchedRef.current = true; setFilter('all') }}
+            onClick={() => { setFilterTouched(true); setFilter('all') }}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               filter === 'all' ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-600'
             }`}
@@ -216,6 +295,33 @@ export function MyTasksClient() {
         </div>
       )}
 
+      {!loading && tasks.length > 0 && (
+        <>
+          <StatGrid>
+            <StatTile label="Overdue" value={dueCounts.overdue} tone={dueCounts.overdue > 0 ? 'alert' : 'good'} active={due === 'overdue'} onClick={() => toggleDue('overdue')} />
+            <StatTile label="Due today" value={dueCounts.today} tone={dueCounts.today > 0 ? 'gold' : 'default'} active={due === 'today'} onClick={() => toggleDue('today')} />
+            <StatTile label="Due in 7 days" value={dueCounts.week} active={due === 'week'} onClick={() => toggleDue('week')} />
+            <StatTile label="Blocked" value={dueCounts.blocked} tone={dueCounts.blocked > 0 ? 'alert' : 'default'} active={due === 'blocked'} onClick={() => toggleDue('blocked')} />
+          </StatGrid>
+
+          <FilterPanel>
+            <div className="flex gap-2 flex-wrap items-end">
+              <FilterSelect label="Job" value={jobId} onChange={setJobId} options={jobOptions} allLabel="All jobs" />
+              <FilterSelect label="Priority" value={priority} onChange={setPriority} options={PRIORITY_OPTIONS} allLabel="Any priority" />
+            </div>
+            <SearchBox value={search} onChange={setSearch} placeholder="Search tasks or jobs" />
+          </FilterPanel>
+
+          <FilterSummary
+            shown={visible.length}
+            total={tasks.length}
+            noun={`open task${visible.length !== 1 ? 's' : ''}`}
+            filters={activeFilters}
+            onClearAll={clearAll}
+          />
+        </>
+      )}
+
       {loading ? (
         <div className="space-y-2">
           {[0, 1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl bg-white animate-pulse border border-border" />)}
@@ -224,11 +330,20 @@ export function MyTasksClient() {
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
           <ClipboardList size={40} className="text-gray-200" />
           <p className="text-sm font-medium">
-            {filter === 'mine' ? 'Nothing assigned to you — nice.' : 'No open tasks. All clear.'}
+            {tasks.length === 0
+              ? 'No open tasks. All clear.'
+              : activeFilters.length > 0
+                ? 'No tasks match these filters.'
+                : 'Nothing assigned to you — nice.'}
           </p>
-          {filter === 'mine' && tasks.length > 0 && (
+          {activeFilters.length > 1 && (
+            <button onClick={clearAll} className="text-sm font-semibold text-gold-600">
+              Clear filters →
+            </button>
+          )}
+          {activeFilters.length === 1 && filter === 'mine' && tasks.length > 0 && (
             <button
-              onClick={() => { filterTouchedRef.current = true; setFilter('all') }}
+              onClick={() => { setFilterTouched(true); setFilter('all') }}
               className="text-sm font-semibold text-gold-600"
             >
               Show all {tasks.length} open tasks →

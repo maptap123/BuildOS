@@ -2,7 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { ChevronRight, BarChart3 } from 'lucide-react'
 import type { JobStatus, QBSyncStatus } from '@/types'
+import {
+  FilterPanel, FilterChips, SearchBox, FilterSummary, EmptyState,
+  type ActiveFilter,
+} from '@/components/summary/SummaryKit'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +28,14 @@ export interface FinanceDashboardClientProps {
 }
 
 type StatusFilter = 'all' | 'active' | 'completed'
+
+const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
+  active: 'Open jobs', completed: 'Completed jobs', all: 'All jobs',
+}
+
+function isOverBudget(j: FinanceJobRow) {
+  return j.estimated_cost > 0 && j.actuals_total > j.estimated_cost
+}
 
 const COMPLETED_STATUSES: JobStatus[] = ['closed', 'archived']
 const ACTIVE_STATUSES: JobStatus[] = ['lead', 'presale', 'active', 'warranty']
@@ -84,7 +97,12 @@ function StatusBadge({ status }: { status: JobStatus }) {
 
 // ── Summary Cards ────────────────────────────────────────────────────────────
 
-function SummaryCards({ jobs }: { jobs: FinanceJobRow[] }) {
+function SummaryCards({ jobs, overOnly, onToggleOver }: {
+  jobs: FinanceJobRow[]
+  overOnly: boolean
+  onToggleOver: () => void
+}) {
+  const overCount        = jobs.filter(isOverBudget).length
   const totalContract    = jobs.reduce((s, j) => s + j.contract_amount, 0)
   const totalEstimated   = jobs.reduce((s, j) => s + j.estimated_cost, 0)
   const totalActuals     = jobs.reduce((s, j) => s + j.actuals_total, 0)
@@ -119,20 +137,31 @@ function SummaryCards({ jobs }: { jobs: FinanceJobRow[] }) {
     {
       label: 'Gross Profit At Risk',
       value: atRisk > 0 ? `+${fmt(atRisk)}` : fmt(atRisk),
-      sub: atRisk > 0 ? 'over budget' : 'within budget',
-      color: atRisk > 0 ? 'text-red-700' : 'text-green-700',
+      sub: overCount > 0
+        ? `${overCount} job${overCount !== 1 ? 's' : ''} over budget · ${overOnly ? 'showing' : 'tap to show'}`
+        : 'within budget',
+      color: atRisk > 0 || overCount > 0 ? 'text-red-700' : 'text-green-700',
+      onClick: overCount > 0 || overOnly ? onToggleOver : undefined,
     },
   ]
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-      {cards.map((c) => (
-        <div key={c.label} className="bg-white rounded-xl border border-border px-4 py-3">
-          <p className="text-xs text-gray-500 font-medium mb-1">{c.label}</p>
-          <p className={`font-display font-semibold text-lg leading-tight ${c.color}`}>{c.value}</p>
-          {c.sub && <p className="text-xs text-gray-400 mt-0.5">{c.sub}</p>}
-        </div>
-      ))}
+      {cards.map((c) => {
+        const onClick = 'onClick' in c ? c.onClick : undefined
+        const active = onClick && overOnly
+        const body = (
+          <>
+            <p className="text-xs text-gray-500 font-medium mb-1">{c.label}</p>
+            <p className={`font-display font-semibold text-lg leading-tight ${c.color}`}>{c.value}</p>
+            {c.sub && <p className="text-xs text-gray-400 mt-0.5">{c.sub}</p>}
+          </>
+        )
+        const cls = `bg-white rounded-xl border px-4 py-3 text-left ${active ? 'border-navy-900 ring-1 ring-navy-900' : 'border-border'}`
+        return onClick
+          ? <button key={c.label} type="button" onClick={onClick} aria-pressed={!!active} className={`${cls} hover:border-gray-400`}>{body}</button>
+          : <div key={c.label} className={cls}>{body}</div>
+      })}
     </div>
   )
 }
@@ -141,15 +170,13 @@ function SummaryCards({ jobs }: { jobs: FinanceJobRow[] }) {
 
 function JobsTable({ jobs }: { jobs: FinanceJobRow[] }) {
   if (jobs.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-border px-6 py-12 text-center text-gray-400 text-sm">
-        No jobs match the current filter.
-      </div>
-    )
+    return <EmptyState icon={BarChart3} message="No jobs match these filters." />
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border overflow-x-auto">
+    <>
+    <JobCards jobs={jobs} />
+    <div className="hidden md:block bg-white rounded-xl border border-border overflow-x-auto">
       <table className="w-full text-sm min-w-[900px]">
         <thead>
           <tr className="border-b border-border text-xs text-gray-500 font-semibold uppercase tracking-wide">
@@ -234,6 +261,67 @@ function JobsTable({ jobs }: { jobs: FinanceJobRow[] }) {
         </tbody>
       </table>
     </div>
+    </>
+  )
+}
+
+// ── Mobile job cards ──────────────────────────────────────────────────────────
+
+function JobCards({ jobs }: { jobs: FinanceJobRow[] }) {
+  return (
+    <div className="md:hidden space-y-2">
+      {jobs.map((job) => {
+        const budgetUsed  = pct(job.actuals_total, job.estimated_cost)
+        const grossMargin = pct(job.contract_amount - job.estimated_cost, job.contract_amount)
+        return (
+          <Link
+            key={job.id}
+            href={`/jobs/${job.id}/budget`}
+            className="block bg-white rounded-xl border border-border px-4 py-3 active:bg-gray-50"
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-navy-900 truncate">{job.name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {job.job_number && <span className="text-[11px] text-gray-400">#{job.job_number}</span>}
+                  <StatusBadge status={job.status} />
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-gray-300 shrink-0 mt-0.5" />
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-2.5 text-[11px]">
+              <div>
+                <p className="text-gray-400">Contract</p>
+                <p className="font-semibold text-navy-900 tabular-nums">{job.contract_amount > 0 ? fmt(job.contract_amount) : '—'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Actuals</p>
+                <p className="font-semibold text-navy-900 tabular-nums">{job.actuals_total > 0 ? fmt(job.actuals_total) : '—'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Margin</p>
+                <p className={`font-semibold tabular-nums ${grossMargin < 0 ? 'text-red-600' : 'text-navy-900'}`}>
+                  {job.contract_amount > 0 && job.estimated_cost > 0 ? `${grossMargin.toFixed(1)}%` : '—'}
+                </p>
+              </div>
+            </div>
+            {job.estimated_cost > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full ${budgetUsedColor(budgetUsed)}`}
+                    style={{ width: `${Math.min(budgetUsed, 100).toFixed(1)}%` }}
+                  />
+                </div>
+                <span className={`text-[11px] font-semibold tabular-nums ${budgetUsedTextColor(budgetUsed)}`}>
+                  {budgetUsed.toFixed(0)}% of budget
+                </span>
+              </div>
+            )}
+          </Link>
+        )
+      })}
+    </div>
   )
 }
 
@@ -241,44 +329,55 @@ function JobsTable({ jobs }: { jobs: FinanceJobRow[] }) {
 
 export function FinanceDashboardClient({ jobs }: FinanceDashboardClientProps) {
   const [filter, setFilter] = useState<StatusFilter>('active')
+  const [search, setSearch] = useState('')
+  const [overOnly, setOverOnly] = useState(false)
 
-  const filtered = useMemo(() => {
-    if (filter === 'all')       return jobs
-    if (filter === 'completed') return jobs.filter((j) => COMPLETED_STATUSES.includes(j.status))
-    return jobs.filter((j) => ACTIVE_STATUSES.includes(j.status))
-  }, [jobs, filter])
+  // Status + search — the summary cards total this set
+  const scoped = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return jobs.filter((j) =>
+      (filter === 'all'
+        || (filter === 'completed' ? COMPLETED_STATUSES : ACTIVE_STATUSES).includes(j.status))
+      && (!q || j.name.toLowerCase().includes(q) || j.job_number.toLowerCase().includes(q)),
+    )
+  }, [jobs, filter, search])
 
-  const filterBtns: { key: StatusFilter; label: string }[] = [
-    { key: 'active',    label: 'Active' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'all',       label: 'All Jobs' },
+  const filtered = overOnly ? scoped.filter(isOverBudget) : scoped
+
+  const counts: Record<StatusFilter, number> = {
+    active:    jobs.filter((j) => ACTIVE_STATUSES.includes(j.status)).length,
+    completed: jobs.filter((j) => COMPLETED_STATUSES.includes(j.status)).length,
+    all:       jobs.length,
+  }
+
+  const activeFilters: ActiveFilter[] = [
+    { key: 'status', label: STATUS_FILTER_LABEL[filter], onRemove: filter === 'active' ? undefined : () => setFilter('active') },
   ]
+  if (overOnly) activeFilters.push({ key: 'over', label: 'Over budget', onRemove: () => setOverOnly(false) })
+  if (search.trim()) activeFilters.push({ key: 'q', label: `“${search.trim()}”`, onRemove: () => setSearch('') })
 
   return (
     <div>
-      {/* Summary cards use ALL jobs, not filtered */}
-      <SummaryCards jobs={filter === 'all' ? jobs : filtered} />
+      <SummaryCards jobs={scoped} overOnly={overOnly} onToggleOver={() => setOverOnly((v) => !v)} />
 
-      {/* Filter row */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-gray-500 font-medium">Show:</span>
-        {filterBtns.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              filter === key
-                ? 'bg-navy-900 text-white'
-                : 'bg-white border border-border text-gray-500 hover:text-navy-900 hover:border-gray-400'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-gray-400">
-          {filtered.length} job{filtered.length !== 1 ? 's' : ''}
-        </span>
-      </div>
+      <FilterPanel>
+        <FilterChips
+          options={(['active', 'completed', 'all'] as StatusFilter[]).map((key) => ({
+            key, label: key === 'active' ? 'Open' : key === 'completed' ? 'Completed' : 'All jobs', count: counts[key],
+          }))}
+          value={filter}
+          onChange={setFilter}
+        />
+        <SearchBox value={search} onChange={setSearch} placeholder="Search job name or number" />
+      </FilterPanel>
+
+      <FilterSummary
+        shown={filtered.length}
+        total={jobs.length}
+        noun={`job${filtered.length !== 1 ? 's' : ''}`}
+        filters={activeFilters}
+        onClearAll={() => { setFilter('active'); setOverOnly(false); setSearch('') }}
+      />
 
       <JobsTable jobs={filtered} />
     </div>

@@ -82,6 +82,16 @@ type NavKey = string
 
 const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'estimates', 'profitability'])
 
+// With no job selected these tabs open an all-jobs summary instead of asking
+// for a job. Estimates has no cross-job view, so it still asks.
+const ALL_JOBS_ROUTES: Record<string, string> = {
+  budget:        '/finance',
+  profitability: '/finance',
+  schedule:      '/schedule',
+  tasks:         '/tasks',
+  logs:          '/logs',
+}
+
 // ── Mobile bottom nav (5 tabs) ────────────────────────────────────────────────
 const MOBILE_NAV = [
   { key: 'home',       label: 'Home',       icon: Home        },
@@ -121,6 +131,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   // Effective job ID: URL-based job takes precedence; fall back to persisted context
   const effectiveJobId = urlJobId || activeJobId
+
+  // All-jobs summary screens: the mobile header says "All Jobs" there even
+  // while a job is remembered, so the title matches what's on screen.
+  const onAllJobsSummary = Object.values(ALL_JOBS_ROUTES).includes(pathname)
+  const headerJobId = onAllJobsSummary ? null : effectiveJobId
 
   // Fetch job data for whichever job is "effective" (used for mobile header + desktop name)
   const { job } = useJob(effectiveJobId)
@@ -201,6 +216,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'vendors')    return '/vendors'
     if (key === 'contacts')   return '/contacts'
     if (key === 'documents')  return '/documents'
+    if (!urlJobId && ALL_JOBS_ROUTES[key]) return ALL_JOBS_ROUTES[key]
     if (!urlJobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
     if (!urlJobId) return '/jobs'
     return `/jobs/${urlJobId}/${key}`
@@ -215,7 +231,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'vendors')    return pathname.startsWith('/vendors')
     if (key === 'contacts')   return pathname.startsWith('/contacts')
     if (key === 'documents')  return pathname.startsWith('/documents')
-    if (!urlJobId) return false
+    if (!urlJobId) return key !== 'budget' && key !== 'profitability' && !!ALL_JOBS_ROUTES[key] && pathname.startsWith(ALL_JOBS_ROUTES[key])
     return pathname.startsWith(`/jobs/${urlJobId}/${key}`)
   }
 
@@ -386,13 +402,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           >
             <div className="min-w-0">
               <p className="text-[#d4a83c] text-[10px] font-bold tracking-widest uppercase leading-none mb-0.5">
-                {effectiveJobId
+                {headerJobId
                   ? (job?.status ?? activeJob?.status ?? '…')
                   : 'BuildOS'}
               </p>
               <div className="flex items-center gap-1">
                 <span className="font-display text-base font-bold text-white truncate">
-                  {effectiveJobId
+                  {headerJobId
                     ? (job?.name ?? activeJob?.name ?? '…')
                     : 'All Jobs'}
                 </span>

@@ -64,10 +64,8 @@ export function MobileHome(_props: Props) {
     if (jobId) {
       router.push(`/jobs/${jobId}/schedule`)
     } else {
-      // No active job set yet — the layout top-bar picker handles this;
-      // the user can tap the job name in the header to pick a job first.
-      // As a fallback, go to All Jobs so they can pick from there.
-      router.push('/jobs')
+      // No active job — open the all-jobs schedule summary
+      router.push('/schedule')
     }
   }
 

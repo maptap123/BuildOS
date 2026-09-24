@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { FinanceDashboardClient } from '@/components/finance'
 import type { FinanceJobRow } from '@/components/finance'
+import { SummaryHeader } from '@/components/summary/SummaryKit'
 
 export const metadata = { title: 'Finance Overview — BuildOS' }
 
@@ -74,10 +75,7 @@ export default async function FinancePage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold text-navy-900">Finance Overview</h1>
-        <p className="text-sm text-gray-500 mt-1">Cross-job financial command center</p>
-      </div>
+      <SummaryHeader title="Finance" subtitle="Contract, budget and actuals across every job" />
       <FinanceDashboardClient jobs={rows} />
     </div>
   )
