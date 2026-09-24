@@ -88,6 +88,7 @@ npx tsx scripts/bt-backfill-schedule-ids.ts --apply
 # 1. re-pull from BuilderTrend into bt-export/  (headed browser, log in when asked)
 npx tsx scripts/bt-migrate.ts                         # jobs + calendar + photos + documents
 npx tsx scripts/bt-migrate-missing.ts                 # daily logs + contacts (the working endpoints)
+npx tsx scripts/bt-migrate-estimates.ts               # estimate worksheets + job costing budgets
 
 # 2. load into Supabase
 npx tsx scripts/bt-seed.ts                            # jobs (upsert job_number) + schedule (upsert bt_event_id)
@@ -96,6 +97,8 @@ npx tsx scripts/bt-sync-job-metadata.ts --apply
 npx tsx scripts/bt-seed-missing.ts                    # daily_logs + contacts
 npx tsx scripts/bt-seed-attached-log-photos.ts        # photos (has retry/backoff; prefer over bt-seed-photos)
 npm run bt:import                                     # time clock (upsert bt_shift_id)
+npx tsx scripts/bt-seed-estimates.ts                  # dry run: per-job budget lines + totals
+npx tsx scripts/bt-seed-estimates.ts --apply          # budget_lines (upsert job_id + bt_line_item_id)
 
 # 3. link clients to jobs so crews can see a phone number
 npx tsx scripts/bt-link-job-contacts.ts               # dry run + match report
@@ -126,6 +129,19 @@ above refreshes it. If you skip step 1 you will load four-month-old data.
 job. `bt-sync-job-metadata.ts` trusts `status` and is correct — which is why it
 runs immediately after, to repair what the seeder got wrong.
 
+**Estimates load as budgets, not BuildOS estimates.** Added 2026-09-24. Only 53
+of 281 jobs have a BT estimate worksheet — JDC started using it recently — and
+46 have real cost lines once selections are dropped: 598 lines, $1.36M. They go
+into `budget_lines`, because BuildOS `estimate_lines` must hang off a lead and
+must split unit cost into labor/material/sub, which BT does not carry. Worksheet
+`lineItemType` 10 = cost line (loaded), 7 = allowance (loaded, cost backed out of
+the client price), 5 = client selection from BT Selections (skipped — client
+price, $0 cost, not a budget line). The job costing budget endpoint is used only
+where its original budget disagrees with the worksheet (Tighe Garage, Ryan
+Porch); for the other ~156 jobs it holds nothing but the "Buildertrend Flat
+Rate" committed-cost bucket. BT cost-code ids are company-wide, so the key is
+`(job_id, bt_line_item_id)` — a global key let one job's rows overwrite another's.
+
 ---
 
 ## Working endpoint inventory
@@ -140,6 +156,8 @@ runs immediately after, to repair what the seeder got wrong.
 | Calendar | `GET /api/Calendar?jobId=` | works |
 | Documents | `GET /api/Documents?jobId=` | works |
 | Time clock | `POST /api/TimeClock/Grid?gridType=29` | works |
+| Estimate worksheet | `GET /api/Proposals/{jobId}/Worksheet` | works |
+| Job costing budget | `POST /apix/v2/JobCostingBudget` (`{ jobId, filter }`) | works |
 | Change orders | `POST /api/ChangeOrders/Grid` | 500 — module unused at JDC, nothing to export |
 | Purchase orders | `POST /api/PurchaseOrders/Grid` | 500 — module unused at JDC, nothing to export |
 
@@ -160,6 +178,7 @@ Two traps worth knowing:
 | `daily_logs` | `bt_log_id` | yes (was: 42P10 on upsert) |
 | `contacts` | `bt_contact_id` | yes (was: deduped in JS, racy) |
 | `log_photos` | `bt_photo_id` | yes |
+| `budget_lines` | `job_id, bt_line_item_id` | yes (migrations 052-053) |
 | `time_entries` | `bt_shift_id` | yes |
 | `cost_catalog` | `cost_code` | yes |
 | `historical_estimates` | `estimate_ref` | yes |
