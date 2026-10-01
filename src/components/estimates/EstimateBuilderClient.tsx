@@ -218,6 +218,7 @@ export function EstimateBuilderClient({
   const [fixerSeed, setFixerSeed]             = useState<string | null>(null)
   const [dirtyLines, setDirtyLines]           = useState<Set<string>>(new Set())
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
+  const [bulkMarkup, setBulkMarkup]           = useState('')
 
   // Scope state
   const [scopeText, setScopeText]             = useState<string>(initialEstimates[0]?.scope_text ?? '')
@@ -454,6 +455,31 @@ export function EstimateBuilderClient({
     },
     []
   )
+
+  // ── Set markup on every line at once ───────────────────────────
+  // Lines go through the normal dirty/autosave path; the estimate's own markup_pct is
+  // updated too so lines added afterwards pick up the same number.
+  async function applyMarkupToAll() {
+    if (!activeEstimate) return
+    const pct = Number(bulkMarkup)
+    if (bulkMarkup.trim() === '' || !Number.isFinite(pct) || pct < 0) {
+      setError('Enter a markup of 0% or more')
+      return
+    }
+    setError(null)
+    setLines(prev => prev.map(l => ({ ...l, markup_pct: pct })))
+    setDirtyLines(prev => {
+      const s = new Set(prev)
+      for (const l of lines) s.add(l.id)
+      return s
+    })
+    setBulkMarkup('')
+    try {
+      await patchEstimate({ markup_pct: pct })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save default markup')
+    }
+  }
 
   // ── Delete line ────────────────────────────────────────────────
   async function deleteLine(id: string) {
@@ -1186,7 +1212,7 @@ export function EstimateBuilderClient({
           {/* Right: Line items table */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl border border-border overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-gray-100">
                 <div>
                   <h2 className="font-display font-semibold text-navy-900 text-base">
                     {activeEstimate.title ?? `Estimate v${activeEstimate.version}`}
@@ -1198,11 +1224,45 @@ export function EstimateBuilderClient({
                     )}
                   </p>
                 </div>
-                {hasDirty && (
-                  <span className="text-[10px] text-gray-400 font-medium bg-gray-100 px-2 py-1 rounded-full animate-pulse">
-                    Saving…
-                  </span>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {hasDirty && (
+                    <span className="text-[10px] text-gray-400 font-medium bg-gray-100 px-2 py-1 rounded-full animate-pulse">
+                      Saving…
+                    </span>
+                  )}
+                  {permissions.can_edit && !activeEstimate.is_locked && lines.length > 0 && (
+                    <form
+                      onSubmit={e => { e.preventDefault(); applyMarkupToAll() }}
+                      className="flex items-center gap-1"
+                      title="Set the same markup on every line"
+                    >
+                      <label htmlFor="bulk-markup" className="text-xs text-gray-500 whitespace-nowrap">
+                        Markup all
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="bulk-markup"
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="any"
+                          value={bulkMarkup}
+                          onChange={e => setBulkMarkup(e.target.value)}
+                          placeholder={String(activeEstimate.markup_pct ?? 0)}
+                          className="w-16 text-right text-xs border border-gray-200 rounded-md pl-2 pr-5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold-400"
+                        />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">%</span>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={bulkMarkup.trim() === ''}
+                        className="text-xs font-semibold text-white bg-navy-900 hover:bg-navy-800 disabled:opacity-40 px-2.5 py-1.5 rounded-md transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </form>
+                  )}
+                </div>
               </div>
 
               {lines.length === 0 ? (
