@@ -558,17 +558,33 @@ export interface Lead {
   address: string | null
   assigned_to: string | null
   converted_job_id: string | null
-  created_by: string
+  /** Null for leads that came in through the website quote form. */
+  created_by: string | null
   created_at: string
   updated_at: string
 }
 
+export type LeadActivityKind = 'note' | 'call' | 'text' | 'email' | 'meeting' | 'status'
+
 export interface LeadActivity {
   id: string
   lead_id: string
+  kind: LeadActivityKind
   note: string
   created_by: string
   created_at: string
+}
+
+export interface LeadAttachment {
+  id: string
+  file_name: string
+  storage_path: string
+  mime_type: string | null
+  size_bytes: number | null
+  uploaded_by: string | null
+  created_at: string
+  /** Signed, expires after an hour. */
+  url: string | null
 }
 
 // ─────────────────────────────────────────────

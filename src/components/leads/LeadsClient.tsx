@@ -58,17 +58,17 @@ export function LeadsClient({ initialLeads, permissions }: Props) {
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus } : l))
     setError(null)
     try {
-      const res = await fetch('/api/leads', {
+      const res = await fetch(`/api/leads/${lead.id}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ id: lead.id, status: newStatus }),
+        body:    JSON.stringify({ status: newStatus }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error ?? 'Failed to update status')
       }
       const updated: Lead = await res.json()
-      setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))
+      setLeads(prev => prev.map(l => l.id === updated.id ? { ...l, ...updated } : l))
     } catch (e) {
       // Revert
       setLeads(prev => prev.map(l => l.id === lead.id ? lead : l))

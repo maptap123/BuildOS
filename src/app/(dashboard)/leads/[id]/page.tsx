@@ -20,14 +20,17 @@ export default async function LeadDetailPage({
 
   const admin = createAdminClient()
 
-  const [{ data: leadPerm }, { data: jobPerm }] = await Promise.all([
+  const [{ data: leadPerm }, { data: jobPerm }, { data: adminPerm }] = await Promise.all([
     admin.from('user_permissions').select('can_view, can_create, can_edit, can_delete').eq('user_id', user.id).eq('module', 'leads').single(),
     admin.from('user_permissions').select('can_create, can_edit, can_delete').eq('user_id', user.id).eq('module', 'jobs').single(),
+    admin.from('user_permissions').select('can_manage').eq('user_id', user.id).eq('module', 'admin').single(),
   ])
 
+  // Same rule as the API (hasModulePermOrAdmin): admins can do everything.
+  const isAdmin = Boolean(adminPerm?.can_manage)
   const perm = leadPerm ?? jobPerm
 
-  if (!leadPerm?.can_view && !jobPerm?.can_create && !jobPerm?.can_edit) {
+  if (!isAdmin && !leadPerm?.can_view && !jobPerm?.can_create && !jobPerm?.can_edit) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
         You don&apos;t have permission to view leads.
@@ -35,13 +38,15 @@ export default async function LeadDetailPage({
     )
   }
 
-  const [{ data: lead, error: leadErr }, { data: activities }] = await Promise.all([
+  const [{ data: lead, error: leadErr }, { data: activities }, { data: users }, { count: estimateCount }] = await Promise.all([
     admin.from('leads').select('*').eq('id', id).single(),
     admin
       .from('lead_activities')
       .select('*')
       .eq('lead_id', id)
       .order('created_at', { ascending: true }),
+    admin.from('users').select('id, full_name, email').eq('is_active', true).order('full_name'),
+    admin.from('estimates').select('id', { count: 'exact', head: true }).eq('lead_id', id),
   ])
 
   if (leadErr || !lead) notFound()
@@ -52,10 +57,13 @@ export default async function LeadDetailPage({
     <LeadDetailClient
       lead={{ ...lead, proposal_total: proposalTotals.get(lead.id) ?? null } as Lead}
       initialActivities={(activities ?? []) as LeadActivity[]}
+      users={(users ?? []).map(u => ({ id: u.id, name: u.full_name || u.email }))}
+      currentUserId={user.id}
+      estimateCount={estimateCount ?? 0}
       permissions={{
-        can_create: perm?.can_create ?? false,
-        can_edit:   perm?.can_edit ?? false,
-        can_delete: perm?.can_delete ?? false,
+        can_create: isAdmin || (perm?.can_create ?? false),
+        can_edit:   isAdmin || (perm?.can_edit ?? false),
+        can_delete: isAdmin || (perm?.can_delete ?? false),
       }}
     />
   )

@@ -70,7 +70,6 @@ export function AddLeadModal({ lead, onClose, onSaved }: Props) {
 
     try {
       const payload = {
-        ...(isEdit ? { id: lead!.id } : {}),
         title:           form.title.trim(),
         client_name:     form.client_name.trim()  || null,
         client_email:    form.client_email.trim() || null,
@@ -82,7 +81,7 @@ export function AddLeadModal({ lead, onClose, onSaved }: Props) {
         notes:           form.notes.trim()         || null,
       }
 
-      const res = await fetch('/api/leads', {
+      const res = await fetch(isEdit ? `/api/leads/${lead!.id}` : '/api/leads', {
         method:  isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
