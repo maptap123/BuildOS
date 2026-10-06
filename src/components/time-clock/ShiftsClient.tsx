@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, CheckCircle, XCircle, Filter, MapPin, Clock, AlertCircle,
@@ -74,6 +74,23 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+// Open shifts store 0 hours until clock-out — show the running time instead
+function runningHours(clockIn: string, now: number) {
+  return Math.max(0, (now - new Date(clockIn).getTime()) / 3_600_000)
+}
+
+// Started before today → almost certainly a forgotten clock-out
+function startedBeforeToday(clockIn: string) {
+  const midnight = new Date()
+  midnight.setHours(0, 0, 0, 0)
+  return new Date(clockIn) < midnight
+}
+
+function formatStart(iso: string) {
+  if (!startedBeforeToday(iso)) return formatTime(iso)
+  return `${new Date(iso).toLocaleDateString([], { weekday: 'short' })} ${formatTime(iso)}`
+}
+
 const STATUS_STYLES: Record<string, string> = {
   pending:  'bg-amber-50 text-amber-700 border-amber-200',
   approved: 'bg-green-50 text-green-700 border-green-200',
@@ -96,6 +113,12 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  // Ticks once a minute so open shifts' running hours stay current
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   // -- Global stats (all loaded entries) ---------------------------------------
   const stats = useMemo(() => ({
@@ -316,20 +339,26 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
             Clocked in now &middot; {clockedInNow.length}
           </div>
           <div className="flex flex-wrap gap-2">
-            {clockedInNow.map((e) => (
-              <div
-                key={e.id}
-                className="flex items-center gap-2 bg-white border border-green-200 rounded-lg pl-2.5 pr-3 py-1.5"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-navy-900 leading-tight">{e.user?.full_name ?? 'Unknown'}</p>
-                  <p className="text-[10px] text-gray-500 leading-tight truncate max-w-[160px]">
-                    {e.job?.name ?? '—'} &middot; since {formatTime(e.clock_in)}
-                  </p>
+            {clockedInNow.map((e) => {
+              const stale = startedBeforeToday(e.clock_in)
+              return (
+                <div
+                  key={e.id}
+                  className={`flex items-center gap-2 bg-white border rounded-lg pl-2.5 pr-3 py-1.5 ${stale ? 'border-amber-300' : 'border-green-200'}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stale ? 'bg-amber-500' : 'bg-green-500'}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-navy-900 leading-tight">{e.user?.full_name ?? 'Unknown'}</p>
+                    <p className="text-[10px] text-gray-500 leading-tight truncate max-w-[200px]">
+                      {e.job?.name ?? '—'} &middot; since {formatStart(e.clock_in)} &middot; {runningHours(e.clock_in, now).toFixed(1)}h
+                    </p>
+                    {stale && (
+                      <p className="text-[10px] font-semibold text-amber-600 leading-tight">Likely forgot to clock out</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -551,8 +580,11 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
         )}
 
         {filtered.map((entry) => {
-          const hrs = (entry.regular_hours ?? 0) + (entry.overtime_hours ?? 0)
           const isOpen = !entry.clock_out
+          const hrs = isOpen
+            ? runningHours(entry.clock_in, now)
+            : (entry.regular_hours ?? 0) + (entry.overtime_hours ?? 0)
+          const isStale = isOpen && startedBeforeToday(entry.clock_in)
           const isLoading = loadingId === entry.id
           const hasOT = (entry.overtime_hours ?? 0) > 0
           const hasClockInLoc = entry.clock_in_latitude != null
@@ -618,7 +650,9 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
                     {formatTime(entry.clock_in)}
                     {entry.clock_out
                       ? ` — ${formatTime(entry.clock_out)}`
-                      : <span className="text-green-600 font-medium"> → clocked in now</span>}
+                      : isStale
+                        ? <span className="text-amber-600 font-medium"> → still open — likely forgot to clock out</span>
+                        : <span className="text-green-600 font-medium"> → clocked in now</span>}
                     {entry.cost_code && (
                       <span className="ml-2 text-navy-500 font-medium">{entry.cost_code}</span>
                     )}
@@ -658,7 +692,10 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
 
                 {/* Right side: hours + cost */}
                 <div className="shrink-0 text-right">
-                  <p className="text-base font-black text-navy-900">{hrs.toFixed(2)}h</p>
+                  <p className={`text-base font-black ${isStale ? 'text-amber-600' : 'text-navy-900'}`}>{hrs.toFixed(2)}h</p>
+                  {isOpen && (
+                    <p className="text-[10px] font-semibold text-gray-400 mt-0.5">running</p>
+                  )}
                   {hasOT && (
                     <p className="text-[10px] font-semibold text-amber-600 mt-0.5">
                       {(entry.overtime_hours ?? 0).toFixed(2)}h OT
