@@ -14,6 +14,9 @@ export async function GET(request: Request) {
   const dateFrom = searchParams.get('date_from')
   const dateTo = searchParams.get('date_to')
   const qbSynced = searchParams.get('qb_synced')
+  // With date_from: also return still-open shifts that started earlier, so a
+  // shift left running overnight is never hidden from the person who owns it.
+  const includeOpen = searchParams.get('include_open') === 'true'
 
   const admin = createAdminClient()
 
@@ -35,7 +38,8 @@ export async function GET(request: Request) {
   if (jobId) query = query.eq('job_id', jobId)
   if (userId && isAdmin) query = query.eq('user_id', userId)
   if (approvalStatus) query = query.eq('approval_status', approvalStatus)
-  if (dateFrom) query = query.gte('clock_in', dateFrom)
+  if (dateFrom && includeOpen) query = query.or(`clock_in.gte.${dateFrom},clock_out.is.null`)
+  else if (dateFrom) query = query.gte('clock_in', dateFrom)
   if (dateTo) query = query.lte('clock_in', dateTo)
   if (qbSynced !== null) query = query.eq('qb_synced', qbSynced === 'true')
 
@@ -93,14 +97,15 @@ export async function POST(request: Request) {
   }
 
   // Guard: prevent a second open shift for the same user
-  const { data: openShift } = await admin
+  // (limit, not maybeSingle — maybeSingle errors on 2+ rows and the guard would pass)
+  const { data: openShifts } = await admin
     .from('time_entries')
     .select('id')
     .eq('user_id', entryUserId)
     .is('clock_out', null)
-    .maybeSingle()
+    .limit(1)
 
-  if (openShift) {
+  if (openShifts?.length) {
     return NextResponse.json(
       { error: 'You already have an open shift. Clock out before starting a new one.' },
       { status: 409 },

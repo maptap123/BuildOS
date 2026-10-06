@@ -47,7 +47,6 @@ interface Props {
   initialEntries: EntryWithJob[]
   activeJobs: Job[]
   isAdmin: boolean
-  weekTotalHours: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -97,6 +96,37 @@ function formatDuration(ms: number): string {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+// Local midnight / Monday — the crew's own day, not the server's (UTC)
+function startOfToday(): Date {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function startOfWeek(): Date {
+  const d = startOfToday()
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+// A shift that started before today was almost certainly left running by
+// mistake — clocking it out "now" would bill the whole night.
+function isStale(entry: EntryWithJob): boolean {
+  return new Date(entry.clock_in) < startOfToday()
+}
+
+function formatStart(iso: string): string {
+  const d = new Date(iso)
+  if (d >= startOfToday()) return formatTime(iso)
+  return `${d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${formatTime(iso)}`
+}
+
+// Date → value for <input type="datetime-local"> in local time
+function toLocalInput(d: Date): string {
+  const p = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 function sumHours(entries: EntryWithJob[]): number {
@@ -230,7 +260,6 @@ export function TimeClockClient({
   initialEntries,
   activeJobs,
   isAdmin,
-  weekTotalHours,
 }: Props) {
   // Active job context — shared with the layout picker
   const { activeJob, activeJobId, setActiveJob } = useActiveJob()
@@ -255,6 +284,8 @@ export function TimeClockClient({
   // Clock-out form
   const [breakMinutes, setBreakMinutes] = useState(0)
   const [clockOutNotes, setClockOutNotes] = useState('')
+  // Only used for a shift left open from a previous day: when they really stopped
+  const [clockOutAt, setClockOutAt] = useState('')
 
   // GPS
   const [clockInLoc, setClockInLoc] = useState<LocState>({ status: 'idle' })
@@ -274,10 +305,12 @@ export function TimeClockClient({
     return () => clearInterval(id)
   }, [activeEntry])
 
-  // ── Refresh today's entries ─────────────────────────────────────────────────
+  // ── Refresh this week's entries (+ any open shift, however old) ─────────────
   const refresh = useCallback(async (): Promise<EntryWithJob | null> => {
-    const today = new Date().toISOString().split('T')[0]
-    const res = await fetch(`/api/time-entries?user_id=${currentUserId}&date_from=${today}`)
+    const from = encodeURIComponent(startOfWeek().toISOString())
+    const res = await fetch(
+      `/api/time-entries?user_id=${currentUserId}&date_from=${from}&include_open=true`,
+    )
     if (res.ok) {
       const data: EntryWithJob[] = await res.json()
       setEntries(data)
@@ -333,7 +366,10 @@ export function TimeClockClient({
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Clock in failed')
-      setStep('idle')
+      // Most likely an open shift this screen didn't know about — load it so
+      // it can be closed right here instead of leaving a dead Clock In button.
+      const open = await refresh()
+      setStep(open ? 'active' : 'idle')
     } finally {
       setLoading(false)
     }
@@ -377,6 +413,7 @@ export function TimeClockClient({
   function startClockOutFlow() {
     setBreakMinutes(0)
     setClockOutNotes('')
+    setClockOutAt('')
     setStep('clocking-out')
     setClockOutLoc({ status: 'requesting' })
     captureLocation().then(setClockOutLoc)
@@ -412,12 +449,25 @@ export function TimeClockClient({
     keepStep?: boolean
   }): Promise<boolean> {
     if (!activeEntry) return false
+    // Forgotten shift from an earlier day — they must say when they stopped
+    let clockOut = new Date()
+    if (isStale(activeEntry) && !opts.keepStep) {
+      if (!clockOutAt) {
+        setError('Enter the time you actually stopped working on this shift.')
+        return false
+      }
+      clockOut = new Date(clockOutAt)
+      if (clockOut <= new Date(activeEntry.clock_in) || clockOut > new Date()) {
+        setError('That stop time must be after you clocked in and not in the future.')
+        return false
+      }
+    }
     setLoading(true)
     setError(null)
     try {
       const loc = finalLoc(opts.loc)
       const body: Record<string, unknown> = {
-        clock_out: new Date().toISOString(),
+        clock_out: clockOut.toISOString(),
         break_minutes: opts.breakMins,
         notes: opts.notes || null,
       }
@@ -438,6 +488,7 @@ export function TimeClockClient({
         setClockOutLoc({ status: 'idle' })
         setBreakMinutes(0)
         setClockOutNotes('')
+        setClockOutAt('')
       }
       return true
     } catch (e: unknown) {
@@ -485,8 +536,14 @@ export function TimeClockClient({
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const completedToday = entries.filter((e) => e.clock_out)
+  const todayStart = startOfToday()
+  const completedToday = entries.filter((e) => e.clock_out && new Date(e.clock_in) >= todayStart)
   const todayTotal = sumHours(completedToday)
+  const weekStart = startOfWeek()
+  const weekTotalHours = sumHours(
+    entries.filter((e) => e.clock_out && new Date(e.clock_in) >= weekStart),
+  )
+  const staleShift = activeEntry ? isStale(activeEntry) : false
   const filteredJobs = activeJobs.filter(
     (j) =>
       j.name.toLowerCase().includes(jobSearch.toLowerCase()) ||
@@ -596,10 +653,20 @@ export function TimeClockClient({
           <div className="flex items-center justify-between text-xs text-navy-400">
             <span className="flex items-center gap-1.5">
               <Clock size={11} />
-              Started {formatTime(activeEntry.clock_in)}
+              Started {formatStart(activeEntry.clock_in)}
             </span>
             <LocationBadge status={activeEntry.location_status} />
           </div>
+
+          {staleShift && (
+            <div className="flex items-start gap-2 bg-amber-400/15 border border-amber-400/40 text-amber-200 text-sm rounded-xl px-3 py-2.5">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" />
+              <span>
+                This shift is still open from {formatStart(activeEntry.clock_in)}. Clock out
+                with the time you actually stopped, then you can clock in for today.
+              </span>
+            </div>
+          )}
 
           {/* ── Active buttons ── */}
           {step === 'active' && (
@@ -612,7 +679,8 @@ export function TimeClockClient({
                 <Square size={18} fill="currentColor" />
                 Clock Out
               </button>
-              <button
+              {/* Switching closes the shift at "now" — wrong for a forgotten one */}
+              {!staleShift && <button
                 onClick={switchJob}
                 disabled={loading}
                 className="flex items-center justify-center gap-1.5 bg-navy-800 hover:bg-navy-700 active:bg-navy-600 text-white text-sm font-semibold px-5 py-4 rounded-xl transition-colors disabled:opacity-50 min-w-[100px]"
@@ -622,7 +690,7 @@ export function TimeClockClient({
                 ) : (
                   'Switch Job'
                 )}
-              </button>
+              </button>}
             </div>
           )}
 
@@ -630,6 +698,23 @@ export function TimeClockClient({
           {step === 'clocking-out' && (
             <div className="space-y-4 pt-3 border-t border-navy-700">
               <p className="text-sm font-bold text-navy-200">Clock Out Details</p>
+
+              {/* Stop time — only for a shift left open from an earlier day */}
+              {staleShift && (
+                <div>
+                  <label className="text-xs text-amber-300 font-medium mb-1.5 block">
+                    What time did you stop working?
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={clockOutAt}
+                    min={toLocalInput(new Date(activeEntry.clock_in))}
+                    max={toLocalInput(new Date())}
+                    onChange={(e) => setClockOutAt(e.target.value)}
+                    className="w-full bg-navy-800 border border-amber-400/60 rounded-xl px-3 py-2.5 text-base text-white outline-none focus:border-gold-400 [color-scheme:dark]"
+                  />
+                </div>
+              )}
 
               {/* Cost code — review/edit before confirming */}
               <div>
@@ -942,7 +1027,7 @@ export function TimeClockClient({
       )}
 
       {/* ── Empty state ── */}
-      {entries.length === 0 && step === 'idle' && (
+      {completedToday.length === 0 && step === 'idle' && (
         <div className="text-center py-16 text-gray-400">
           <Clock size={44} className="mx-auto mb-3 opacity-20" />
           <p className="text-sm font-semibold text-gray-500">No shifts today</p>

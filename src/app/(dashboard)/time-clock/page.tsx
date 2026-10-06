@@ -10,32 +10,25 @@ export default async function TimeClockPage() {
 
   const admin = createAdminClient()
 
-  // Today's start (for initial entry fetch)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayISO = today.toISOString()
-
-  // Monday of this ISO week (for weekly total)
-  const weekStart = new Date()
-  const dayOfWeek = weekStart.getDay() // 0=Sun, 1=Mon, â€¦
-  const daysFromMonday = (dayOfWeek + 6) % 7
-  weekStart.setDate(weekStart.getDate() - daysFromMonday)
-  weekStart.setHours(0, 0, 0, 0)
+  // Last 8 days covers today + this week in any timezone. The browser decides
+  // which of these are "today" / "this week" — the server runs in UTC, where
+  // midnight is 8pm Eastern. Open shifts are always included, whatever day they
+  // started, so a shift left running overnight can still be closed.
+  const recentFrom = new Date(Date.now() - 8 * 24 * 3600_000).toISOString()
 
   const [
     { data: myEntries },
     { data: activeJobs },
     { data: myUser },
-    { data: weekEntries },
     { data: adminPerm },
     { data: timePerm },
   ] = await Promise.all([
-    // Today's entries for this user (including active shift)
+    // Recent entries for this user, plus any open shift
     admin
       .from('time_entries')
       .select('*, job:jobs(id, name)')
       .eq('user_id', user.id)
-      .gte('clock_in', todayISO)
+      .or(`clock_in.gte.${recentFrom},clock_out.is.null`)
       .order('clock_in', { ascending: false }),
 
     // Active / presale jobs crew can clock into
@@ -51,14 +44,6 @@ export default async function TimeClockPage() {
       .select('id, full_name, hourly_rate, overtime_rate')
       .eq('id', user.id)
       .single(),
-
-    // This week's completed entries for the week total
-    admin
-      .from('time_entries')
-      .select('regular_hours, overtime_hours')
-      .eq('user_id', user.id)
-      .gte('clock_in', weekStart.toISOString())
-      .not('clock_out', 'is', null),
 
     // Admin check (for "Manage Shifts" link)
     admin
@@ -84,12 +69,6 @@ export default async function TimeClockPage() {
   const hasAccess = isAdmin || !timePerm || timePerm.can_view !== false
   if (!hasAccess) redirect('/jobs')
 
-  // Week total hours (completed shifts only)
-  const weekTotalHours = (weekEntries ?? []).reduce(
-    (sum, e) => sum + (e.regular_hours ?? 0) + (e.overtime_hours ?? 0),
-    0,
-  )
-
   return (
     <TimeClockClient
       currentUserId={user.id}
@@ -97,7 +76,6 @@ export default async function TimeClockPage() {
       initialEntries={myEntries ?? []}
       activeJobs={activeJobs ?? []}
       isAdmin={isAdmin}
-      weekTotalHours={Math.round(weekTotalHours * 100) / 100}
     />
   )
 }

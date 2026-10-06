@@ -88,6 +88,15 @@ export async function PATCH(
   // Server-side hours computation when clock_out is provided.
   // Overrides any client-sent regular_hours / overtime_hours to prevent time fraud.
   if (updates.clock_out) {
+    // A forgotten shift is closed with the time the crew actually stopped, so
+    // clock_out can be in the past — but never before clock_in or in the future.
+    const outMs = new Date(updates.clock_out as string).getTime()
+    if (Number.isNaN(outMs) || outMs <= new Date(existing.clock_in).getTime()) {
+      return NextResponse.json({ error: 'Clock-out time must be after the clock-in time.' }, { status: 400 })
+    }
+    if (outMs > Date.now() + 5 * 60_000) {
+      return NextResponse.json({ error: 'Clock-out time can’t be in the future.' }, { status: 400 })
+    }
     const brkMins =
       typeof updates.break_minutes === 'number'
         ? updates.break_minutes
