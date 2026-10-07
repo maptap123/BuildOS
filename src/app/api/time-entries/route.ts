@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { laborCost } from '@/lib/timeClock'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -96,20 +97,35 @@ export async function POST(request: Request) {
     )
   }
 
-  // Guard: prevent a second open shift for the same user
-  // (limit, not maybeSingle — maybeSingle errors on 2+ rows and the guard would pass)
-  const { data: openShifts } = await admin
-    .from('time_entries')
-    .select('id')
-    .eq('user_id', entryUserId)
-    .is('clock_out', null)
-    .limit(1)
+  // A closed shift (admin backfill) must end after it starts, and not in the future
+  if (clock_out) {
+    const inMs = new Date(clock_in).getTime()
+    const outMs = new Date(clock_out).getTime()
+    if (Number.isNaN(inMs) || Number.isNaN(outMs) || outMs <= inMs) {
+      return NextResponse.json({ error: 'Clock-out time must be after the clock-in time.' }, { status: 400 })
+    }
+    if (outMs > Date.now() + 5 * 60_000) {
+      return NextResponse.json({ error: 'Clock-out time can’t be in the future.' }, { status: 400 })
+    }
+  }
 
-  if (openShifts?.length) {
-    return NextResponse.json(
-      { error: 'You already have an open shift. Clock out before starting a new one.' },
-      { status: 409 },
-    )
+  // Guard: prevent a second open shift for the same user. Only applies when this
+  // entry would itself be open — backfilling a finished shift is always allowed.
+  // (limit, not maybeSingle — maybeSingle errors on 2+ rows and the guard would pass)
+  if (!clock_out) {
+    const { data: openShifts } = await admin
+      .from('time_entries')
+      .select('id')
+      .eq('user_id', entryUserId)
+      .is('clock_out', null)
+      .limit(1)
+
+    if (openShifts?.length) {
+      const msg = entryUserId === user.id
+        ? 'You already have an open shift. Clock out before starting a new one.'
+        : 'This person is already clocked in. Clock them out before starting a new shift.'
+      return NextResponse.json({ error: msg }, { status: 409 })
+    }
   }
 
   // Snapshot hourly rates at time of entry
@@ -142,6 +158,9 @@ export async function POST(request: Request) {
       overtime_hours: overtimeHours,
       break_minutes: break_minutes ?? 0,
       cost_code: cost_code ?? null,
+      labor_cost: clock_out
+        ? laborCost(regularHours, overtimeHours, userData?.hourly_rate, userData?.overtime_rate)
+        : null,
       hourly_rate: userData?.hourly_rate ?? null,
       overtime_rate: userData?.overtime_rate ?? null,
       notes: notes ?? null,
@@ -154,7 +173,7 @@ export async function POST(request: Request) {
       device_info: device_info ?? null,
       created_by: user.id,
     })
-    .select('*, user:users!user_id(id, full_name, avatar_url), job:jobs!job_id(id, name)')
+    .select('*, user:users!user_id(id, full_name, avatar_url, hourly_rate), job:jobs!job_id(id, name, job_number)')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

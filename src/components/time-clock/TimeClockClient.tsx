@@ -51,7 +51,7 @@ interface Props {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const COST_CODES = [
+export const COST_CODES = [
   '01 Plans & Permits',
   '02 Site Prep',
   '03 Demolition',
@@ -573,9 +573,9 @@ export function TimeClockClient({
         {isAdmin && (
           <Link
             href="/time-clock/shifts"
-            className="hidden md:flex items-center gap-1 text-sm font-medium text-navy-600 hover:text-navy-900 transition-colors mt-1"
+            className="flex items-center gap-1 shrink-0 text-xs md:text-sm font-semibold text-navy-700 hover:text-navy-900 bg-navy-50 md:bg-transparent border border-navy-100 md:border-0 px-3 py-2 md:p-0 rounded-lg transition-colors mt-1"
           >
-            Manage Shifts
+            Manage Team Time
             <ChevronRight size={14} />
           </Link>
         )}

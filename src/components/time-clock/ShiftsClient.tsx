@@ -4,11 +4,12 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, CheckCircle, XCircle, Filter, MapPin, Clock, AlertCircle,
-  Download, Users, CheckSquare, Square, Timer, X,
+  Download, Users, CheckSquare, Square, Timer, X, Pencil, LogIn, LogOut,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { TimeEntry } from '@/types'
 import type { ShiftRange } from '@/app/(dashboard)/time-clock/shifts/page'
+import { ShiftEditor, type ShiftEditorMode } from './ShiftEditor'
 
 // --- Local types --------------------------------------------------------------
 
@@ -113,6 +114,8 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  // Manager clock-in / clock-out / edit sheet
+  const [editor, setEditor] = useState<{ mode: ShiftEditorMode; entry: EntryRow | null } | null>(null)
   // Ticks once a minute so open shifts' running hours stay current
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -288,12 +291,28 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
     }
   }
 
+  // -- Manager edits ------------------------------------------------------------
+  function handleSaved(saved: EntryRow) {
+    setEntries((prev) => {
+      const exists = prev.some((e) => e.id === saved.id)
+      const next = exists ? prev.map((e) => (e.id === saved.id ? saved : e)) : [saved, ...prev]
+      return next.sort((a, b) => b.clock_in.localeCompare(a.clock_in))
+    })
+    setEditor(null)
+  }
+
+  function handleDeleted(id: string) {
+    setEntries((prev) => prev.filter((e) => e.id !== id))
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+    setEditor(null)
+  }
+
   // -- Render ------------------------------------------------------------------
   return (
     <div className="space-y-5">
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/time-clock" className="text-gray-400 hover:text-navy-900 transition-colors p-1">
             <ArrowLeft size={18} />
@@ -321,14 +340,23 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
           </div>
         </div>
 
-        <button
-          onClick={exportCSV}
-          disabled={filtered.length === 0}
-          className="flex items-center gap-1.5 text-xs font-semibold text-navy-700 bg-white border border-gray-200 hover:border-navy-300 px-3 py-2 rounded-lg transition-colors disabled:opacity-40 shrink-0"
-        >
-          <Download size={13} />
-          Export CSV
-        </button>
+        <div className="flex gap-2 md:shrink-0">
+          <button
+            onClick={() => setEditor({ mode: 'clock-in', entry: null })}
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-navy-900 hover:bg-navy-800 px-3 py-2 rounded-lg transition-colors"
+          >
+            <LogIn size={13} />
+            Clock In / Add Shift
+          </button>
+          <button
+            onClick={exportCSV}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 text-xs font-semibold text-navy-700 bg-white border border-gray-200 hover:border-navy-300 px-3 py-2 rounded-lg transition-colors disabled:opacity-40"
+          >
+            <Download size={13} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* Clocked in now */}
@@ -356,6 +384,13 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
                       <p className="text-[10px] font-semibold text-amber-600 leading-tight">Likely forgot to clock out</p>
                     )}
                   </div>
+                  <button
+                    onClick={() => setEditor({ mode: 'clock-out', entry: e })}
+                    className="ml-1 flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1 rounded-md shrink-0"
+                  >
+                    <LogOut size={11} />
+                    Clock out
+                  </button>
                 </div>
               )
             })}
@@ -709,24 +744,44 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
                 </div>
               </div>
 
-              {/* Approve / Reject — only for completed pending entries, hidden in bulk-select mode */}
-              {!isOpen && !selectMode && entry.approval_status === 'pending' && (
-                <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+              {/* Actions — hidden in bulk-select mode */}
+              {!selectMode && (
+                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                  {isOpen && (
+                    <button
+                      onClick={() => setEditor({ mode: 'clock-out', entry })}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-lg transition-colors"
+                    >
+                      <LogOut size={13} />
+                      Clock Out
+                    </button>
+                  )}
+                  {!isOpen && entry.approval_status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => updateApproval(entry.id, 'approved')}
+                        disabled={isLoading}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle size={13} />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => updateApproval(entry.id, 'rejected')}
+                        disabled={isLoading}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <XCircle size={13} />
+                        Reject
+                      </button>
+                    </>
+                  )}
                   <button
-                    onClick={() => updateApproval(entry.id, 'approved')}
-                    disabled={isLoading}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    onClick={() => setEditor({ mode: 'edit', entry })}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-navy-700 bg-white hover:bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg transition-colors ml-auto"
                   >
-                    <CheckCircle size={13} />
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => updateApproval(entry.id, 'rejected')}
-                    disabled={isLoading}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <XCircle size={13} />
-                    Reject
+                    <Pencil size={12} />
+                    Edit
                   </button>
                 </div>
               )}
@@ -734,6 +789,18 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
           )
         })}
       </div>
+      )}
+
+      {editor && (
+        <ShiftEditor<EntryRow>
+          mode={editor.mode}
+          entry={editor.entry}
+          users={users}
+          jobs={jobs}
+          onSaved={handleSaved}
+          onDeleted={handleDeleted}
+          onClose={() => setEditor(null)}
+        />
       )}
 
       {/* Sticky bulk action bar */}

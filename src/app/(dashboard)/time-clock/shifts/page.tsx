@@ -75,7 +75,9 @@ export default async function ShiftsPage({
           { count: 'exact' },
         )
         .order('clock_in', { ascending: false })
-      if (cutoff) q = q.gte('clock_in', cutoff)
+      // Open shifts always come back, whatever day they started — a manager has
+      // to see (and clock out) someone who forgot yesterday, even on "Today"
+      if (cutoff) q = q.or(`clock_in.gte.${cutoff},clock_out.is.null`)
       return q.range(0, ROW_CAP - 1)
     })(),
 
