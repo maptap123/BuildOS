@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { BREAKDOWN_FIELDS, reconcileLineUpdate, touchesPricing } from '@/lib/estimates/costBreakdown'
+import { rememberAllowance } from '@/lib/estimates/allowances'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -21,7 +22,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!perm?.can_edit) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes', 'client_visible', 'internal_note', ...BREAKDOWN_FIELDS]
+  const allowed = ['description', 'phase', 'cost_code', 'uom', 'quantity', 'unit_cost', 'markup_pct', 'sort_order', 'notes', 'allowance', 'client_visible', 'internal_note', ...BREAKDOWN_FIELDS]
   const numericFields = ['quantity', 'unit_cost', 'markup_pct', 'sort_order']
   const updates: Record<string, unknown> = {}
   for (const k of allowed) {
@@ -44,6 +45,24 @@ export async function PATCH(request: Request, { params }: Params) {
     merged = reconcileLineUpdate(updates, current ?? undefined)
   }
 
+  // The builder sends every field on every autosave, so the allowance is only worth
+  // remembering for the cost code when it actually changed on this line.
+  let before: { allowance: string | null; cost_code: string | null } | null = null
+  if ('allowance' in merged) {
+    const { data: current, error: readErr } = await admin
+      .from('estimate_lines')
+      .select('allowance, cost_code')
+      .eq('id', id)
+      .maybeSingle()
+    // Before migration 058 the column doesn't exist; save the rest of the line anyway.
+    if (readErr) {
+      merged = { ...merged }
+      delete merged.allowance
+    } else {
+      before = current
+    }
+  }
+
   const { data, error } = await admin
     .from('estimate_lines')
     .update(merged)
@@ -52,6 +71,11 @@ export async function PATCH(request: Request, { params }: Params) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (before && (before.allowance ?? '') !== (data.allowance ?? '')) {
+    await rememberAllowance(admin, data.cost_code, data.allowance, user.id)
+  }
+
   return NextResponse.json(data)
 }
 

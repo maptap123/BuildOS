@@ -502,6 +502,7 @@ export default async function PrintProposalPage({
                                 </span>
                               )}
                               {disp.showDescription && line.notes && <span className="notes">{line.notes}</span>}
+                              {disp.showDescription && line.allowance && <span className="notes">Allowance: {line.allowance}</span>}
                               {isInternalView && line.internal_note && (
                                 <span className="notes" style={{ color: '#d97706', fontStyle: 'italic' }}>
                                   Internal note: {line.internal_note}

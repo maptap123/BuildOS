@@ -667,6 +667,9 @@ export interface EstimateLine {
   markup_pct: number
   sort_order: number
   notes: string | null
+  /** Shown to the client like notes. Remembered per cost code: a new line with the
+   *  same code starts with the last allowance entered for it (migration 058). */
+  allowance: string | null
   created_at: string
   updated_at: string
   // Proposal visibility

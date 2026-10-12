@@ -264,6 +264,7 @@ export function EstimateBuilderClient({
               markup_pct:    l.markup_pct,
               sort_order:    l.sort_order,
               notes:         l.notes,
+              allowance:     l.allowance,
               internal_note: l.internal_note,
             }),
           })
@@ -520,6 +521,7 @@ export function EstimateBuilderClient({
               markup_pct:    l.markup_pct,
               sort_order:    l.sort_order,
               notes:         l.notes,
+              allowance:     l.allowance,
               internal_note: l.internal_note,
             }),
           })
@@ -997,7 +999,7 @@ export function EstimateBuilderClient({
                     <div className="flex flex-col gap-2.5">
                       <Toggle checked={disp.showLineNumbers} onChange={v => saveProposalDisplay({ showLineNumbers: v })} title="Line numbers" hint="Numbers each item 1, 2, 3 down the proposal" />
                       <Toggle checked={disp.showItemTitle}   onChange={v => saveProposalDisplay({ showItemTitle: v })}   title="Item name" />
-                      <Toggle checked={disp.showDescription} onChange={v => saveProposalDisplay({ showDescription: v })} title="Description / notes" />
+                      <Toggle checked={disp.showDescription} onChange={v => saveProposalDisplay({ showDescription: v })} title="Description / notes / allowance" />
                       <Toggle checked={disp.showCostCode}    onChange={v => saveProposalDisplay({ showCostCode: v })}    title="Cost code" />
                       <Toggle checked={disp.showQtyUnit}     onChange={v => saveProposalDisplay({ showQtyUnit: v })}     title="Quantity & unit" />
                       <Toggle checked={disp.showUnitPrice}   onChange={v => saveProposalDisplay({ showUnitPrice: v })}   title="Unit price" hint="Marked-up price per unit — not your cost" />

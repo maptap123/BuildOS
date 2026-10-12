@@ -584,6 +584,12 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
                   className="w-full text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-400"
                 />
                 <input
+                  value={line.allowance ?? ''}
+                  onChange={e => onChange(line.id, 'allowance', e.target.value)}
+                  placeholder={line.cost_code ? 'Allowance — remembered for this cost code…' : 'Allowance…'}
+                  className="w-full text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-400"
+                />
+                <input
                   value={line.internal_note ?? ''}
                   onChange={e => onChange(line.id, 'internal_note', e.target.value)}
                   placeholder="Internal note (not shown to client)…"
@@ -593,6 +599,9 @@ export function EstimateLineRow({ line, canEdit, canDelete, onChange, onDelete }
             ) : (
               <>
                 <p className="text-xs text-gray-400 italic">{line.notes || 'No notes'}</p>
+                {line.allowance && (
+                  <p className="text-xs text-gray-400 italic">Allowance: {line.allowance}</p>
+                )}
                 {line.internal_note && (
                   <p className="text-xs text-amber-700 italic">Internal: {line.internal_note}</p>
                 )}
@@ -781,7 +790,7 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
           className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          Notes
+          Notes &amp; allowance
         </button>
         <p className={`text-xs tabular-nums${isHidden ? ' opacity-50' : ''}`}>
           <span className="text-gray-400">cost {fmt(builderCost)} → </span>
@@ -801,6 +810,12 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
                 className="w-full text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-400"
               />
               <input
+                value={line.allowance ?? ''}
+                onChange={e => onChange(line.id, 'allowance', e.target.value)}
+                placeholder={line.cost_code ? 'Allowance — remembered for this cost code…' : 'Allowance…'}
+                className="w-full text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-400"
+              />
+              <input
                 value={line.internal_note ?? ''}
                 onChange={e => onChange(line.id, 'internal_note', e.target.value)}
                 placeholder="Internal note (not shown to client)…"
@@ -810,6 +825,9 @@ export function EstimateLineCard({ line, canEdit, canDelete, onChange, onDelete 
           ) : (
             <>
               <p className="text-xs text-gray-400 italic">{line.notes || 'No notes'}</p>
+              {line.allowance && (
+                <p className="text-xs text-gray-400 italic">Allowance: {line.allowance}</p>
+              )}
               {line.internal_note && (
                 <p className="text-xs text-amber-700 italic">Internal: {line.internal_note}</p>
               )}

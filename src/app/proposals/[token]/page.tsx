@@ -26,6 +26,7 @@ interface ProposalLine {
   markup_pct: number
   sort_order: number
   notes: string | null
+  allowance: string | null
   client_visible: boolean | null
 }
 
@@ -139,6 +140,7 @@ export default async function PublicProposalPage({
         markup_pct,
         sort_order,
         notes,
+        allowance,
         client_visible
       )
     `)
@@ -275,6 +277,9 @@ export default async function PublicProposalPage({
                                       )}
                                       {disp.showDescription && line.notes && (
                                         <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-wrap">{line.notes}</p>
+                                      )}
+                                      {disp.showDescription && line.allowance && (
+                                        <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-wrap">Allowance: {line.allowance}</p>
                                       )}
                                       {meta.length > 0 && (
                                         <p className="text-xs text-gray-400 mt-0.5">{meta.join('  •  ')}</p>
