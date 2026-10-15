@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { JobStatusSelect } from '@/components/jobs'
 import { JobContactBar } from '@/components/jobs/JobContactBar'
+import { JobHeaderActions } from '@/components/jobs/JobHeaderActions'
 import { getJobClientContact } from '@/lib/jobClientContact'
 import type { JobStatus } from '@/types'
 
@@ -41,8 +42,8 @@ export default async function JobLayout({
         Home
       </Link>
 
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b border-border">
+        <div className="flex-1 min-w-0 basis-full sm:basis-auto">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
             {job.job_number}
           </p>
@@ -50,7 +51,12 @@ export default async function JobLayout({
             {job.name}
           </h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <JobHeaderActions
+          phone={clientContact.phone}
+          address={clientContact.address}
+          cityStateZip={clientContact.cityStateZip}
+        />
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
           <JobStatusSelect
             jobId={job.id}
             initialStatus={job.status as JobStatus}
