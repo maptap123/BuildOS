@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getJobClientContact } from '@/lib/jobClientContact'
 
 const VALID_STATUSES = ['lead', 'presale', 'active', 'warranty', 'closed', 'archived'] as const
 
@@ -44,6 +45,13 @@ export async function GET(
     .single()
 
   if (error || !job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Same authentication/jobs-view boundary as job details; expose no budget data.
+  if (new URL(_req.url).searchParams.get('contact') === '1') {
+    return NextResponse.json(await getJobClientContact(id), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    })
+  }
 
   // Contract value / cost are budget-gated — strip for callers without budget.can_view,
   // matching GET /api/jobs (list). A crew login only has jobs.can_view.

@@ -17,6 +17,7 @@ import { HermesChatPanel } from '@/components/hermes/HermesChatPanel'
 import { LogDraftSync } from '@/components/logs/LogDraftSync'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ActiveJobProvider, useActiveJob } from '@/contexts/ActiveJobContext'
+import { SelectedJobHeaderActions } from '@/components/jobs/SelectedJobHeaderActions'
 import type { Job } from '@/types'
 
 // ── Individual tab definition ────────────────────────────────────────────────
@@ -138,7 +139,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const headerJobId = onAllJobsSummary ? null : effectiveJobId
 
   // Fetch job data for whichever job is "effective" (used for mobile header + desktop name)
-  const { job } = useJob(effectiveJobId)
+  const { job: fetchedJob } = useJob(effectiveJobId)
+  const job = fetchedJob?.id === effectiveJobId ? fetchedJob : null
 
   // When the user navigates to a specific job URL, sync it to the active context
   useEffect(() => {
@@ -380,7 +382,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           })}
 
           <div className="ml-auto flex items-center gap-3 py-2">
-            {urlJobId && (
+            {headerJobId && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400 truncate max-w-[180px]">
                   {job?.name ?? '…'}
@@ -390,15 +392,16 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                 </span>
               </div>
             )}
+            <SelectedJobHeaderActions jobId={headerJobId} variant="light" />
             <NotificationBell variant="light" />
           </div>
         </nav>
 
         {/* ── Mobile top bar ── */}
-        <header className="md:hidden bg-[#1b2b4a] px-4 py-3 flex items-center justify-between shrink-0">
+        <header className="md:hidden bg-[#1b2b4a] px-3 py-3 flex items-center gap-1 shrink-0 min-w-0">
           <button
             onClick={() => setPickerOpen(true)}
-            className="flex items-center gap-1.5 min-w-0 flex-1"
+            className="flex items-center gap-1.5 min-w-0 min-h-[44px] flex-1 text-left"
           >
             <div className="min-w-0">
               <p className="text-[#d4a83c] text-[10px] font-bold tracking-widest uppercase leading-none mb-0.5">
@@ -416,11 +419,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </button>
-          <div className="flex items-center gap-3 shrink-0 ml-3">
+          <SelectedJobHeaderActions jobId={headerJobId} />
+          <div className="flex items-center gap-1 shrink-0">
             <NotificationBell variant="dark" />
             <button
               onClick={signOut}
-              className="text-[#4d6a9a] hover:text-white transition-colors"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa8d0] hover:text-white transition-colors"
               aria-label="Sign out"
             >
               <LogOut size={20} />
