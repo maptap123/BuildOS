@@ -38,9 +38,12 @@ interface Props {
   qbBilling: JobBillingRecord[]
   permissions: Permissions
   currentUserId: string
+  /** Opens on this tab — `?tab=change_orders` from a Selections overage link. */
+  initialTab?: string
 }
 
 type Tab = 'budget' | 'change_orders' | 'bills' | 'purchase_orders' | 'work_orders' | 'billing'
+const TABS: Tab[] = ['budget', 'change_orders', 'bills', 'purchase_orders', 'work_orders', 'billing']
 
 const QB_STATUS: Record<QBSyncStatus, { icon: React.ReactNode; text: string; color: string }> = {
   not_synced: { icon: <Clock size={12} />,       text: 'Not linked to QuickBooks', color: 'text-gray-400'    },
@@ -65,7 +68,7 @@ function QBSyncBadge({ status, lastSynced }: { status: QBSyncStatus; lastSynced:
 }
 
 export function BudgetClient({
-  jobId, job, leadId, initialLines, initialActuals, initialChangeOrders, qbBilling, permissions, currentUserId
+  jobId, job, leadId, initialLines, initialActuals, initialChangeOrders, qbBilling, permissions, currentUserId, initialTab
 }: Props) {
   const { lines, actuals, loading: budgetLoading, error: budgetError, refresh: refreshBudget } = useBudget(jobId, initialLines, initialActuals)
   const { orders, loading: coLoading, error: coError, refresh: refreshCOs } = useChangeOrders(jobId, initialChangeOrders)
@@ -73,7 +76,9 @@ export function BudgetClient({
   const { workOrders, loading: woLoading, error: woError, refresh: refreshWOs } = useWorkOrders(jobId)
   const { milestones, loading: billingLoading, error: billingError, refresh: refreshMilestones } = useBillingMilestones(jobId)
 
-  const [tab, setTab] = useState<Tab>('budget')
+  const [tab, setTab] = useState<Tab>(
+    TABS.includes(initialTab as Tab) ? (initialTab as Tab) : 'budget'
+  )
   const [qbSyncing, setQbSyncing] = useState(false)
   const [qbError, setQbError] = useState<string | null>(null)
 

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Target, DollarSign, Calendar, CheckSquare,
   FileText, Folder, Users, HardHat, BarChart3, TrendingUp,
-  Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList,
+  Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList, Palette,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -30,6 +30,7 @@ const SECTIONS = [
       { key: 'budget',        label: 'Budget',         icon: DollarSign,   href: '/jobs?selectJob=budget',        description: 'Budget & cost control' },
       { key: 'profitability', label: 'Profitability',  icon: TrendingUp,   href: '/jobs?selectJob=profitability', description: 'Job profitability' },
       { key: 'estimates',     label: 'Estimates',      icon: ClipboardList,href: '/jobs?selectJob=estimates',     description: 'Estimate builder' },
+      { key: 'selections',    label: 'Selections',     icon: Palette,      href: '/jobs?selectJob=selections',    description: 'Client picks & allowances' },
       { key: 'logs',          label: 'Daily Logs',     icon: FileText,     href: '/jobs?selectJob=logs',          description: 'Field logs & photos' },
       { key: 'schedule',      label: 'Schedule',       icon: Calendar,     href: '/jobs?selectJob=schedule',      description: 'Job timeline' },
       { key: 'tasks',         label: 'Tasks',          icon: CheckSquare,  href: '/tasks',                        description: 'My tasks across all jobs' },
@@ -48,7 +49,7 @@ const SECTIONS = [
 // These tools live under /jobs/[id]/…. Tapping one uses the persisted active
 // job; with none set, it opens the all-jobs summary — or, for estimates (no
 // cross-job view), the job picker with destination intent.
-const JOB_SCOPED_TOOLS = new Set(['budget', 'profitability', 'estimates', 'logs', 'schedule'])
+const JOB_SCOPED_TOOLS = new Set(['budget', 'profitability', 'estimates', 'selections', 'logs', 'schedule'])
 const ALL_JOBS_ROUTES: Record<string, string> = {
   budget:        '/finance',
   profitability: '/finance',
@@ -69,7 +70,7 @@ export default function MorePage() {
   // only office-level users (admin, or budget/finance view) ever see them —
   // crew get Today / Jobs / Log / Tasks / Clock and the field tools below.
   const isOfficeUser = isAdmin() || can('budget', 'view') || can('finance', 'view')
-  const OFFICE_ONLY = new Set(['budget', 'estimates', 'finance', 'profitability', 'vendors', 'leads'])
+  const OFFICE_ONLY = new Set(['budget', 'estimates', 'selections', 'finance', 'profitability', 'vendors', 'leads'])
 
   function canUseItem(key: string): boolean {
     if (OFFICE_ONLY.has(key) && !isOfficeUser) return false
@@ -79,6 +80,7 @@ export default function MorePage() {
     if (key === 'tasks') return isAdmin() || can('tasks', 'view')
     if (key === 'documents') return isAdmin() || can('documents', 'view')
     if (key === 'budget') return canViewBudget
+    if (key === 'selections') return canViewBudget
     if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
     if (key === 'profitability') return isAdmin() || can('profitability', 'view') || canViewBudget
     if (key === 'estimates') return isAdmin() || can('estimates', 'view') || canViewBudget

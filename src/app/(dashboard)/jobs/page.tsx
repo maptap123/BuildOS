@@ -64,6 +64,7 @@ function Empty({ message }: { message: string }) {
 const SELECT_JOB_LABELS: Record<string, string> = {
   budget: 'Budget',
   schedule: 'Schedule',
+  selections: 'Selections',
   tasks: 'Tasks',
   logs: 'Logs',
   profitability: 'Profitability',

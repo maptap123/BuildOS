@@ -800,3 +800,89 @@ export interface Notification {
   read_at: string | null
   created_at: string
 }
+
+// ── Selections (migration 059) ───────────────────────────────────────────────
+
+export type SelectionStatus = 'pending' | 'selected' | 'ordered' | 'installed'
+
+export interface Allowance {
+  id: string
+  job_id: string
+  title: string
+  cost_code: string | null
+  amount: number
+  source: 'estimate' | 'manual'
+  estimate_line_id: string | null
+  allowance_text: string | null
+  needs_review: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** An allowance with its spend worked out from the selected choices drawing on it. */
+export interface AllowanceSummary extends Allowance {
+  spent: number
+  remaining: number
+  selection_count: number
+}
+
+export interface SelectionChoice {
+  id: string
+  selection_id: string
+  title: string
+  details: string | null
+  product_url: string | null
+  vendor_id: string | null
+  client_price: number
+  builder_cost: number | null
+  is_selected: boolean
+  selected_by: string | null
+  selected_at: string | null
+  created_at: string
+  vendor?: { id: string; name: string } | null
+  selected_by_user?: { full_name: string | null } | null
+}
+
+export interface Selection {
+  id: string
+  job_id: string
+  allowance_id: string | null
+  title: string
+  cost_code: string | null
+  location: string | null
+  status: SelectionStatus
+  instructions: string | null
+  deadline: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+  choices: SelectionChoice[]
+}
+
+/** An estimate line, as the new-selection prompt needs it. */
+export interface SelectionEstimateLine {
+  id: string
+  description: string
+  cost_code: string | null
+  allowance_id: string | null
+}
+
+export interface SelectionsBoard {
+  estimate: { id: string; title: string | null; version: number | null; status: string } | null
+  allowances: AllowanceSummary[]
+  selections: Selection[]
+  estimateLines: SelectionEstimateLine[]
+  changeOrders: SelectionChangeOrder[]
+  vendors: { id: string; name: string }[]
+}
+
+/** A change order drafted for an allowance overage. */
+export interface SelectionChangeOrder {
+  id: string
+  co_number: string
+  title: string
+  status: ChangeOrderStatus
+  amount: number
+  client_token: string | null
+  allowance_id: string
+}

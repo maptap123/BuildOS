@@ -7,7 +7,7 @@ import {
   Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut,
   ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp,
   HardHat, BarChart3, ClipboardList,
-  Home, Grid3X3,
+  Home, Grid3X3, Palette,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
@@ -60,8 +60,9 @@ const DESKTOP_NAV: NavItem[] = [
     label: 'Operations',
     icon: Calendar,
     children: [
-      { key: 'schedule', label: 'Schedule', icon: Calendar    },
-      { key: 'tasks',    label: 'Tasks',    icon: CheckSquare },
+      { key: 'schedule',   label: 'Schedule',   icon: Calendar    },
+      { key: 'selections', label: 'Selections', icon: Palette     },
+      { key: 'tasks',      label: 'Tasks',      icon: CheckSquare },
       { key: 'logs',     label: 'Logs',     icon: FileText    },
     ],
   },
@@ -81,7 +82,7 @@ const DESKTOP_NAV: NavItem[] = [
 
 type NavKey = string
 
-const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'tasks', 'logs', 'estimates', 'profitability'])
+const JOB_SCOPED_TABS = new Set(['budget', 'schedule', 'selections', 'tasks', 'logs', 'estimates', 'profitability'])
 
 // With no job selected these tabs open an all-jobs summary instead of asking
 // for a job. Estimates has no cross-job view, so it still asks.
@@ -192,6 +193,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'logs') return isAdmin() || can('logs', 'view')
     if (key === 'documents') return isAdmin() || can('documents', 'view')
     if (key === 'budget') return canViewBudget
+    if (key === 'selections') return canViewBudget
     if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
     if (key === 'profitability') return isAdmin() || can('profitability', 'view') || canViewBudget
     if (key === 'estimates') return isAdmin() || can('estimates', 'view') || canViewBudget

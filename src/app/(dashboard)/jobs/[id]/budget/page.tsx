@@ -5,10 +5,13 @@ import { BudgetClient } from '@/components/budget'
 
 export default async function JobBudgetPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const { tab } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -78,6 +81,7 @@ export default async function JobBudgetPage({
         can_delete: perm.can_delete,
       }}
       currentUserId={user.id}
+      initialTab={tab}
     />
   )
 }
