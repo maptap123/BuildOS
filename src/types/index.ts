@@ -16,7 +16,8 @@ export type PermissionModule =
   | "documents"
   | "time_clock"
   | "admin"
-  | "ai";
+  | "ai"
+  | "owners";
 
 export type JobStatus =
   | "lead"

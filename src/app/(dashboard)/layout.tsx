@@ -7,7 +7,7 @@ import {
   Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut,
   ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp,
   HardHat, BarChart3, ClipboardList,
-  Home, Grid3X3, Palette,
+  Home, Grid3X3, Palette, Gauge,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
@@ -42,6 +42,7 @@ function isGroup(item: NavItem): item is NavGroup {
 
 // ── Desktop grouped nav ──────────────────────────────────────────────────────
 const DESKTOP_NAV: NavItem[] = [
+  { key: 'owners',   label: 'Owners',   icon: Gauge     },
   { key: 'leads',    label: 'Leads',    icon: Target    },
   { key: 'jobs',     label: 'Jobs',     icon: Briefcase },
   {
@@ -186,6 +187,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   function canUseNav(key: NavKey): boolean {
     if (key === 'home' || key === 'more') return true
+    if (key === 'owners') return can('owners', 'view') // not implied by admin
     if (key === 'time-clock') return isAdmin() || can('time_clock', 'view') || can('jobs', 'view')
     if (key === 'jobs') return isAdmin() || can('jobs', 'view')
     if (key === 'schedule') return isAdmin() || can('schedule', 'view')
@@ -212,6 +214,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   // ── Desktop tab routing ───────────────────────────────────────────────────
   function tabHref(key: string): string {
+    if (key === 'owners')     return '/owners'
     if (key === 'leads')      return '/leads'
     if (key === 'jobs')       return '/jobs'
     if (key === 'finance')    return '/finance'
@@ -227,6 +230,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   function isActiveDesktop(key: string): boolean {
+    if (key === 'owners')     return pathname.startsWith('/owners')
     if (key === 'leads')      return pathname.startsWith('/leads')
     if (key === 'jobs')       return pathname === '/jobs' || (!!urlJobId && segments.length === 2)
     if (key === 'finance')    return pathname.startsWith('/finance')

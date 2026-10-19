@@ -30,6 +30,7 @@ const MODULES: { key: PermissionModule; label: string; helper: string }[] = [
   { key: 'time_clock', label: 'Time Clock', helper: 'Clock in/out and personal time entries' },
   { key: 'ai', label: 'Fixer / AI', helper: 'AI summaries, chat, and agent tools' },
   { key: 'admin', label: 'Admin', helper: 'Users, permissions, tags, and system settings' },
+  { key: 'owners', label: 'Owners View', helper: 'Owner command center: live crew, every job’s margin and spend. Not included with Admin.' },
 ]
 
 const FLAGS: { key: PermissionFlag; label: string }[] = [

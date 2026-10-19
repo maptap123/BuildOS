@@ -20,6 +20,7 @@ const MODULES: PermissionModule[] = [
   'time_clock',
   'admin',
   'ai',
+  'owners',
 ]
 
 const FLAGS = [

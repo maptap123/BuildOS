@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Target, DollarSign, Calendar, CheckSquare,
   FileText, Folder, Users, HardHat, BarChart3, TrendingUp,
-  Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList, Palette,
+  Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList, Palette, Gauge,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -18,6 +18,7 @@ const SECTIONS = [
   {
     title: 'Management',
     items: [
+      { key: 'owners',        label: 'Owners View',    icon: Gauge,        href: '/owners',       description: 'Live crew, every job’s margin' },
       { key: 'leads',         label: 'Leads',          icon: Target,       href: '/leads',        description: 'CRM pipeline' },
       { key: 'finance',       label: 'Finance',        icon: BarChart3,    href: '/finance',      description: 'Overview & reports' },
       { key: 'vendors',       label: 'Vendors',        icon: HardHat,      href: '/vendors',      description: 'Vendor directory' },
@@ -73,6 +74,7 @@ export default function MorePage() {
   const OFFICE_ONLY = new Set(['budget', 'estimates', 'selections', 'finance', 'profitability', 'vendors', 'leads'])
 
   function canUseItem(key: string): boolean {
+    if (key === 'owners') return can('owners', 'view') // not implied by admin
     if (OFFICE_ONLY.has(key) && !isOfficeUser) return false
     if (key === 'time-clock') return isAdmin() || can('time_clock', 'view') || can('jobs', 'view')
     if (key === 'logs') return isAdmin() || can('logs', 'view')
