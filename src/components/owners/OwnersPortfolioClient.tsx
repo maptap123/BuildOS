@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, Search, TrendingUp, TrendingDown, Minus, AlertTriangle, HardHat } from 'lucide-react'
+import { RefreshCw, Search, TrendingUp, TrendingDown, Minus, AlertTriangle, HardHat, FileX, Unlink } from 'lucide-react'
 import type { JobTile, LiveShift, Portfolio, CostClass } from '@/lib/owners/data'
 import { C, CLASS_COLOR, money, moneyShort, pct, hoursFmt, marginTone, TONE_COLOR, type Tone } from './theme'
 import { Sparkline, WeeklyBars, Legend } from './charts'
@@ -70,6 +70,28 @@ export function ProgressBar({ value, basis }: { value: number | null; basis: Job
   )
 }
 
+const needsSetup = (j: JobTile) => !j.setup.hasEstimate || !j.setup.qbLinked
+
+/** Amber alerts for what a job is missing. Icon + label, never color alone. */
+export function SetupBadges({ setup, size = 'sm' }: { setup: JobTile['setup']; size?: 'sm' | 'md' }) {
+  const items = [
+    !setup.hasEstimate && { key: 'est', icon: FileX, label: 'No estimate' },
+    !setup.qbLinked && { key: 'qb', icon: Unlink, label: 'Not in QuickBooks' },
+  ].filter(Boolean) as { key: string; icon: typeof FileX; label: string }[]
+  if (items.length === 0) return null
+  const cls = size === 'md' ? 'px-2.5 py-1 text-xs gap-1.5' : 'px-2 py-0.5 text-[10px] gap-1'
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map(({ key, icon: Icon, label }) => (
+        <span key={key} className={`flex items-center rounded-full font-semibold ${cls}`}
+          style={{ background: 'rgba(251,191,36,0.12)', color: C.warn, border: '1px solid rgba(251,191,36,0.35)' }}>
+          <Icon size={size === 'md' ? 13 : 11} aria-hidden /> {label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function StatusChip({ status }: { status: string }) {
   return (
     <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ background: C.panel2, color: C.text2 }}>
@@ -91,6 +113,7 @@ function Tile({ job, onSite }: { job: JobTile; onSite: number }) {
           <div className="truncate text-xs" style={{ color: C.muted }}>
             {[job.jobNumber, job.clientName].filter(Boolean).join(' · ') || '—'}
           </div>
+          <div className="mt-1.5"><SetupBadges setup={job.setup} /></div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <StatusChip status={job.status} />
@@ -162,6 +185,7 @@ export function OwnersPortfolioClient({ portfolio, initialCrew }: { portfolio: P
   const [sort, setSort] = useState<SortKey>('spent')
   const [q, setQ] = useState('')
   const [showQuiet, setShowQuiet] = useState(false)
+  const [setupOnly, setSetupOnly] = useState(false)
 
   const onSiteByJob = useMemo(() => {
     const m = new Map<string, number>()
@@ -179,7 +203,7 @@ export function OwnersPortfolioClient({ portfolio, initialCrew }: { portfolio: P
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase()
     const list = inStatus.filter(j =>
-      (showQuiet || !isQuiet(j)) &&
+      (setupOnly ? needsSetup(j) : (showQuiet || !isQuiet(j))) &&
       (!needle || `${j.name} ${j.jobNumber} ${j.clientName ?? ''}`.toLowerCase().includes(needle)))
     const by: Record<SortKey, (a: JobTile, b: JobTile) => number> = {
       spent: (a, b) => b.spent - a.spent,
@@ -191,9 +215,12 @@ export function OwnersPortfolioClient({ portfolio, initialCrew }: { portfolio: P
     // Jobs with crew on site right now float to the top of every sort.
     return [...list].sort((a, b) => ((onSiteByJob.get(b.id) ?? 0) > 0 ? 1 : 0) - ((onSiteByJob.get(a.id) ?? 0) > 0 ? 1 : 0) || by[sort](a, b))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inStatus, q, sort, showQuiet, onSiteByJob])
+  }, [inStatus, q, sort, showQuiet, setupOnly, onSiteByJob])
 
   const quietCount = inStatus.filter(isQuiet).length
+  const setupCount = inStatus.filter(needsSetup).length
+  const noEstimate = inStatus.filter(j => !j.setup.hasEstimate).length
+  const noQB = inStatus.filter(j => !j.setup.qbLinked).length
 
   const totals = useMemo(() => {
     const t = inStatus.reduce((acc, j) => ({
@@ -279,7 +306,17 @@ export function OwnersPortfolioClient({ portfolio, initialCrew }: { portfolio: P
             className="rounded-lg border px-2.5 py-1.5 text-xs" style={{ borderColor: C.border, background: C.panel, color: C.text }}>
             {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          {quietCount > 0 && (
+          {setupCount > 0 && (
+            <button onClick={() => setSetupOnly(v => !v)}
+              title={`${noEstimate} without an estimate · ${noQB} not linked to QuickBooks`}
+              className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+              style={setupOnly
+                ? { background: 'rgba(251,191,36,0.18)', borderColor: C.warn, color: C.warn }
+                : { background: C.panel, borderColor: 'rgba(251,191,36,0.45)', color: C.warn }}>
+              <AlertTriangle size={13} aria-hidden /> Needs setup <span className="font-mono">{setupCount}</span>
+            </button>
+          )}
+          {quietCount > 0 && !setupOnly && (
             <button onClick={() => setShowQuiet(v => !v)} className="text-xs underline-offset-2 hover:underline" style={{ color: C.text2 }}>
               {showQuiet ? 'Hide' : 'Show'} {quietCount} job{quietCount === 1 ? '' : 's'} with no costs or billing
             </button>

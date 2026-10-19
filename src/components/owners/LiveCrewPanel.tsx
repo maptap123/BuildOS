@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Users } from 'lucide-react'
 import type { LiveShift } from '@/lib/owners/data'
 import { C, money } from './theme'
+import { isOverheadJob } from '@/lib/owners/overhead'
 
 const POLL_MS = 30_000
 
@@ -93,7 +94,7 @@ export function LiveCrewPanel({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium" style={{ color: C.text }}>{s.name}</div>
                   <div className="truncate text-xs" style={{ color: C.text2 }}>
-                    {linkJobs && s.jobId
+                    {linkJobs && s.jobId && !isOverheadJob(s.jobName)
                       ? <Link href={`/owners/${s.jobId}`} className="hover:underline">{s.jobName}</Link>
                       : s.jobName}
                     {' · in '}

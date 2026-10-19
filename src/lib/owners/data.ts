@@ -20,6 +20,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DIVISION_NAMES } from '@/lib/estimates/divisions'
+import { isOverheadJob } from './overhead'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -269,6 +270,33 @@ export async function loadLiveCrew(admin: Admin = createAdminClient()): Promise<
   }))
 }
 
+// ── Setup gaps ───────────────────────────────────────────────────────────────
+
+/**
+ * What a job is missing for its numbers to be trusted.
+ *  - estimate: a BuildOS estimate tied to the job (directly or through its lead), or an
+ *    estimate imported from BuilderTrend — those landed as budget lines.
+ *  - quickbooks: `jobs.qb_customer_id`. Cost and billing sync key off it, so a job with only
+ *    candidate links in job_external_links (e.g. two possible customers awaiting review)
+ *    still gets no QB money and counts as unlinked.
+ */
+export interface SetupFlags { hasEstimate: boolean; qbLinked: boolean }
+
+async function estimateJobIds(admin: Admin, jobs: { id: string; lead_id: string | null }[]): Promise<Set<string>> {
+  const ids = jobs.map(j => j.id)
+  const leadToJob = new Map(jobs.filter(j => j.lead_id).map(j => [j.lead_id as string, j.id]))
+  const [byJob, byLead] = await Promise.all([
+    selectAll<{ job_id: string | null }>((f, t) => admin.from('estimates').select('job_id').in('job_id', ids).order('id').range(f, t)),
+    leadToJob.size
+      ? selectAll<{ lead_id: string | null }>((f, t) => admin.from('estimates').select('lead_id').in('lead_id', [...leadToJob.keys()]).order('id').range(f, t))
+      : Promise.resolve([]),
+  ])
+  const out = new Set<string>()
+  for (const e of byJob) if (e.job_id) out.add(e.job_id)
+  for (const e of byLead) { const j = e.lead_id ? leadToJob.get(e.lead_id) : undefined; if (j) out.add(j) }
+  return out
+}
+
 // ── Portfolio ────────────────────────────────────────────────────────────────
 
 export interface JobTile extends Financials {
@@ -279,6 +307,7 @@ export interface JobTile extends Financials {
   status: string
   weekly: number[]          // spend per week, oldest first (WEEKS_TILE)
   lastActivity: string | null
+  setup: SetupFlags
 }
 
 export interface PortfolioWeek {
@@ -300,16 +329,17 @@ export interface Portfolio {
 const PORTFOLIO_STATUSES = ['active', 'warranty', 'presale']
 
 export async function loadPortfolio(admin: Admin = createAdminClient()): Promise<Portfolio> {
-  const { data: jobs, error } = await admin
+  const { data: allJobs, error } = await admin
     .from('jobs')
-    .select('id, name, job_number, client_name, status, contract_amount, estimated_cost')
+    .select('id, name, job_number, client_name, status, contract_amount, estimated_cost, qb_customer_id, lead_id')
     .in('status', PORTFOLIO_STATUSES)
     .order('name')
   if (error) throw error
-  const ids = (jobs ?? []).map(j => j.id)
+  const jobs = (allJobs ?? []).filter(j => !isOverheadJob(j.name))
+  const ids = jobs.map(j => j.id)
   if (ids.length === 0) return { jobs: [], weeks: [], laborThisWeek: 0, hoursThisWeek: 0, generatedAt: new Date().toISOString() }
 
-  const [actuals, entries, billing, budget, schedule, cos] = await Promise.all([
+  const [actuals, entries, billing, budget, schedule, cos, withEstimate] = await Promise.all([
     selectAll<ActualRow>((f, t) => admin.from('actuals')
       .select('job_id, amount, incurred_date, created_at, cost_class, qb_item_name, vendor_name, description, budget_line_id')
       .in('job_id', ids).order('id').range(f, t)),
@@ -328,6 +358,7 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
     selectAll<{ job_id: string; status: string; type: string; amount: number | null }>((f, t) => admin.from('change_orders')
       .select('job_id, status, type, amount')
       .in('job_id', ids).order('id').range(f, t)),
+    estimateJobIds(admin, jobs),
   ])
 
   const today = localDate(new Date())
@@ -338,8 +369,8 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
   const thisWeek = portWeeks[portWeeks.length - 1]
 
   const weeks: PortfolioWeek[] = portWeeks.map(week => ({ week, labor: 0, material: 0, sub: 0, other: 0 }))
-  type Acc = { estimated: number; spent: number; labor: number; billed: number; collected: number; openAR: number; hours: number; weekly: number[]; last: string | null; schedule: ScheduleRow[] }
-  const acc = new Map<string, Acc>(ids.map(id => [id, { estimated: 0, spent: 0, labor: 0, billed: 0, collected: 0, openAR: 0, hours: 0, weekly: Array(WEEKS_TILE).fill(0), last: null, schedule: [] }]))
+  type Acc = { budgetLines: number; estimated: number; spent: number; labor: number; billed: number; collected: number; openAR: number; hours: number; weekly: number[]; last: string | null; schedule: ScheduleRow[] }
+  const acc = new Map<string, Acc>(ids.map(id => [id, { budgetLines: 0, estimated: 0, spent: 0, labor: 0, billed: 0, collected: 0, openAR: 0, hours: 0, weekly: Array(WEEKS_TILE).fill(0), last: null, schedule: [] }]))
   const touch = (a: Acc, d: string) => { if (!a.last || d > a.last) a.last = d }
 
   for (const a of actuals) {
@@ -378,11 +409,12 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
   }
   for (const l of budget) {
     const j = acc.get(l.job_id); if (!j) continue
+    j.budgetLines += 1
     j.estimated += (l.revised_budget ?? 0) > 0 ? (l.revised_budget ?? 0) : (l.original_budget ?? 0)
   }
   for (const s of schedule) acc.get(s.job_id)?.schedule.push(s)
 
-  const tiles: JobTile[] = (jobs ?? []).map(job => {
+  const tiles: JobTile[] = jobs.map(job => {
     const a = acc.get(job.id)!
     const fin = finish({
       contract: (job.contract_amount ?? 0) + sumApprovedCOs(cos, job.id),
@@ -398,6 +430,7 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
       status: job.status,
       weekly: a.weekly,
       lastActivity: a.last,
+      setup: { hasEstimate: a.budgetLines > 0 || withEstimate.has(job.id), qbLinked: !!job.qb_customer_id },
     }
   })
 
@@ -415,6 +448,7 @@ export interface WeekHours { week: string; hours: number; cost: number }
 
 export interface JobDetail {
   job: { id: string; name: string; jobNumber: string; clientName: string | null; status: string; siteAddress: string | null }
+  setup: SetupFlags
   fin: Financials
   mix: Record<CostClass, number>
   trades: TradeRow[]
@@ -429,12 +463,12 @@ export interface JobDetail {
 export async function loadJobDetail(jobId: string, admin: Admin = createAdminClient()): Promise<JobDetail | null> {
   const { data: job } = await admin
     .from('jobs')
-    .select('id, name, job_number, client_name, status, site_address, city, contract_amount, estimated_cost')
+    .select('id, name, job_number, client_name, status, site_address, city, contract_amount, estimated_cost, qb_customer_id, lead_id')
     .eq('id', jobId)
     .maybeSingle()
   if (!job) return null
 
-  const [actuals, entries, billing, budget, schedule, cos, users] = await Promise.all([
+  const [actuals, entries, billing, budget, schedule, cos, users, withEstimate] = await Promise.all([
     selectAll<ActualRow>((f, t) => admin.from('actuals')
       .select('job_id, amount, incurred_date, created_at, cost_class, qb_item_name, vendor_name, description, budget_line_id')
       .eq('job_id', jobId).order('id').range(f, t)),
@@ -454,6 +488,7 @@ export async function loadJobDetail(jobId: string, admin: Admin = createAdminCli
       .select('job_id, status, type, amount')
       .eq('job_id', jobId).order('id').range(f, t)),
     admin.from('users').select('id, full_name').then(r => r.data ?? []),
+    estimateJobIds(admin, [job]),
   ])
 
   const today = localDate(new Date())
@@ -563,6 +598,7 @@ export async function loadJobDetail(jobId: string, admin: Admin = createAdminCli
       id: job.id, name: job.name ?? '', jobNumber: job.job_number ?? '', clientName: job.client_name ?? null, status: job.status,
       siteAddress: [job.site_address, job.city].filter(Boolean).join(', ') || null,
     },
+    setup: { hasEstimate: budget.length > 0 || withEstimate.has(job.id), qbLinked: !!job.qb_customer_id },
     fin,
     mix,
     trades: [...tradeMap.values()].filter(t => t.budget > 0 || t.spent > 0).sort((a, b) => Math.max(b.spent, b.budget) - Math.max(a.spent, a.budget)),

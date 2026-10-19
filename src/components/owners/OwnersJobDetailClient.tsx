@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, MapPin, ExternalLink } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, MapPin, ExternalLink, FileX, Unlink } from 'lucide-react'
 import type { CostClass, JobDetail, LiveShift } from '@/lib/owners/data'
 import { C, CLASS_COLOR, money, moneyShort, pct, hoursFmt, marginTone, shortDate } from './theme'
 import { CumulativeChart, MixBar, WeeklyBars, Legend } from './charts'
@@ -70,6 +70,19 @@ function TradeBars({ rows }: { rows: JobDetail['trades'] }) {
   )
 }
 
+function SetupAlert({ icon: Icon, text, href, cta }: { icon: typeof FileX; text: string; href: string; cta: string }) {
+  return (
+    <div className="flex flex-1 items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm"
+      style={{ background: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.4)', color: C.text }}>
+      <Icon size={16} color={C.warn} className="mt-0.5 shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <div>{text}</div>
+        <Link href={href} className="mt-0.5 inline-block text-xs font-semibold hover:underline" style={{ color: C.warn }}>{cta} →</Link>
+      </div>
+    </div>
+  )
+}
+
 function Table({ head, rows, empty }: { head: { label: string; right?: boolean }[]; rows: React.ReactNode[][]; empty: string }) {
   if (rows.length === 0) return <div className="text-sm" style={{ color: C.muted }}>{empty}</div>
   return (
@@ -97,7 +110,7 @@ function Table({ head, rows, empty }: { head: { label: string; right?: boolean }
 }
 
 export function OwnersJobDetailClient({ detail, initialCrew }: { detail: JobDetail; initialCrew: LiveShift[] }) {
-  const { job, fin, mix, trades, crew, vendors, cumulative, weeklyHours, recent, invoices } = detail
+  const { job, setup, fin, mix, trades, crew, vendors, cumulative, weeklyHours, recent, invoices } = detail
   const live = useLiveCrew(initialCrew, job.id)
   const tone = marginTone(fin.marginPct)
   const mixParts = CLASS_ORDER.map(k => ({ key: k, label: CLASS_LABEL[k], color: CLASS_COLOR[k], value: mix[k] }))
@@ -127,6 +140,19 @@ export function OwnersJobDetailClient({ detail, initialCrew }: { detail: JobDeta
             </Link>
           </div>
         </header>
+
+        {(!setup.hasEstimate || !setup.qbLinked) && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {!setup.hasEstimate && (
+              <SetupAlert icon={FileX} href={`/jobs/${job.id}/estimates`} cta="Add estimate"
+                text="No estimate attached — there's nothing to measure spend against." />
+            )}
+            {!setup.qbLinked && (
+              <SetupAlert icon={Unlink} href={`/jobs/${job.id}`} cta="Link in Connected Systems"
+                text="Not linked to a QuickBooks customer — QuickBooks costs and billing may be missing from these numbers." />
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 xl:grid-cols-8">
           <Kpi label="Margin to date" value={pct(fin.marginPct)} tone={tone} sub="on billings" />
