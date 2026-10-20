@@ -4,8 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, MapPin, ExternalLink, FileX, Unlink } from 'lucide-react'
 import type { CostClass, JobDetail, LiveShift } from '@/lib/owners/data'
-import { C, CLASS_COLOR, money, moneyShort, pct, hoursFmt, marginTone, shortDate } from './theme'
-import { CumulativeChart, MixBar, WeeklyBars, Legend } from './charts'
+import { C, CLASS_COLOR, money, moneyShort, pct, hoursFmt, shortDate } from './theme'
+import { CumulativeChart, MixBar, WeeklyBars, Legend, ContractBar } from './charts'
 import { LiveCrewPanel, useLiveCrew } from './LiveCrewPanel'
 import { OwnersShell, Kpi, ProgressBar } from './OwnersPortfolioClient'
 
@@ -70,6 +70,84 @@ function TradeBars({ rows }: { rows: JobDetail['trades'] }) {
   )
 }
 
+function Figure({ label, value, sub, color, big }: { label: string; value: string; sub?: string; color?: string; big?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: C.muted }}>{label}</div>
+      <div className={`font-mono font-semibold tabular-nums ${big ? 'text-3xl' : 'text-xl'}`} style={{ color: color ?? C.text }}>{value}</div>
+      {sub && <div className="text-xs" style={{ color: C.text2 }}>{sub}</div>}
+    </div>
+  )
+}
+
+const Op = ({ children }: { children: React.ReactNode }) => (
+  <span className="hidden self-center font-mono text-2xl sm:block" style={{ color: C.muted }}>{children}</span>
+)
+
+/** The owner's question first: what did we sell it for, what's it costing, what do we keep. */
+function ProfitPicture({ fin, jobId }: { fin: JobDetail['fin']; jobId: string }) {
+  if (!fin.priced) {
+    return (
+      <section className="rounded-xl border p-4" style={{ background: C.panel, borderColor: C.border, borderTop: '2px solid #c09030' }}>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider" style={{ color: C.text }}>Profit picture</h2>
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <Figure big label="Billed − spent so far" value={fin.cashProfit == null ? '—' : moneyShort(fin.cashProfit)}
+            color={fin.cashProfit == null ? C.text2 : fin.cashProfit >= 0 ? C.good : C.bad}
+            sub={fin.cashMarginPct != null ? `${pct(fin.cashMarginPct, 0)} of what's been billed` : 'nothing billed yet'} />
+          {fin.contract > 0 && <Figure label="Sell price" value={moneyShort(fin.contract)} sub={`${moneyShort(fin.leftToBill ?? 0)} left to bill`} />}
+        </div>
+        <p className="mt-3 text-sm" style={{ color: C.text2 }}>
+          {fin.budgetIncomplete
+            ? `The imported estimate (${moneyShort(fin.estimated)} cost) covers only part of this job, so planned profit can't be worked out from it. `
+            : fin.contract > 0 ? 'There is no cost budget to measure against, so planned profit can’t be worked out. '
+            : 'This job has no sell price yet, so planned profit can’t be worked out. '}
+          Enter the contract price and this panel shows planned profit, profit earned so far and what’s left.
+        </p>
+        <Link href={`/jobs/${jobId}/edit`} className="mt-2 inline-block text-xs font-semibold hover:underline" style={{ color: C.warn }}>
+          Set contract price →
+        </Link>
+      </section>
+    )
+  }
+
+  const stillToEarn = (fin.projectedProfit ?? 0) - (fin.earnedProfit ?? 0)
+  const over = (fin.leftToSpend ?? 0) < 0
+  return (
+    <section className="rounded-xl border p-4" style={{ background: C.panel, borderColor: C.border, borderTop: '2px solid #c09030' }}>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: C.text }}>Profit picture</h2>
+        <span className="text-[11px]" style={{ color: C.muted }}>
+          Sell price from {fin.contractSource === 'contract' ? 'the job’s contract amount' : 'the BuilderTrend estimate'}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <Figure label="Sell price" value={moneyShort(fin.contract)} />
+        <Op>−</Op>
+        <Figure label="Cost budget" value={moneyShort(fin.estimated)} />
+        <Op>=</Op>
+        <Figure big label="Planned profit" value={moneyShort(fin.plannedProfit ?? 0)} color={C.good}
+          sub={`${pct(fin.plannedMarginPct, 0)} margin · ${pct(fin.markupPct, 0)} markup`} />
+      </div>
+
+      <div className="mt-4"><ContractBar contract={fin.contract} estimated={fin.estimated} spent={fin.spent} height={14} /></div>
+
+      <div className="mt-4 grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4" style={{ borderColor: C.border }}>
+        <Figure label="Profit so far" value={moneyShort(fin.earnedProfit ?? 0)}
+          color={(fin.earnedProfit ?? 0) >= 0 ? C.good : C.bad}
+          sub={`${Math.round(fin.earnedPct ?? 0)}% of the cost budget used`} />
+        <Figure label="Still to earn" value={moneyShort(stillToEarn)}
+          sub={`projected ${moneyShort(fin.projectedProfit ?? 0)} total · ${pct(fin.projectedMarginPct, 0)}`} />
+        <Figure label="Left to bill" value={moneyShort(fin.leftToBill ?? 0)}
+          sub={`${moneyShort(fin.billed)} billed of ${moneyShort(fin.contract)}`} />
+        <Figure label={over ? 'Over budget' : 'Left to spend'} value={moneyShort(Math.abs(fin.leftToSpend ?? 0))}
+          color={over ? C.bad : undefined}
+          sub={over ? 'coming out of profit' : `of ${moneyShort(fin.estimated)} cost budget`} />
+      </div>
+    </section>
+  )
+}
+
 function SetupAlert({ icon: Icon, text, href, cta }: { icon: typeof FileX; text: string; href: string; cta: string }) {
   return (
     <div className="flex flex-1 items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm"
@@ -112,7 +190,6 @@ function Table({ head, rows, empty }: { head: { label: string; right?: boolean }
 export function OwnersJobDetailClient({ detail, initialCrew }: { detail: JobDetail; initialCrew: LiveShift[] }) {
   const { job, setup, fin, mix, trades, crew, vendors, cumulative, weeklyHours, recent, invoices } = detail
   const live = useLiveCrew(initialCrew, job.id)
-  const tone = marginTone(fin.marginPct)
   const mixParts = CLASS_ORDER.map(k => ({ key: k, label: CLASS_LABEL[k], color: CLASS_COLOR[k], value: mix[k] }))
   const hoursData = weeklyHours.map(w => ({ week: w.week, values: { hours: w.hours } }))
   const hours16 = weeklyHours.reduce((s, w) => s + w.hours, 0)
@@ -154,12 +231,13 @@ export function OwnersJobDetailClient({ detail, initialCrew }: { detail: JobDeta
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 xl:grid-cols-8">
-          <Kpi label="Margin to date" value={pct(fin.marginPct)} tone={tone} sub="on billings" />
-          <Kpi label="Profit to date" value={fin.profit == null ? '—' : moneyShort(fin.profit)} tone={fin.profit == null ? undefined : fin.profit >= 0 ? 'good' : 'bad'} />
-          <Kpi label="Billed" value={moneyShort(fin.billed)} sub={fin.contract > 0 ? `of ${moneyShort(fin.contract)} contract` : 'no contract set'} />
-          <Kpi label="Spent" value={moneyShort(fin.spent)} sub={fin.estimated > 0 ? `${Math.round((fin.spent / fin.estimated) * 100)}% of estimate` : undefined} />
-          <Kpi label="Estimated cost" value={fin.estimated > 0 ? moneyShort(fin.estimated) : '—'} sub={fin.budgetIncomplete ? '⚠ looks incomplete' : fin.projectedMarginPct != null ? `${pct(fin.projectedMarginPct)} planned margin` : undefined} />
+        <ProfitPicture fin={fin} jobId={job.id} />
+
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
+          <Kpi label="Billed" value={moneyShort(fin.billed)} sub={fin.contract > 0 ? `${Math.round((fin.billed / fin.contract) * 100)}% of sell price` : undefined} />
+          <Kpi label="Spent" value={moneyShort(fin.spent)} sub={fin.estimated > 0 && !fin.budgetIncomplete ? `${Math.round((fin.spent / fin.estimated) * 100)}% of cost budget` : undefined} />
+          <Kpi label="Billed − spent" value={fin.cashProfit == null ? '—' : moneyShort(fin.cashProfit)}
+            tone={fin.cashProfit == null ? undefined : fin.cashProfit >= 0 ? 'good' : 'bad'} sub="cash position" />
           <Kpi label="Collected" value={moneyShort(fin.collected)} sub={fin.openAR > 0 ? `${moneyShort(fin.openAR)} still owed` : 'nothing open'} />
           <Kpi label="Crew labor" value={moneyShort(fin.labor)} sub={fin.spent > 0 ? `${Math.round((fin.labor / fin.spent) * 100)}% of spend` : undefined} />
           <Kpi label="Hours logged" value={hoursFmt(fin.hours)} sub={fin.hours > 0 ? `${money(fin.labor / fin.hours)}/hr avg` : undefined} />
@@ -167,8 +245,12 @@ export function OwnersJobDetailClient({ detail, initialCrew }: { detail: JobDeta
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Panel title="Spent vs billed" className="lg:col-span-2"
-            right={<Legend items={[{ label: 'Billed', color: C.billed }, { label: 'Spent', color: C.spent }, ...(fin.estimated > 0 ? [{ label: 'Estimate', color: C.budget }] : [])]} />}>
-            <CumulativeChart points={cumulative} budget={fin.estimated} />
+            right={<Legend items={[
+              { label: 'Billed', color: C.billed }, { label: 'Spent', color: C.spent },
+              ...(fin.contract > 0 ? [{ label: 'Sell price', color: C.good }] : []),
+              ...(fin.estimated > 0 && !fin.budgetIncomplete ? [{ label: 'Cost budget', color: C.budget }] : []),
+            ]} />}>
+            <CumulativeChart points={cumulative} budget={fin.budgetIncomplete ? 0 : fin.estimated} contract={fin.contract} />
           </Panel>
           <div className="flex flex-col gap-4">
             <Panel title="Progress">

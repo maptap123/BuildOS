@@ -205,32 +205,98 @@ function sumApprovedCOs(rows: { job_id: string; status: string; type: string; am
 }
 
 export interface Financials {
-  contract: number      // contract + approved change orders
-  estimated: number     // budgeted cost
-  spent: number         // QB costs + crew labor
-  labor: number         // crew labor (time clock) + QB payroll
+  contract: number                 // sell price incl. approved change orders; 0 when unknown
+  contractSource: 'contract' | 'estimate' | null
+  estimated: number                // cost budget
+  estimatePrice: number            // client price on the estimate lines
+  spent: number                    // QB costs + crew labor
+  labor: number                    // crew labor (time clock) + QB payroll
   billed: number
   collected: number
-  openAR: number        // open balance on QB invoices
+  openAR: number                   // open balance on QB invoices
   hours: number
-  marginPct: number | null     // on billings to date
-  profit: number | null        // billed − spent
-  projectedMarginPct: number | null // (contract − estimated) / contract
+  /** Sell price AND cost budget are both trustworthy, so profit can be planned and earned. */
+  priced: boolean
+  plannedProfit: number | null     // contract − cost budget
+  plannedMarginPct: number | null  // planned profit / contract
+  markupPct: number | null         // planned profit / cost budget
+  earnedPct: number | null         // spent / cost budget, capped at 100
+  earnedProfit: number | null      // contract × earnedPct − spent  (percent-of-completion)
+  projectedProfit: number | null   // contract − max(cost budget, spent)
+  projectedMarginPct: number | null
+  leftToBill: number | null        // contract − billed
+  leftToSpend: number | null       // cost budget − spent (negative = over budget)
+  cashProfit: number | null        // billed − spent
+  cashMarginPct: number | null     // on billings to date
   progressPct: number | null
   progressBasis: 'schedule' | 'cost' | null
-  budgetIncomplete: boolean    // spent well past an estimate that clearly isn't the whole job
+  budgetIncomplete: boolean        // the estimate clearly isn't the whole job
 }
 
-function finish(f: Omit<Financials, 'marginPct' | 'profit' | 'projectedMarginPct' | 'progressPct' | 'progressBasis' | 'budgetIncomplete'>, schedulePct: number | null): Financials {
-  const marginPct = f.billed > 0 ? ((f.billed - f.spent) / f.billed) * 100 : null
-  const profit = f.billed > 0 ? f.billed - f.spent : null
-  const projectedMarginPct = f.contract > 0 && f.estimated > 0 ? ((f.contract - f.estimated) / f.contract) * 100 : null
-  const budgetIncomplete = f.estimated > 0 && f.spent > f.estimated * 1.5
+interface FinInput {
+  contractAmount: number   // jobs.contract_amount
+  changeOrders: number     // approved CO net
+  estimated: number
+  estimatePrice: number
+  spent: number; labor: number; billed: number; collected: number; openAR: number; hours: number
+}
+
+/** "… markup 50% · client price $6,003.36 · BT worksheet" → 6003.36 */
+export function clientPriceFromNotes(notes: string | null | undefined): number | null {
+  const m = /client price \$([0-9,]+(?:\.[0-9]+)?)/.exec(notes ?? '')
+  return m ? Number(m[1].replace(/,/g, '')) : null
+}
+
+/**
+ * Profit, the way an owner reads it.
+ *
+ * Sell price: the job's contract amount (accepted proposals set it) + approved change orders,
+ * else the client price on the imported BuilderTrend estimate. An estimate whose price
+ * equals its cost (BT's flat-rate buckets) or that the job has blown far past — spent 1.5×
+ * its cost, or billed 1.15× its price — is a fragment, not the job, and prices nothing.
+ *
+ * Profit so far is percent-of-completion: revenue is earned in step with the cost budget
+ * consumed, so an on-budget job shows its markup accruing as work happens rather than
+ * swinging with when invoices go out. Billed − spent is kept alongside as the cash view.
+ */
+function finish(f: FinInput, schedulePct: number | null): Financials {
+  const { estimated, estimatePrice, spent, billed } = f
+  const budgetIncomplete = estimated > 0 &&
+    (spent > estimated * 1.5 || billed > Math.max(estimatePrice, estimated) * 1.15)
+
+  let contract = 0
+  let contractSource: Financials['contractSource'] = null
+  if (f.contractAmount > 0) { contract = f.contractAmount + f.changeOrders; contractSource = 'contract' }
+  else if (estimatePrice > estimated && estimated > 0 && !budgetIncomplete) { contract = estimatePrice + f.changeOrders; contractSource = 'estimate' }
+
+  const priced = contract > 0 && estimated > 0 && !budgetIncomplete
+  const plannedProfit = priced ? contract - estimated : null
+  const earnedPct = priced ? Math.min(100, (spent / estimated) * 100) : null
+  const earnedProfit = priced ? contract * (earnedPct! / 100) - spent : null
+  const projectedProfit = priced ? contract - Math.max(estimated, spent) : null
+
   let progressPct: number | null = null
   let progressBasis: Financials['progressBasis'] = null
   if (schedulePct != null) { progressPct = schedulePct; progressBasis = 'schedule' }
-  else if (f.estimated > 0 && !budgetIncomplete) { progressPct = Math.min(100, (f.spent / f.estimated) * 100); progressBasis = 'cost' }
-  return { ...f, marginPct, profit, projectedMarginPct, progressPct, progressBasis, budgetIncomplete }
+  else if (estimated > 0 && !budgetIncomplete) { progressPct = Math.min(100, (spent / estimated) * 100); progressBasis = 'cost' }
+
+  return {
+    contract, contractSource, estimated, estimatePrice,
+    spent, labor: f.labor, billed, collected: f.collected, openAR: f.openAR, hours: f.hours,
+    priced,
+    plannedProfit,
+    plannedMarginPct: plannedProfit != null ? (plannedProfit / contract) * 100 : null,
+    markupPct: plannedProfit != null ? (plannedProfit / estimated) * 100 : null,
+    earnedPct,
+    earnedProfit,
+    projectedProfit,
+    projectedMarginPct: projectedProfit != null ? (projectedProfit / contract) * 100 : null,
+    leftToBill: contract > 0 ? contract - billed : null,
+    leftToSpend: priced ? estimated - spent : null,
+    cashProfit: billed > 0 ? billed - spent : null,
+    cashMarginPct: billed > 0 ? ((billed - spent) / billed) * 100 : null,
+    progressPct, progressBasis, budgetIncomplete,
+  }
 }
 
 // ── Live crew ────────────────────────────────────────────────────────────────
@@ -349,8 +415,8 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
     selectAll<BillingRow>((f, t) => admin.from('job_billing')
       .select('job_id, qb_txn_type, amount, balance, txn_date, doc_number')
       .in('job_id', ids).order('id').range(f, t)),
-    selectAll<{ job_id: string; original_budget: number | null; revised_budget: number | null }>((f, t) => admin.from('budget_lines')
-      .select('job_id, original_budget, revised_budget')
+    selectAll<{ job_id: string; original_budget: number | null; revised_budget: number | null; notes: string | null }>((f, t) => admin.from('budget_lines')
+      .select('job_id, original_budget, revised_budget, notes')
       .in('job_id', ids).order('id').range(f, t)),
     selectAll<ScheduleRow>((f, t) => admin.from('schedule_items')
       .select('job_id, start_date, end_date, status, percent_complete')
@@ -369,8 +435,8 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
   const thisWeek = portWeeks[portWeeks.length - 1]
 
   const weeks: PortfolioWeek[] = portWeeks.map(week => ({ week, labor: 0, material: 0, sub: 0, other: 0 }))
-  type Acc = { budgetLines: number; estimated: number; spent: number; labor: number; billed: number; collected: number; openAR: number; hours: number; weekly: number[]; last: string | null; schedule: ScheduleRow[] }
-  const acc = new Map<string, Acc>(ids.map(id => [id, { budgetLines: 0, estimated: 0, spent: 0, labor: 0, billed: 0, collected: 0, openAR: 0, hours: 0, weekly: Array(WEEKS_TILE).fill(0), last: null, schedule: [] }]))
+  type Acc = { budgetLines: number; estimated: number; estimatePrice: number; spent: number; labor: number; billed: number; collected: number; openAR: number; hours: number; weekly: number[]; last: string | null; schedule: ScheduleRow[] }
+  const acc = new Map<string, Acc>(ids.map(id => [id, { budgetLines: 0, estimated: 0, estimatePrice: 0, spent: 0, labor: 0, billed: 0, collected: 0, openAR: 0, hours: 0, weekly: Array(WEEKS_TILE).fill(0), last: null, schedule: [] }]))
   const touch = (a: Acc, d: string) => { if (!a.last || d > a.last) a.last = d }
 
   for (const a of actuals) {
@@ -409,16 +475,20 @@ export async function loadPortfolio(admin: Admin = createAdminClient()): Promise
   }
   for (const l of budget) {
     const j = acc.get(l.job_id); if (!j) continue
+    const cost = (l.revised_budget ?? 0) > 0 ? (l.revised_budget ?? 0) : (l.original_budget ?? 0)
     j.budgetLines += 1
-    j.estimated += (l.revised_budget ?? 0) > 0 ? (l.revised_budget ?? 0) : (l.original_budget ?? 0)
+    j.estimated += cost
+    j.estimatePrice += clientPriceFromNotes(l.notes) ?? cost
   }
   for (const s of schedule) acc.get(s.job_id)?.schedule.push(s)
 
   const tiles: JobTile[] = jobs.map(job => {
     const a = acc.get(job.id)!
     const fin = finish({
-      contract: (job.contract_amount ?? 0) + sumApprovedCOs(cos, job.id),
+      contractAmount: job.contract_amount ?? 0,
+      changeOrders: sumApprovedCOs(cos, job.id),
       estimated: a.estimated > 0 ? a.estimated : (job.estimated_cost ?? 0),
+      estimatePrice: a.estimated > 0 ? a.estimatePrice : 0,
       spent: a.spent, labor: a.labor, billed: a.billed, collected: a.collected, openAR: a.openAR, hours: a.hours,
     }, scheduleProgress(a.schedule, today))
     return {
@@ -478,8 +548,8 @@ export async function loadJobDetail(jobId: string, admin: Admin = createAdminCli
     selectAll<BillingRow>((f, t) => admin.from('job_billing')
       .select('job_id, qb_txn_type, amount, balance, txn_date, doc_number')
       .eq('job_id', jobId).order('id').range(f, t)),
-    selectAll<{ id: string; job_id: string; original_budget: number | null; revised_budget: number | null; category: string | null; cost_code: string | null }>((f, t) => admin.from('budget_lines')
-      .select('id, job_id, original_budget, revised_budget, category, cost_code')
+    selectAll<{ id: string; job_id: string; original_budget: number | null; revised_budget: number | null; category: string | null; cost_code: string | null; notes: string | null }>((f, t) => admin.from('budget_lines')
+      .select('id, job_id, original_budget, revised_budget, category, cost_code, notes')
       .eq('job_id', jobId).order('id').range(f, t)),
     selectAll<ScheduleRow>((f, t) => admin.from('schedule_items')
       .select('job_id, start_date, end_date, status, percent_complete')
@@ -505,9 +575,11 @@ export async function loadJobDetail(jobId: string, admin: Admin = createAdminCli
   }
 
   let estimated = 0
+  let estimatePrice = 0
   for (const l of budget) {
     const amt = (l.revised_budget ?? 0) > 0 ? (l.revised_budget ?? 0) : (l.original_budget ?? 0)
     estimated += amt
+    estimatePrice += clientPriceFromNotes(l.notes) ?? amt
     const tr = tradeOfCategory(l.category, l.cost_code)
     budgetTrade.set(l.id, tr)
     tradeRow(tr ?? UNCODED).budget += amt
@@ -586,8 +658,10 @@ export async function loadJobDetail(jobId: string, admin: Admin = createAdminCli
   if (cumulative.length && cumulative[cumulative.length - 1].date !== today) cumulative.push({ date: today, spent: cs, billed: cb })
 
   const fin = finish({
-    contract: (job.contract_amount ?? 0) + sumApprovedCOs(cos),
+    contractAmount: job.contract_amount ?? 0,
+    changeOrders: sumApprovedCOs(cos),
     estimated: estimated > 0 ? estimated : (job.estimated_cost ?? 0),
+    estimatePrice: estimated > 0 ? estimatePrice : 0,
     spent, labor, billed, collected, openAR, hours,
   }, scheduleProgress(schedule, today))
 

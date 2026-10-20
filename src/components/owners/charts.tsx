@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { C, moneyShort, shortDate } from './theme'
+import { C, money, moneyShort, shortDate } from './theme'
 
 // Hand-rolled SVG charts for the Owners View — no chart library in the bundle. Every
 // plotted chart has a hover layer (crosshair or per-mark tooltip); text stays in text
@@ -194,10 +194,11 @@ function roundTopRect(x: number, y: number, w: number, h: number, r: number): st
 // ── Cumulative spent vs billed (line, crosshair) ─────────────────────────────
 
 export function CumulativeChart({
-  points, budget, height = 280,
+  points, budget, contract = 0, height = 280,
 }: {
   points: { date: string; spent: number; billed: number }[]
   budget: number
+  contract?: number
   height?: number
 }) {
   const { ref, width } = useWidth<HTMLDivElement>()
@@ -211,7 +212,7 @@ export function CumulativeChart({
   const t0 = Date.parse(`${points[0].date}T12:00:00Z`)
   const t1 = Date.parse(`${points[points.length - 1].date}T12:00:00Z`)
   const span = Math.max(1, t1 - t0)
-  const max = niceMax(Math.max(...points.map(p => Math.max(p.spent, p.billed)), budget) * 1.05)
+  const max = niceMax(Math.max(...points.map(p => Math.max(p.spent, p.billed)), budget, contract) * 1.05)
   const plotW = Math.max(0, width - padL - padR)
   const plotH = height - padT - padB
   const x = (d: string) => padL + ((Date.parse(`${d}T12:00:00Z`) - t0) / span) * plotW
@@ -262,21 +263,33 @@ export function CumulativeChart({
           ))}
           {xTicks.map(d => (
             <text key={d} x={x(d)} y={height - 8} textAnchor="middle" fontSize={10} fill={C.muted}>
-              {new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })}
+              {span < 180 * 86_400_000
+                ? shortDate(d)
+                : new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })}
             </text>
           ))}
           {budget > 0 && (
             <g>
               <line x1={padL} x2={width - padR} y1={y(budget)} y2={y(budget)} stroke={C.budget} strokeWidth={1.5} />
-              <text x={width - padR + 4} y={y(budget) + 3} fontSize={10} fill={C.text2}>Est. {moneyShort(budget)}</text>
+            </g>
+          )}
+          {contract > 0 && (
+            <g>
+              <line x1={padL} x2={width - padR} y1={y(contract)} y2={y(contract)} stroke={C.good} strokeOpacity={0.6} strokeWidth={1.5} />
             </g>
           )}
           <path d={`${spentPath} V${y(0)} H${x(points[0].date)} Z`} fill="url(#cum-spent)" />
           <path d={billedPath} fill="none" stroke={C.billed} strokeWidth={2} strokeLinejoin="round" />
           <path d={spentPath} fill="none" stroke={C.spent} strokeWidth={2} strokeLinejoin="round" />
-          {/* direct labels at the line ends */}
-          <text x={width - padR + 4} y={y(last.billed) + 3} fontSize={10} fill={C.text}>Billed</text>
-          <text x={width - padR + 4} y={y(last.spent) + (Math.abs(y(last.spent) - y(last.billed)) < 12 ? 15 : 3)} fontSize={10} fill={C.text}>Spent</text>
+          {/* direct labels at the right edge, nudged apart so they never collide */}
+          {endLabels([
+            { y: y(last.billed), text: 'Billed', fill: C.text },
+            { y: y(last.spent), text: 'Spent', fill: C.text },
+            ...(budget > 0 ? [{ y: y(budget), text: `Cost ${moneyShort(budget)}`, fill: C.text2 }] : []),
+            ...(contract > 0 ? [{ y: y(contract), text: `Sell ${moneyShort(contract)}`, fill: C.text2 }] : []),
+          ], padT, padT + plotH).map(l => (
+            <text key={l.text} x={width - padR + 4} y={l.y + 3} fontSize={10} fill={l.fill}>{l.text}</text>
+          ))}
           {hp && (
             <g>
               <line x1={x(hp.date)} x2={x(hp.date)} y1={padT} y2={padT + plotH} stroke={C.text2} strokeWidth={1} />
@@ -296,6 +309,17 @@ export function CumulativeChart({
       )}
     </div>
   )
+}
+
+/** Spread right-edge labels so each sits ≥12px from its neighbor, staying inside [top, bottom]. */
+function endLabels<T extends { y: number }>(labels: T[], top: number, bottom: number, gap = 12): T[] {
+  const out = labels.map(l => ({ ...l })).sort((a, b) => a.y - b.y)
+  for (let i = 1; i < out.length; i++) if (out[i].y - out[i - 1].y < gap) out[i].y = out[i - 1].y + gap
+  const overflow = out.length ? out[out.length - 1].y - bottom : 0
+  if (overflow > 0) for (const l of out) l.y -= overflow
+  for (let i = out.length - 2; i >= 0; i--) if (out[i + 1].y - out[i].y < gap) out[i].y = out[i + 1].y - gap
+  if (out.length && out[0].y < top) { const d = top - out[0].y; for (const l of out) l.y += d }
+  return out
 }
 
 // ── 100% stacked mix bar ─────────────────────────────────────────────────────
@@ -336,5 +360,64 @@ export function MixBar({ parts }: { parts: { key: string; label: string; color: 
         ))}
       </div>
     </div>
+  )
+}
+
+// ── Contract bar: the sell price split into spent / cost to go / profit ─────
+
+export function ContractBar({
+  contract, estimated, spent, height = 10, showLegend = true,
+}: { contract: number; estimated: number; spent: number; height?: number; showLegend?: boolean }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const total = Math.max(contract, spent)
+  if (total <= 0) return null
+  const costToGo = Math.max(0, estimated - spent)
+  const profitLeft = Math.max(0, contract - Math.max(estimated, spent))
+  const overBudget = Math.max(0, spent - estimated)
+  const loss = Math.max(0, spent - contract)
+  const parts = [
+    { key: 'spent', label: 'Spent', value: spent, color: C.spent },
+    { key: 'togo', label: 'Cost to go', value: costToGo, color: C.budget },
+    { key: 'profit', label: 'Profit', value: profitLeft, color: C.good },
+  ].filter(p => p.value > 0)
+  const h = parts.find(p => p.key === hover)
+  return (
+    <div>
+      <div className="relative flex w-full gap-[2px] overflow-hidden rounded-full" style={{ height, background: C.panel2 }}>
+        {parts.map(p => (
+          <div key={p.key} onMouseEnter={() => setHover(p.key)} onMouseLeave={() => setHover(null)}
+            title={`${p.label}: ${moneyShort(p.value)}`}
+            style={{ width: `${(p.value / total) * 100}%`, background: p.color, opacity: hover && hover !== p.key ? 0.45 : 1 }} />
+        ))}
+        {/* tick where the cost budget ends — anything past it is eating profit */}
+        {estimated > 0 && estimated < total && (
+          <div className="pointer-events-none absolute top-0 h-full w-[2px]" style={{ left: `${(estimated / total) * 100}%`, background: C.text }} />
+        )}
+      </div>
+      {showLegend && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: C.text2 }}>
+          {h ? (
+            <span><span style={{ color: C.text }}>{h.label}</span> · <span className="font-mono">{money(h.value)}</span> · {((h.value / total) * 100).toFixed(0)}% of {loss > 0 ? 'spend' : 'sell price'}</span>
+          ) : (
+            <>
+              <LegendDot color={C.spent} label="Spent" value={moneyShort(spent)} />
+              {costToGo > 0 && <LegendDot color={C.budget} label="To go" value={moneyShort(costToGo)} />}
+              {profitLeft > 0 && <LegendDot color={C.good} label="Profit" value={moneyShort(profitLeft)} />}
+              {overBudget > 0 && <span style={{ color: C.warn }}>▲ {moneyShort(overBudget)} over budget</span>}
+              {loss > 0 && <span style={{ color: C.bad }}>▼ {moneyShort(loss)} past sell price</span>}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LegendDot({ color, label, value }: { color: string; label: string; value: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
+      {label} <span className="font-mono" style={{ color: C.text }}>{value}</span>
+    </span>
   )
 }
