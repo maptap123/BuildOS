@@ -70,7 +70,7 @@ export async function DELETE(request: Request, { params }: Params) {
   const admin = createAdminClient()
   const { data: act } = await admin
     .from('lead_activities')
-    .select('created_by')
+    .select('created_by, email_message_id')
     .eq('id', activityId)
     .eq('lead_id', id)
     .single()
@@ -80,6 +80,14 @@ export async function DELETE(request: Request, { params }: Params) {
   if (act.created_by !== user.id) {
     const canDelete = await hasModulePermOrAdmin(admin, user.id, 'leads', 'can_delete')
     if (!canDelete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // A synced Outlook email would come straight back on the next sync — remember it's unwanted.
+  if (act.email_message_id) {
+    await admin.from('lead_email_dismissals').upsert(
+      { lead_id: id, email_message_id: act.email_message_id, dismissed_by: user.id },
+      { onConflict: 'lead_id,email_message_id', ignoreDuplicates: true },
+    )
   }
 
   const { error } = await admin.from('lead_activities').delete().eq('id', activityId)

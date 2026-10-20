@@ -574,6 +574,12 @@ export interface LeadActivity {
   note: string
   created_by: string
   created_at: string
+  /** Set on emails synced from Outlook; null on hand-logged entries. */
+  email_message_id?: string | null
+  email_direction?: 'sent' | 'received' | null
+  email_subject?: string | null
+  email_from?: string | null
+  email_to?: string | null
 }
 
 export interface LeadAttachment {

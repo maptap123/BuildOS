@@ -156,6 +156,56 @@ export function LeadDetailClient({
       .catch(() => setAttachments([]))
   }, [lead.id])
 
+  // ── Outlook email sync ─────────────────────────────────────────────────
+  const [syncingEmail, setSyncingEmail] = useState(false)
+  const [emailSyncError, setEmailSyncError] = useState<string | null>(null)
+  const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set())
+
+  async function syncEmail(force = false) {
+    if (!lead.client_email) return
+    setSyncingEmail(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/emails/sync${force ? '?force=1' : ''}`, { method: 'POST' })
+      const body = await res.json().catch(() => ({})) as { added?: LeadActivity[]; error?: string }
+      setEmailSyncError(res.ok ? body.error ?? null : body.error ?? 'Email sync failed')
+      if (body.added?.length) {
+        // Synced emails carry their real send time, so they can land anywhere in the timeline.
+        setActivities(prev => [...prev, ...body.added!].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+      }
+    } catch {
+      setEmailSyncError('Email sync failed')
+    }
+    setSyncingEmail(false)
+  }
+
+  useEffect(() => {
+    syncEmail()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead.id, lead.client_email])
+
+  // After the Email button hands off to the mail app, re-check when the user
+  // comes back so the email they just sent shows up without a manual sync.
+  const emailOpenedAt = useRef<number | null>(null)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== 'visible' || emailOpenedAt.current == null) return
+      if (Date.now() - emailOpenedAt.current > 60 * 60 * 1000) { emailOpenedAt.current = null; return }
+      syncEmail(true)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead.id, lead.client_email])
+
+  function toggleEmail(id: string) {
+    setExpandedEmails(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   // ── Lead fields ────────────────────────────────────────────────────────
   async function patchLead(updates: Partial<Lead>): Promise<boolean> {
     setError(null)
@@ -389,6 +439,7 @@ export function LeadDetailClient({
                   href={href}
                   target={label === 'Map' ? '_blank' : undefined}
                   rel={label === 'Map' ? 'noopener noreferrer' : undefined}
+                  onClick={label === 'Email' ? () => { emailOpenedAt.current = Date.now() } : undefined}
                   className="flex flex-col items-center gap-1 bg-white border border-border rounded-xl py-3 text-navy-900 hover:border-gold-300 hover:bg-gold-50 transition-colors"
                 >
                   <Icon size={18} className="text-gold-600" />
@@ -615,7 +666,26 @@ export function LeadDetailClient({
 
           {/* Activity */}
           <div className={card}>
-            <h2 className={`${cardTitle} mb-3`}>Activity</h2>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className={cardTitle}>Activity</h2>
+              {lead.client_email && (
+                <button
+                  type="button"
+                  onClick={() => syncEmail(true)}
+                  disabled={syncingEmail}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy-900 disabled:opacity-60 transition-colors"
+                  title="Pull emails with this client from Outlook"
+                >
+                  <RefreshCw size={12} className={syncingEmail ? 'animate-spin' : ''} />
+                  {syncingEmail ? 'Checking email…' : 'Sync email'}
+                </button>
+              )}
+            </div>
+            {emailSyncError && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                {emailSyncError}
+              </p>
+            )}
 
             {permissions.can_create && (
               <form onSubmit={addActivity} className="mb-5 space-y-2">
@@ -672,17 +742,40 @@ export function LeadDetailClient({
                       }`}>
                         <Icon size={13} />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                          act.kind === 'status' ? 'text-gray-500' : 'text-navy-800'
-                        }`}>
-                          {act.note}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          {act.kind !== 'note' && act.kind !== 'status' && `${meta.label} · `}
-                          {userName.get(act.created_by) ?? 'Team member'} · {formatDate(act.created_at)}
-                        </p>
-                      </div>
+                      {act.email_message_id ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleEmail(act.id)}
+                          className="flex-1 min-w-0 text-left"
+                        >
+                          <p className="text-sm font-semibold text-navy-900 break-words">
+                            {act.email_subject || '(no subject)'}
+                          </p>
+                          <p className={`text-sm text-navy-800 leading-relaxed whitespace-pre-wrap break-words mt-0.5 ${
+                            expandedEmails.has(act.id) ? '' : 'line-clamp-3'
+                          }`}>
+                            {act.note}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {act.email_direction === 'received'
+                              ? `Email from client · to ${userName.get(act.created_by) ?? 'team'}`
+                              : `Email sent by ${userName.get(act.created_by) ?? 'team'}`}
+                            {' · '}{formatDate(act.created_at)}
+                          </p>
+                        </button>
+                      ) : (
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                            act.kind === 'status' ? 'text-gray-500' : 'text-navy-800'
+                          }`}>
+                            {act.note}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {act.kind !== 'note' && act.kind !== 'status' && `${meta.label} · `}
+                            {userName.get(act.created_by) ?? 'Team member'} · {formatDate(act.created_at)}
+                          </p>
+                        </div>
+                      )}
                       {canRemove && (
                         <button
                           onClick={() => deleteActivity(act)}
