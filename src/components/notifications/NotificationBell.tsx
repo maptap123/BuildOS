@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 import type { Notification } from '@/types'
@@ -28,7 +28,20 @@ export function NotificationBell({ variant = 'light' }: Props) {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const panelId = useId()
+  const [position, setPosition] = useState({ left: 0, top: 0 })
+
+  function positionPanel() {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const width = Math.min(320, window.innerWidth * 0.9)
+    setPosition({
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+      top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 120)),
+    })
+  }
 
   async function load() {
     try {
@@ -49,12 +62,15 @@ export function NotificationBell({ variant = 'light' }: Props) {
   }, [])
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    if (!open) return
+    window.addEventListener('resize', positionPanel)
+    // Capture scrolls from the horizontal nav as well as the page.
+    window.addEventListener('scroll', positionPanel, true)
+    return () => {
+      window.removeEventListener('resize', positionPanel)
+      window.removeEventListener('scroll', positionPanel, true)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  }, [open])
 
   async function markAllRead() {
     setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })))
@@ -67,7 +83,7 @@ export function NotificationBell({ variant = 'light' }: Props) {
   }
 
   async function handleItemClick(n: Notification) {
-    setOpen(false)
+    panelRef.current?.hidePopover()
     if (!n.read_at) {
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)))
       setUnreadCount((c) => Math.max(0, c - 1))
@@ -83,9 +99,13 @@ export function NotificationBell({ variant = 'light' }: Props) {
   const iconColor = variant === 'dark' ? 'text-[#4d6a9a] hover:text-white' : 'text-gray-500 hover:text-navy-900'
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={buttonRef}
+        onClick={positionPanel}
+        popoverTarget={panelId}
+        aria-controls={panelId}
+        aria-expanded={open}
         className={`relative p-1 transition-colors ${iconColor}`}
         aria-label="Notifications"
       >
@@ -97,8 +117,18 @@ export function NotificationBell({ variant = 'light' }: Props) {
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-w-[90vw] bg-white border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+      {/* The browser top layer escapes the scrolling nav's clipping and every
+          application stacking context (including sheets and Fixer windows).
+          Auto popovers also provide outside-click and Escape dismissal. */}
+        <div
+          ref={panelRef}
+          id={panelId}
+          popover="auto"
+          onToggle={(event) => setOpen(event.currentTarget.matches(':popover-open'))}
+          aria-label="Notifications"
+          className="fixed w-80 max-w-[90vw] bg-white border border-border rounded-xl shadow-lg overflow-hidden"
+          style={{ inset: 'auto', margin: 0, left: position.left, top: position.top }}
+        >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
             <span className="text-sm font-semibold text-navy-900">Notifications</span>
             {unreadCount > 0 && (
@@ -108,7 +138,7 @@ export function NotificationBell({ variant = 'light' }: Props) {
             )}
           </div>
 
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto" style={{ maxHeight: `min(24rem, calc(100dvh - ${position.top + 64}px))` }}>
             {notifications.length === 0 && (
               <p className="text-center text-sm text-gray-400 py-8">No notifications yet.</p>
             )}
@@ -132,7 +162,6 @@ export function NotificationBell({ variant = 'light' }: Props) {
             ))}
           </div>
         </div>
-      )}
     </div>
   )
 }
