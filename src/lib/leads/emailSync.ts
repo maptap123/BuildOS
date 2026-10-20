@@ -93,10 +93,29 @@ async function graphList(path: string, maxPages: number): Promise<GraphMessage[]
   return out
 }
 
-/** A mailbox that isn't on Exchange Online (or was deleted) — skip it, don't fail the sync. */
-function isMissingMailbox(e: unknown): boolean {
+/**
+ * A mailbox to skip rather than fail the sync on: not on Exchange Online, or
+ * denied — an Exchange application access policy can scope the app to some
+ * mailboxes, and the rest answer 403.
+ */
+function isSkippableMailbox(e: unknown): boolean {
   const err = e as { status?: number; code?: string }
-  return err.status === 404 || err.code === 'MailboxNotEnabledForRESTAPI' || err.code === 'ResourceNotFound'
+  return err.status === 403 || err.status === 404 || err.code === 'MailboxNotEnabledForRESTAPI' || err.code === 'ResourceNotFound'
+}
+
+/** Remembers why mailboxes were skipped, so a sync where every mailbox was denied still reports it. */
+class SkipTracker {
+  private denied = 0
+  private reachable = 0
+  private lastDenied: unknown
+  ok() { this.reachable++ }
+  skip(e: unknown) {
+    if ((e as { status?: number }).status === 403) { this.denied++; this.lastDenied = e }
+  }
+  /** An error only when no mailbox could be read and at least one was denied. */
+  error(): string | undefined {
+    return this.reachable === 0 && this.denied > 0 ? describeGraphError(this.lastDenied) : undefined
+  }
 }
 
 function describeGraphError(e: unknown): string {
@@ -174,6 +193,7 @@ export async function syncLeadEmails(admin: Admin, lead: SyncLead): Promise<Sync
 
   const mailboxes = await listMailboxes(admin)
   const rows: Row[] = []
+  const skips = new SkipTracker()
 
   try {
     for (const owner of mailboxes) {
@@ -187,9 +207,11 @@ export async function syncLeadEmails(admin: Admin, lead: SyncLead): Promise<Sync
             2,
           )
         } catch (e) {
-          if (isMissingMailbox(e)) break
-          throw e
+          if (!isSkippableMailbox(e)) throw e
+          skips.skip(e)
+          break
         }
+        if (client === clientAddrs[0]) skips.ok()
         for (const msg of messages) {
           if (belongsToLead(msg, lead, clientAddrs)) rows.push(toRow(msg, lead, clientAddrs, owner))
         }
@@ -198,6 +220,8 @@ export async function syncLeadEmails(admin: Admin, lead: SyncLead): Promise<Sync
   } catch (e) {
     return { added: [], error: describeGraphError(e) }
   }
+  const skipError = skips.error()
+  if (skipError) return { added: [], error: skipError }
 
   const added = await insertRows(admin, rows)
   await admin.from('leads').update({ emails_synced_at: new Date().toISOString() }).eq('id', lead.id)
@@ -229,6 +253,7 @@ export async function syncRecentLeadEmails(admin: Admin, days = 2): Promise<{ ad
   const mailboxes = await listMailboxes(admin)
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   const rows: Row[] = []
+  const skips = new SkipTracker()
 
   try {
     for (const owner of mailboxes) {
@@ -239,9 +264,11 @@ export async function syncRecentLeadEmails(admin: Admin, days = 2): Promise<{ ad
           20,
         )
       } catch (e) {
-        if (isMissingMailbox(e)) continue
-        throw e
+        if (!isSkippableMailbox(e)) throw e
+        skips.skip(e)
+        continue
       }
+      skips.ok()
       for (const msg of messages) {
         const people = new Set([msg.from, ...(msg.toRecipients ?? []), ...(msg.ccRecipients ?? [])].map(addr))
         const leadsHit = new Set<SyncLead>()
@@ -257,5 +284,5 @@ export async function syncRecentLeadEmails(admin: Admin, days = 2): Promise<{ ad
   }
 
   const added = await insertRows(admin, rows)
-  return { added: added.length, mailboxes: mailboxes.length }
+  return { added: added.length, mailboxes: mailboxes.length, error: skips.error() }
 }
