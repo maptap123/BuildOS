@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { syncHistoricalLines } from '@/lib/estimates/historicalLines'
 import {
   listSharePointFolderContents,
   listSharePointFolderContentsByUrl,
@@ -167,8 +168,8 @@ async function syncOneFile(args: {
     return { file: item.name, status: 'imported', lines: parsed.lines.length, total: round2(parsed.totalCost) }
   }
 
-  // Upsert the parent record, then replace its lines. Lines cascade on delete, so
-  // re-syncing a changed file cannot leave stale rows behind.
+  // Upsert the parent record, then sync its lines in place (see historicalLines.ts) so
+  // re-syncing a changed file neither leaves stale rows nor drops Fixer's citations.
   const { data: saved, error: upsertErr } = await admin
     .from('historical_estimates')
     .upsert({
@@ -196,34 +197,11 @@ async function syncOneFile(args: {
     return { file: item.name, status: 'error', reason: upsertErr?.message ?? 'upsert failed' }
   }
 
-  await admin.from('historical_estimate_lines').delete().eq('historical_estimate_id', saved.id)
-
-  const rows = parsed.lines.map(l => ({
-    historical_estimate_id: saved.id,
-    job_id:         job.id,
-    row_number:     l.row_number,
-    cost_code:      l.cost_code,
-    division_num:   l.division_num,
-    division_name:  l.division_name,
-    cost_type:      l.cost_type,
-    area:           l.area,
-    description:    l.description,
-    uom:            l.uom,
-    quantity:       l.quantity,
-    unit_cost:      l.unit_cost,
-    total_cost:     round2(l.total_cost),
-    markup_pct:     l.markup_pct,
-    internal_notes: l.internal_notes,
-  }))
-
-  // Chunked so a large workbook does not exceed the request size limit.
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await admin.from('historical_estimate_lines').insert(rows.slice(i, i + 500))
-    if (error) return { file: item.name, status: 'error', reason: error.message }
-  }
+  const lineErr = await syncHistoricalLines(admin, saved.id, job.id, parsed.lines)
+  if (lineErr) return { file: item.name, status: 'error', reason: lineErr }
 
   existingByItem.set(item.id, { id: saved.id, file_modified_at: modified })
-  return { file: item.name, status: 'imported', lines: rows.length, total: round2(parsed.totalCost) }
+  return { file: item.name, status: 'imported', lines: parsed.lines.length, total: round2(parsed.totalCost) }
 }
 
 async function recordQuarantine(

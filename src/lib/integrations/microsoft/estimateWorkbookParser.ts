@@ -335,9 +335,15 @@ function parseDetailed(rows: unknown[][], headerIndex: number, columns: ColumnMa
     const row = rows[i] ?? []
     if (row.every(c => c === null || c === undefined || String(c).trim() === '')) continue
 
-    const description = cell(row, columns.description)
     const rowCost     = num(row, columns.totalCost)
     const rowPrice    = num(row, columns.totalPrice)
+    const cost_code   = tidyCostCode(cell(row, columns.costCode))
+
+    // A priced line whose Description cell was left blank is still a line item (Kinnett's
+    // $4,500 plumbing rough-in, Ison's $4,000 mini-split). Fall back to its note, which
+    // estimators use as the line's heading, then to the bare cost code.
+    const description = cell(row, columns.description)
+      || (cost_code && rowCost ? cell(row, columns.notes) || cost_code : '')
 
     // Area banners ("  Bath 1") and division banners ("02", "  Site Preparation") carry
     // text but no money. They organise the sheet; they are not line items.
@@ -349,7 +355,6 @@ function parseDetailed(rows: unknown[][], headerIndex: number, columns: ColumnMa
     const area          = cell(row, columns.phase) || null
     const division_num  = cell(row, columns.divNum) || null
     const division_name = cell(row, columns.divisionName) || null
-    const cost_code     = tidyCostCode(cell(row, columns.costCode))
     const uom           = (cell(row, columns.uom) || UOM_FALLBACK).toUpperCase()
 
     // Quantity of 0 would make every derived unit cost infinite; treat it as a single unit.

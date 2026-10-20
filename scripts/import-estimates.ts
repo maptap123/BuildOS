@@ -12,7 +12,9 @@
  * are still imported and still usable as comparables — they just show their own title
  * instead of a job name.
  *
- * Safe to re-run: rows are upserted on the estimating system's own estimate id.
+ * Safe to re-run: rows are upserted on the estimating system's own estimate id, lines are
+ * updated in place (Fixer cites them by id), and links set by hand (job_match_method
+ * 'manual') are kept over the name matcher.
  *
  * Usage
  * -----
@@ -29,6 +31,7 @@ import {
   EmptyEstimateError,
   type ParsedEstimate,
 } from '../src/lib/integrations/microsoft/estimateWorkbookParser'
+import { syncHistoricalLines } from '../src/lib/estimates/historicalLines'
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 const envFile = path.resolve(__dirname, '../.env.local')
@@ -143,6 +146,14 @@ async function main() {
   if (jobsErr) { console.error('Failed to load jobs:', jobsErr.message); process.exit(1) }
   console.log(`Loaded ${jobs!.length} jobs for name matching\n`)
 
+  // A link someone set by hand (job_match_method 'manual') beats the name matcher.
+  const { data: prior, error: priorErr } = await db
+    .from('historical_estimates')
+    .select('estimate_ref, job_id')
+    .eq('job_match_method', 'manual')
+  if (priorErr) { console.error('Failed to load manual links:', priorErr.message); process.exit(1) }
+  const manualLinks = new Map((prior ?? []).map(p => [p.estimate_ref as string, p.job_id as string | null]))
+
   const stats = {
     imported: 0, empty: 0, quarantined: 0, errored: 0,
     lines: 0, cost: 0, matched: 0,
@@ -163,8 +174,13 @@ async function main() {
       continue
     }
 
-    const { job, method, confidence } = matchJob(parsed, file, jobs as Job[])
-    if (job) { stats.matched++; byMethod[method!] = (byMethod[method!] ?? 0) + 1 }
+    const ref = parsed.meta.estimate_ref
+    const manual = ref != null && manualLinks.has(ref)
+    const auto = matchJob(parsed, file, jobs as Job[])
+    const jobId: string | null = manual ? manualLinks.get(ref!)! : auto.job?.id ?? null
+    const method: string | null = manual ? 'manual' : auto.method
+    const confidence = manual ? 1 : auto.confidence
+    if (jobId) { stats.matched++; byMethod[method!] = (byMethod[method!] ?? 0) + 1 }
     else unmatched.push(parsed.meta.title ?? file)
 
     stats.imported++
@@ -176,7 +192,7 @@ async function main() {
     const { data: saved, error: upsertErr } = await db
       .from('historical_estimates')
       .upsert({
-        job_id:       job?.id ?? null,
+        job_id:       jobId,
         source_kind:  'import',
         layout:       parsed.layout,
         drive_id:     null,
@@ -208,31 +224,8 @@ async function main() {
       continue
     }
 
-    // Replace lines wholesale so a re-import of a revised file leaves nothing stale.
-    await db.from('historical_estimate_lines').delete().eq('historical_estimate_id', saved.id)
-
-    const rows = parsed.lines.map(l => ({
-      historical_estimate_id: saved.id,
-      job_id:         job?.id ?? null,
-      row_number:     l.row_number,
-      cost_code:      l.cost_code,
-      division_num:   l.division_num,
-      division_name:  l.division_name,
-      cost_type:      l.cost_type,
-      area:           l.area,
-      description:    l.description,
-      uom:            l.uom,
-      quantity:       l.quantity,
-      unit_cost:      l.unit_cost,
-      total_cost:     l.total_cost,
-      markup_pct:     l.markup_pct,
-      internal_notes: l.internal_notes,
-    }))
-
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error } = await db.from('historical_estimate_lines').insert(rows.slice(i, i + 500))
-      if (error) { console.log(`  LINE ERROR   ${file} :: ${error.message}`); break }
-    }
+    const lineErr = await syncHistoricalLines(db, saved.id, jobId, parsed.lines)
+    if (lineErr) console.log(`  LINE ERROR   ${file} :: ${lineErr}`)
   }
 
   console.log('\n─── Summary ───────────────────────────────')
