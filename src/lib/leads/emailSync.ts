@@ -286,3 +286,30 @@ export async function syncRecentLeadEmails(admin: Admin, days = 2): Promise<{ ad
   const added = await insertRows(admin, rows)
   return { added: added.length, mailboxes: mailboxes.length, error: skips.error() }
 }
+
+// ─── Opening a synced email ──────────────────────────────────────────────────
+
+export function isTeamMailbox(email: string | null | undefined): boolean {
+  return Boolean(email && MAILBOX_DOMAINS.includes(email.split('@')[1]?.toLowerCase()))
+}
+
+export interface FullMessage {
+  subject?: string | null
+  from?: GraphAddress
+  toRecipients?: GraphAddress[]
+  ccRecipients?: GraphAddress[]
+  sentDateTime?: string
+  body?: { contentType?: string; content?: string }
+  /** Outlook on the web link — opens only for the owner of the mailbox it came from. */
+  webLink?: string
+}
+
+/** Finds one message in a mailbox by its RFC 822 Message-ID, or null when it isn't there. */
+export async function findMessage(mailbox: string, internetMessageId: string, select: string): Promise<FullMessage | null> {
+  const id = internetMessageId.replace(/'/g, "''")
+  const filter = encodeURIComponent(`internetMessageId eq '${id}'`)
+  const res = await graphFetch(`/users/${encodeURIComponent(mailbox)}/messages?$filter=${filter}&$select=${select}&$top=1`)
+  if (!res.ok) return null
+  const json = await res.json() as { value?: FullMessage[] }
+  return json.value?.[0] ?? null
+}

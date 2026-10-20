@@ -743,26 +743,37 @@ export function LeadDetailClient({
                         <Icon size={13} />
                       </div>
                       {act.email_message_id ? (
-                        <button
-                          type="button"
-                          onClick={() => toggleEmail(act.id)}
-                          className="flex-1 min-w-0 text-left"
-                        >
-                          <p className="text-sm font-semibold text-navy-900 break-words">
-                            {act.email_subject || '(no subject)'}
-                          </p>
-                          <p className={`text-sm text-navy-800 leading-relaxed whitespace-pre-wrap break-words mt-0.5 ${
-                            expandedEmails.has(act.id) ? '' : 'line-clamp-3'
-                          }`}>
-                            {act.note}
-                          </p>
+                        <div className="flex-1 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleEmail(act.id)}
+                            className="block w-full text-left"
+                          >
+                            <p className="text-sm font-semibold text-navy-900 break-words">
+                              {act.email_subject || '(no subject)'}
+                            </p>
+                            <p className={`text-sm text-navy-800 leading-relaxed whitespace-pre-wrap break-words mt-0.5 ${
+                              expandedEmails.has(act.id) ? '' : 'line-clamp-3'
+                            }`}>
+                              {act.note}
+                            </p>
+                          </button>
                           <p className="text-[11px] text-gray-400 mt-0.5">
                             {act.email_direction === 'received'
                               ? `Email from client · to ${userName.get(act.created_by) ?? 'team'}`
                               : `Email sent by ${userName.get(act.created_by) ?? 'team'}`}
                             {' · '}{formatDate(act.created_at)}
+                            {' · '}
+                            <a
+                              href={`/api/leads/${lead.id}/emails/${act.id}/open`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 font-medium text-blue-600 hover:underline"
+                            >
+                              Open email <ExternalLink size={10} />
+                            </a>
                           </p>
-                        </button>
+                        </div>
                       ) : (
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${
