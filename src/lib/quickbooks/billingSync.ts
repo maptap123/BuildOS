@@ -16,7 +16,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadTokens, refreshTokenIfNeeded, getQBClient } from '@/lib/quickbooks/client'
-import { fetchAll, loadJobMap, type TxnChange } from '@/lib/quickbooks/costSync'
+import { fetchAll, loadJobMap, type JobMap, type TxnChange } from '@/lib/quickbooks/costSync'
 
 const DOC_ENTITIES = ['Invoice', 'SalesReceipt', 'CreditMemo', 'RefundReceipt'] as const
 export const BILLING_ENTITIES: readonly string[] = [...DOC_ENTITIES, 'Payment']
@@ -51,8 +51,8 @@ type Row = {
 
 const keyOf = (r: Pick<Row, 'qb_txn_type' | 'qb_txn_id' | 'job_id'>) => `${r.qb_txn_type}|${r.qb_txn_id}|${r.job_id}`
 
-function docRow(entity: string, d: QBDoc, jobMap: Map<string, string>): Row | null {
-  const jobId = d.CustomerRef ? jobMap.get(d.CustomerRef.value) : undefined
+function docRow(entity: string, d: QBDoc, jobMap: JobMap): Row | null {
+  const jobId = d.CustomerRef ? jobMap(d.CustomerRef.value, d.TxnDate) : undefined
   if (!jobId || !Number(d.TotalAmt)) return null
   const desc = (d.Line ?? []).map((l) => l.Description?.trim()).filter(Boolean).join(' · ')
   return {
@@ -76,7 +76,7 @@ function docRow(entity: string, d: QBDoc, jobMap: Map<string, string>): Row | nu
  * QB invoice id to its BuildOS job. Unapplied money stays on the payment's own
  * customer's job. Credit-memo-only applications carry no cash and are dropped.
  */
-function paymentRows(p: QBDoc & { UnappliedAmt?: number }, jobMap: Map<string, string>, invoiceJob: Map<string, string>): Row[] {
+function paymentRows(p: QBDoc & { UnappliedAmt?: number }, jobMap: JobMap, invoiceJob: Map<string, string>): Row[] {
   const cash = Number(p.TotalAmt ?? 0)
   if (!cash) return []
 
@@ -90,7 +90,7 @@ function paymentRows(p: QBDoc & { UnappliedAmt?: number }, jobMap: Map<string, s
     perJob.set(jobId, cur)
   }
 
-  const ownJob = p.CustomerRef ? jobMap.get(p.CustomerRef.value) : undefined
+  const ownJob = p.CustomerRef ? jobMap(p.CustomerRef.value, p.TxnDate) : undefined
   let applied = 0
   for (const line of p.Line ?? []) {
     const inv = line.LinkedTxn?.find((t) => t.TxnType === 'Invoice')
@@ -149,7 +149,7 @@ export async function syncQuickBooksBilling(admin: SupabaseClient): Promise<Bill
     documents[entity] = docs.length
     for (const d of docs) {
       if (entity === 'Invoice' && d.CustomerRef) {
-        const j = jobMap.get(d.CustomerRef.value)
+        const j = jobMap(d.CustomerRef.value, d.TxnDate)
         if (j) invoiceJob.set(d.Id, j)
       }
       const r = docRow(entity, d, jobMap)
@@ -210,8 +210,11 @@ export async function syncQuickBooksBillingTransactions(admin: SupabaseClient, c
         const inv = line.LinkedTxn?.find((t) => t.TxnType === 'Invoice')
         if (!inv || invoiceJob.has(inv.TxnId)) continue
         const { data } = await admin.from('job_billing').select('job_id').eq('qb_txn_type', 'Invoice').eq('qb_txn_id', inv.TxnId).maybeSingle()
-        const jobId = data?.job_id ?? (await read('Invoice', inv.TxnId))?.CustomerRef?.value
-        const resolved = data?.job_id ?? (jobId ? jobMap.get(jobId) : undefined)
+        let resolved: string | undefined = data?.job_id
+        if (!resolved) {
+          const invoice = await read('Invoice', inv.TxnId)
+          if (invoice?.CustomerRef) resolved = jobMap(invoice.CustomerRef.value, invoice.TxnDate)
+        }
         if (resolved) invoiceJob.set(inv.TxnId, resolved)
       }
       rows = paymentRows(doc, jobMap, invoiceJob)

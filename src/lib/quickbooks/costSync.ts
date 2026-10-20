@@ -71,12 +71,30 @@ export async function fetchAll<T = QBTxn>(qbFetch: (path: string) => Promise<Res
   }
 }
 
-/** QB customer id → BuildOS job id, from jobs.qb_customer_id plus every linked job_external_links row. */
-export async function loadJobMap(admin: SupabaseClient): Promise<Map<string, string>> {
-  const map = new Map<string, string>()
-  const { data: jobs, error: jobsErr } = await admin.from('jobs').select('id, qb_customer_id').not('qb_customer_id', 'is', null)
+/** (QB customer id, transaction date) → BuildOS job id, or undefined if the transaction doesn't belong to a linked job. */
+export type JobMap = (customerId: string, txnDate: string) => string | undefined
+
+/**
+ * A job only claims transactions dated up to this many days before it was
+ * created. Repeat clients are often linked at the parent QB customer, which
+ * carries their whole history (some back to 2003); without a floor every old
+ * invoice and bill lands on their newest job. Real early costs (deposits,
+ * long-lead materials) run at most ~4 months ahead of job creation.
+ */
+const PRE_JOB_DAYS = 180
+
+/** From jobs.qb_customer_id plus every linked job_external_links row. */
+export async function loadJobMap(admin: SupabaseClient): Promise<JobMap> {
+  const byCustomer = new Map<string, string>()
+  const floor = new Map<string, string>()
+  const { data: jobs, error: jobsErr } = await admin.from('jobs').select('id, qb_customer_id, created_at')
   if (jobsErr) throw new Error(`Failed to load jobs: ${jobsErr.message}`)
-  for (const j of jobs ?? []) map.set(j.qb_customer_id as string, j.id as string)
+  for (const j of jobs ?? []) {
+    if (j.qb_customer_id) byCustomer.set(j.qb_customer_id as string, j.id as string)
+    const d = new Date(j.created_at as string)
+    d.setUTCDate(d.getUTCDate() - PRE_JOB_DAYS)
+    floor.set(j.id as string, d.toISOString().slice(0, 10))
+  }
 
   const { data: links, error: linksErr } = await admin
     .from('job_external_links')
@@ -84,8 +102,14 @@ export async function loadJobMap(admin: SupabaseClient): Promise<Map<string, str
     .eq('provider', 'quickbooks')
     .eq('status', 'linked')
   if (linksErr) throw new Error(`Failed to load QB job links: ${linksErr.message}`)
-  for (const l of links ?? []) if (!map.has(l.external_id)) map.set(l.external_id, l.job_id)
-  return map
+  for (const l of links ?? []) if (!byCustomer.has(l.external_id)) byCustomer.set(l.external_id, l.job_id)
+
+  return (customerId, txnDate) => {
+    const jobId = byCustomer.get(customerId)
+    if (!jobId) return undefined
+    const min = floor.get(jobId)
+    return min && txnDate < min ? undefined : jobId
+  }
 }
 
 /** created_by is required; attribute synced costs to the migration/system user, else whoever connected QB. */
@@ -102,7 +126,7 @@ function key(type: string, txnId: string, lineId: string) {
 }
 
 /** actuals rows for one QB transaction: one per line tagged to a linked job. */
-function txnRows(entity: Entity, t: QBTxn, jobMap: Map<string, string>, createdBy: string): Record<string, unknown>[] {
+function txnRows(entity: Entity, t: QBTxn, jobMap: JobMap, createdBy: string): Record<string, unknown>[] {
   // Vendor credits and Purchase refunds reduce job cost.
   const sign = entity === 'VendorCredit' || (entity === 'Purchase' && t.Credit) ? -1 : 1
   const status = entity === 'Bill' && Number(t.Balance ?? 0) > 0 ? 'approved' : 'paid'
@@ -110,7 +134,7 @@ function txnRows(entity: Entity, t: QBTxn, jobMap: Map<string, string>, createdB
 
   for (const line of t.Line ?? []) {
     const d = (line[line.DetailType] ?? {}) as LineDetail
-    const jobId = d.CustomerRef ? jobMap.get(d.CustomerRef.value) : undefined
+    const jobId = d.CustomerRef ? jobMap(d.CustomerRef.value, t.TxnDate) : undefined
     if (!jobId || !line.Id || !line.Amount) continue
 
     const item = d.ItemRef?.name ?? d.AccountRef?.name ?? null
