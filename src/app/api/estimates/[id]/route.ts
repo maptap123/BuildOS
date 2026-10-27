@@ -128,8 +128,8 @@ export async function DELETE(_request: Request, { params }: Params) {
   }
 
   // Do not cascade review/chat history or detach linked job allowances.
-  for (const table of ['chat_messages', 'estimate_line_proposals']) {
-    const { data: refs, error } = await admin.from(table).select('id').eq('estimate_id', id).limit(1)
+  for (const table of ['chat_messages', 'estimate_line_proposals', 'estimate_proposal_sessions']) {
+    const { data: refs, error } = await admin.from(table).select('estimate_id').eq('estimate_id', id).limit(1)
     if (error) return NextResponse.json({ error: 'History check failed' }, { status: 500 })
     if (refs?.length) return NextResponse.json({ error: 'This estimate has conversation or review history and cannot be deleted.' }, { status: 422 })
   }
@@ -140,11 +140,9 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (error) return NextResponse.json({ error: 'Allowance check failed' }, { status: 500 })
     if (allowances?.length) return NextResponse.json({ error: 'This estimate has linked allowances and cannot be deleted.' }, { status: 422 })
   }
-  // Cross-table checks above are conservative preflight checks, not a transaction.
-  // A concurrent budget import/history insert can still race deletion. A future
-  // database RPC/trigger must coordinate those writers for strict serialization.
-  // Atomic delete: conditions mirror the guard so a concurrent lock/approval between
-  // the pre-check and the delete cannot silently bypass the protection.
+  // Preflight provides specific messages. The database RESTRICT foreign keys
+  // atomically preserve concurrent budget imports, history, and allowance links.
+  // These predicates also reject concurrent lifecycle changes without deleting.
   const { data: deleted, error: delErr } = await admin
     .from('estimates')
     .delete()
@@ -158,7 +156,15 @@ export async function DELETE(_request: Request, { params }: Params) {
     .is('client_response_note', null)
     .select('id')
 
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+  if (delErr) {
+    if (['23503', '23514', '40001', '40P01', '55P03'].includes(delErr.code)) {
+      return NextResponse.json(
+        { error: 'This estimate is protected or changed while deleting. Refresh and review its budget, history, allowances, and current state.' },
+        { status: 409 },
+      )
+    }
+    return NextResponse.json({ error: 'Failed to delete estimate. Please try again.' }, { status: 500 })
+  }
   if (!deleted || deleted.length === 0) {
     // The state changed between our pre-check and the delete (concurrent lock/approval).
     return NextResponse.json({ error: 'Estimate state changed — refresh and try again.' }, { status: 409 })

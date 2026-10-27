@@ -80,10 +80,10 @@ class Query {
     return { data: this.result()[0] ?? null, error: null }
   }
   // Called when route uses `await admin.from(...).select()...` as a Promise
-  then<T>(resolve: (r: { data: Row[]; error: null | { message: string } }) => T) {
+  then<T>(resolve: (r: { data: Row[]; error: null | { message: string; code?: string } }) => T) {
     if (this._isDelete) {
       if (this.state.deleteQueryError) {
-        return Promise.resolve(resolve({ data: null as unknown as Row[], error: { message: 'delete failed' } }))
+        return Promise.resolve(resolve({ data: null as unknown as Row[], error: { message: 'delete failed', code: this.state.deleteErrorCode } }))
       }
       if (this.state.deleteRowCount !== undefined) {
         const fakeRows = Array.from({ length: this.state.deleteRowCount }, () => ({ id: 'del' }))
@@ -104,6 +104,7 @@ interface State {
   permQueryError: boolean
   estimateQueryError: boolean
   deleteQueryError: boolean
+  deleteErrorCode?: string
   deleteRowCount: number | undefined
 }
 
@@ -391,6 +392,21 @@ async function main() {
   await test('422 - preserve linked allowance', async () => {
     const s = makeState(); s.tables.estimate_lines = [{id:'line-1',estimate_id:EID}]
     s.tables.allowances = [{id:'allowance-1',estimate_line_id:'line-1'}]; setup(s)
+    assert.equal((await DEL(EID)).status, 422)
+  })
+  for (const code of ['23503', '23514', '40001', '40P01', '55P03']) {
+    await test(`409 - concurrent database protection (${code}) is understandable`, async () => {
+      const s = makeState({deleteQueryError: true, deleteErrorCode: code}); setup(s)
+      const res = await DEL(EID)
+      assert.equal(res.status, 409)
+      const body = await res.json()
+      assert.match(body.error, /refresh/i)
+      assert.ok(!body.error.includes('delete failed'))
+      assert.equal(s.tables.estimates.length, 1)
+    })
+  }
+  await test('422 - preserve proposal session history', async () => {
+    const s = makeState(); s.tables.estimate_proposal_sessions = [{estimate_id:EID}]; setup(s)
     assert.equal((await DEL(EID)).status, 422)
   })
   console.log('')
