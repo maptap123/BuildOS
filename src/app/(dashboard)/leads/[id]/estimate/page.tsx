@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { EstimateBuilderClient } from '@/components/estimates'
+import { resolveDeletePermission } from '@/lib/estimates/deleteGuard'
 import type { Lead, Estimate, EstimateLine } from '@/types'
 
 export const metadata = { title: 'Estimate Builder — BuildOS' }
@@ -19,22 +20,29 @@ export default async function LeadEstimatePage({
 
   const admin = createAdminClient()
 
-  const [{ data: estimatePerm }, { data: budgetPerm }, { data: lead, error: leadErr }] = await Promise.all([
+  // maybeSingle() distinguishes absent rows (null, no error) from DB errors,
+  // which is critical for resolveDeletePermission (row-present governs).
+  const [
+    { data: estimatePerm },
+    { data: budgetPerm },
+    { data: lead, error: leadErr },
+  ] = await Promise.all([
     admin
       .from('user_permissions')
       .select('can_view, can_create, can_edit, can_delete')
       .eq('user_id', user.id)
       .eq('module', 'estimates')
-      .single(),
+      .maybeSingle(),
     admin
       .from('user_permissions')
       .select('can_view, can_create, can_edit, can_delete')
       .eq('user_id', user.id)
       .eq('module', 'budget')
-      .single(),
+      .maybeSingle(),
     admin.from('leads').select('*').eq('id', id).single(),
   ])
 
+  // For non-delete ops: prefer estimates module if enrolled, else fall back to budget
   const perm = estimatePerm?.can_view ? estimatePerm : budgetPerm
 
   if (!estimatePerm?.can_view && !budgetPerm?.can_view) {
@@ -46,6 +54,13 @@ export default async function LeadEstimatePage({
   }
 
   if (leadErr || !lead) notFound()
+
+  // For delete: estimates row present governs exclusively; absent → budget fallback.
+  // Both paths require can_view AND can_delete.
+  const canDelete = resolveDeletePermission(
+    estimatePerm ? { can_view: estimatePerm.can_view, can_delete: estimatePerm.can_delete } : null,
+    budgetPerm   ? { can_view: budgetPerm.can_view,   can_delete: budgetPerm.can_delete   } : null,
+  )
 
   // Load existing estimates for this lead
   const { data: estimates } = await admin
@@ -73,7 +88,7 @@ export default async function LeadEstimatePage({
       permissions={{
         can_create: perm?.can_create ?? false,
         can_edit:   perm?.can_edit ?? false,
-        can_delete: perm?.can_delete ?? false,
+        can_delete: canDelete,
       }}
     />
   )

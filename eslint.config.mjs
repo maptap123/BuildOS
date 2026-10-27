@@ -22,6 +22,8 @@ const eslintConfig = defineConfig([
     ".bootstrap-stage-*/**",
     "bt-export/**",
     "tmp_althoff_logs_pages/**",
+    // Generated test artefacts (esbuild bundles, Playwright fixtures)
+    ".playwright-mcp/**",
   ]),
 ]);
 

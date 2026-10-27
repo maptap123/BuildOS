@@ -4,7 +4,8 @@ import { FileText, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ImportEstimateButton } from '@/components/budget/ImportEstimateButton'
-import { StartEstimateButton } from '@/components/estimates'
+import { StartEstimateButton, DeleteEstimateButton } from '@/components/estimates'
+import { resolveDeletePermission } from '@/lib/estimates/deleteGuard'
 import type { Estimate, EstimateLine } from '@/types'
 
 const fmtCurrency = (n: number) =>
@@ -35,9 +36,10 @@ export default async function JobEstimatesPage({
 
   const admin = createAdminClient()
 
+  // maybeSingle() for permission rows: absent row = null (no error), needed by resolveDeletePermission
   const [{ data: estimatePerm }, { data: budgetPerm }, { data: job }] = await Promise.all([
-    admin.from('user_permissions').select('can_view, can_create').eq('user_id', user.id).eq('module', 'estimates').single(),
-    admin.from('user_permissions').select('can_view, can_create').eq('user_id', user.id).eq('module', 'budget').single(),
+    admin.from('user_permissions').select('can_view, can_create, can_delete').eq('user_id', user.id).eq('module', 'estimates').maybeSingle(),
+    admin.from('user_permissions').select('can_view, can_create, can_delete').eq('user_id', user.id).eq('module', 'budget').maybeSingle(),
     admin.from('jobs').select('id, lead_id, name').eq('id', id).single(),
   ])
 
@@ -75,6 +77,10 @@ export default async function JobEstimatesPage({
 
   const estimateList = (estimates ?? []) as Estimate[]
   const canCreate = budgetPerm?.can_create ?? false
+  const canDelete = resolveDeletePermission(
+    estimatePerm ? { can_view: estimatePerm.can_view, can_delete: estimatePerm.can_delete ?? false } : null,
+    budgetPerm   ? { can_view: budgetPerm.can_view,   can_delete: budgetPerm.can_delete   ?? false } : null,
+  )
 
   return (
     <div className="space-y-4">
@@ -151,6 +157,9 @@ export default async function JobEstimatesPage({
                       estimate={estimate}
                       lineCount={lines.length}
                     />
+                  )}
+                  {canDelete && estimate.status === 'draft' && !estimate.is_locked && (
+                    <DeleteEstimateButton estimate={estimate} />
                   )}
                 </div>
               </div>

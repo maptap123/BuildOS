@@ -28,6 +28,7 @@ import { CostCatalogSearch } from './CostCatalogSearch'
 import { EstimateLineRow, EstimateLineCard } from './EstimateLineRow'
 import { EstimateTotals } from './EstimateTotals'
 import { EstimateFixerPanel } from './EstimateFixerPanel'
+import { DeleteEstimateButton } from './DeleteEstimateButton'
 import { comparePhases, divisionPhase, UNASSIGNED_PHASE } from '@/lib/estimates/divisions'
 import type { Lead, Estimate, EstimateLine, CostCatalogItem, EstimateStatus } from '@/types'
 import {
@@ -236,6 +237,9 @@ export function EstimateBuilderClient({
   const linesRef          = useRef(lines)
   const dirtyLinesRef     = useRef(dirtyLines)
   const activeEstimateRef = useRef(activeEstimate)
+  // Monotonically increasing token; a load only applies if its token equals the
+  // current ref when the response arrives, preventing stale async loads.
+  const loadSeqRef        = useRef(0)
   useEffect(() => { linesRef.current = lines },           [lines])
   useEffect(() => { dirtyLinesRef.current = dirtyLines }, [dirtyLines])
   useEffect(() => { activeEstimateRef.current = activeEstimate }, [activeEstimate])
@@ -287,15 +291,57 @@ export function EstimateBuilderClient({
   const reloadLines = useCallback(async () => {
     const est = activeEstimateRef.current
     if (!est) return
+    const seq = loadSeqRef.current
     try {
       const res = await fetch(`/api/estimate-lines?estimate_id=${est.id}`)
       if (!res.ok) return
-      setLines(await res.json())
+      const loaded: EstimateLine[] = await res.json()
+      if (loadSeqRef.current !== seq || activeEstimateRef.current?.id !== est.id) return
+      setLines(loaded)
       setDirtyLines(new Set())
     } catch {
       // Leave what is on screen; the next edit or save will reconcile.
     }
   }, [])
+
+  // ── Load lines with stale-response protection ──────────────────
+  async function loadLinesFor(est: Estimate, seq: number) {
+    try {
+      const res = await fetch(`/api/estimate-lines?estimate_id=${est.id}`)
+      // Discard if another load started while this one was in flight
+      if (loadSeqRef.current !== seq) return
+      if (!res.ok) throw new Error('Failed to load lines')
+      const loaded: EstimateLine[] = await res.json()
+      if (loadSeqRef.current !== seq || activeEstimateRef.current?.id !== est.id) return
+      setLines(loaded)
+      setDirtyLines(new Set())
+    } catch (e) {
+      if (loadSeqRef.current !== seq) return
+      setError(e instanceof Error ? e.message : 'Failed to load estimate lines')
+    }
+  }
+
+  // ── Delete estimate ────────────────────────────────────────────
+  function handleEstimateDeleted(deletedId: string) {
+    const remaining = estimates.filter(e => e.id !== deletedId)
+    setEstimates(remaining)
+    if (activeEstimateRef.current?.id === deletedId) {
+      ++loadSeqRef.current
+      const next = remaining[0] ?? null
+      // Sync the ref immediately so autosave does not flush lines for a deleted estimate
+      activeEstimateRef.current = next
+      // Clear dirty refs right away to stop any queued autosave for deleted lines
+      dirtyLinesRef.current = new Set()
+      setActiveEstimate(next)
+      setLines([])
+      setDirtyLines(new Set())
+      setScopeText(next?.scope_text ?? '')
+      if (next) {
+        const seq = ++loadSeqRef.current
+        loadLinesFor(next, seq)
+      }
+    }
+  }
 
   // ── Create a new estimate ──────────────────────────────────────
   async function createEstimate() {
@@ -312,6 +358,9 @@ export function EstimateBuilderClient({
         throw new Error(b.error ?? 'Failed to create estimate')
       }
       const est: Estimate = await res.json()
+      ++loadSeqRef.current
+      activeEstimateRef.current = est
+      dirtyLinesRef.current = new Set()
       setEstimates(prev => [est, ...prev])
       setActiveEstimate(est)
       setLines([])
@@ -326,17 +375,18 @@ export function EstimateBuilderClient({
 
   // ── Switch active estimate ─────────────────────────────────────
   async function switchEstimate(est: Estimate) {
+    // Sync the ref immediately so autosave uses the new estimate even if the
+    // React state update is batched — prevents writing to the previous estimate.
+    activeEstimateRef.current = est
+    dirtyLinesRef.current = new Set()
+    linesRef.current = []
+    setLines([])
+    setDirtyLines(new Set())
     setActiveEstimate(est)
     setScopeText(est.scope_text ?? '')
     setError(null)
-    try {
-      const res = await fetch(`/api/estimate-lines?estimate_id=${est.id}`)
-      if (!res.ok) throw new Error('Failed to load lines')
-      setLines(await res.json())
-      setDirtyLines(new Set())
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load estimate lines')
-    }
+    const seq = ++loadSeqRef.current
+    await loadLinesFor(est, seq)
   }
 
   // ── Add line from cost catalog ─────────────────────────────────
@@ -799,23 +849,34 @@ export function EstimateBuilderClient({
 
       {/* Estimate version tabs */}
       {estimates.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1 flex-wrap items-center">
           {estimates.map(est => (
-            <button
-              key={est.id}
-              onClick={() => switchEstimate(est)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                activeEstimate?.id === est.id
-                  ? 'bg-navy-900 text-white'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}
-            >
-              <FileText size={11} />
-              {est.title ?? `Estimate v${est.version}`}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_STYLES[est.status as EstimateStatus]}`}>
-                {est.status}
-              </span>
-            </button>
+            <div key={est.id} className="flex items-center gap-0.5">
+              <button
+                onClick={() => switchEstimate(est)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeEstimate?.id === est.id
+                    ? 'bg-navy-900 text-white'
+                    : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                <FileText size={11} />
+                {est.title ?? `Estimate v${est.version}`}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_STYLES[est.status as EstimateStatus]}`}>
+                  {est.status}
+                </span>
+              </button>
+              {permissions.can_delete && est.status === 'draft' && !est.is_locked && (
+                <DeleteEstimateButton
+                  estimate={est}
+                  onDeleted={handleEstimateDeleted}
+                  disabled={
+                    est.id === activeEstimate?.id &&
+                    (saving || scopeSaving || proposalSettingsSaving || creating || addingAssembly !== null || dirtyLines.size > 0)
+                  }
+                />
+              )}
+            </div>
           ))}
         </div>
       )}
