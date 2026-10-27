@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Job } from '@/types'
 
 interface UseJobsOptions {
@@ -14,8 +14,13 @@ export function useJobs({ statuses, search, tags, manager_id }: UseJobsOptions =
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Filters often change right after mount (saved defaults load async), so an
+  // older, slower unfiltered fetch can land after the filtered one. Only the
+  // latest request is allowed to write state.
+  const latestRequest = useRef(0)
 
   const fetchJobs = useCallback(async () => {
+    const requestId = ++latestRequest.current
     setLoading(true)
     setError(null)
 
@@ -32,11 +37,14 @@ export function useJobs({ statuses, search, tags, manager_id }: UseJobsOptions =
         throw new Error(body.error ?? `Request failed (${res.status})`)
       }
 
-      setJobs(await res.json())
+      const data = await res.json()
+      if (requestId !== latestRequest.current) return
+      setJobs(data)
     } catch (e) {
+      if (requestId !== latestRequest.current) return
       setError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
-      setLoading(false)
+      if (requestId === latestRequest.current) setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statuses?.join(','), search, tags?.join(','), manager_id])

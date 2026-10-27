@@ -18,7 +18,7 @@ export default async function TimeClockPage() {
 
   const [
     { data: myEntries },
-    { data: activeJobs },
+    { data: jobs },
     { data: myUser },
     { data: adminPerm },
     { data: timePerm },
@@ -31,11 +31,10 @@ export default async function TimeClockPage() {
       .or(`clock_in.gte.${recentFrom},clock_out.is.null`)
       .order('clock_in', { ascending: false }),
 
-    // Active / presale jobs crew can clock into
+    // Every job — the picker lists active ones and finds the rest by search
     admin
       .from('jobs')
       .select('id, name, job_number, status, client_name')
-      .in('status', ['active', 'presale'])
       .order('name', { ascending: true }),
 
     // User profile for name + rate display
@@ -74,7 +73,7 @@ export default async function TimeClockPage() {
       currentUserId={user.id}
       currentUser={myUser ?? null}
       initialEntries={myEntries ?? []}
-      activeJobs={activeJobs ?? []}
+      jobs={jobs ?? []}
       isAdmin={isAdmin}
     />
   )

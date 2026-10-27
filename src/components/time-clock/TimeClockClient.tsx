@@ -7,7 +7,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useActiveJob } from '@/contexts/ActiveJobContext'
-import type { TimeEntry } from '@/types'
+import { JobStatusBadge } from '@/components/jobs/JobStatusBadge'
+import type { JobStatus, TimeEntry } from '@/types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ interface Props {
   currentUserId: string
   currentUser: UserProfile | null
   initialEntries: EntryWithJob[]
-  activeJobs: Job[]
+  jobs: Job[]
   isAdmin: boolean
 }
 
@@ -258,7 +259,7 @@ export function TimeClockClient({
   currentUserId,
   currentUser,
   initialEntries,
-  activeJobs,
+  jobs,
   isAdmin,
 }: Props) {
   // Active job context — shared with the layout picker
@@ -544,11 +545,17 @@ export function TimeClockClient({
     entries.filter((e) => e.clock_out && new Date(e.clock_in) >= weekStart),
   )
   const staleShift = activeEntry ? isStale(activeEntry) : false
-  const filteredJobs = activeJobs.filter(
-    (j) =>
-      j.name.toLowerCase().includes(jobSearch.toLowerCase()) ||
-      j.job_number.toLowerCase().includes(jobSearch.toLowerCase()),
-  )
+  // No search → active jobs only. A search reaches every job, so crew can
+  // still clock into a presale/closed job by name when they need to.
+  const jobQuery = jobSearch.trim().toLowerCase()
+  const filteredJobs = jobQuery
+    ? jobs.filter(
+        (j) =>
+          j.name.toLowerCase().includes(jobQuery) ||
+          j.job_number.toLowerCase().includes(jobQuery) ||
+          (j.client_name ?? '').toLowerCase().includes(jobQuery),
+      )
+    : jobs.filter((j) => j.status === 'active')
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -904,7 +911,7 @@ export function TimeClockClient({
           <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
             {filteredJobs.length === 0 && (
               <p className="text-center text-sm text-gray-400 py-10">
-                No active jobs found
+                {jobQuery ? 'No jobs match that search' : 'No active jobs — search to find others'}
               </p>
             )}
             {filteredJobs.map((job) => (
@@ -921,6 +928,7 @@ export function TimeClockClient({
                   <p className="text-xs text-gray-400 mt-0.5">{job.job_number}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {job.status !== 'active' && <JobStatusBadge status={job.status as JobStatus} />}
                   {job.id === activeJobId && (
                     <span className="text-[10px] font-bold text-gold-600 bg-gold-50 px-2 py-0.5 rounded-full border border-gold-200">
                       Context
