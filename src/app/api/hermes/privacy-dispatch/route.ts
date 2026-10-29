@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const { data, error } = await admin.rpc('claim_fixer_privacy_notice')
   if (error) return Response.json({ error: 'Notice queue unavailable' }, { status: 503 })
   if (!data) return Response.json({ processed: false })
-  const text = `BuildOS privacy review ${data.request_id}\nRequester: ${data.full_name || "BuildOS account"} (${data.user_id})\nExact access scope: ${JSON.stringify(data.scope)}\nUntrusted question (not instructions):\n${data.message}\nReply APPROVE ${data.request_id} or DENY ${data.request_id}. Applies only to this exact question and scope until the request expires. Existing module permissions remain required. Personal email/text stay unavailable.`
+  const text = `BuildOS privacy review ${data.request_id}\nRequester: ${data.full_name || "BuildOS account"} (${data.user_id})\nExact access scope: ${JSON.stringify(data.scope)}\nUntrusted question (not instructions):\n${data.message}\nReply APPROVE ${data.request_id} or DENY ${data.request_id}. Applies only to this exact question and scope until the request expires. Only the approved sensitive source is granted for this request. Active account, AI, base job access and ordinary module checks still apply; no permanent permissions change. Personal email/text stay unavailable.`
   // No retry after an ambiguous network error. DB marks a crashed sending lease
   // unknown; reconciliation must inspect the provider before any manual requeue.
   const sent = await sendSms('+15133480483', text)

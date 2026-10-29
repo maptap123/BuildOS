@@ -5,12 +5,12 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
 async function main() {
- const state = { user: { id: '10000000-0000-4000-8000-000000000001' } as {id:string}|null, active: true, ai: true, calls: 0, rpcCalls: [] as Record<string,unknown>[] }
+ const state = { user: { id: '10000000-0000-4000-8000-000000000001' } as {id:string}|null, active: true, ai: true, calls: 0, rpcError: null as null|{message:string}, rpcCalls: [] as Record<string,unknown>[] }
  ;(globalThis as unknown as {privacyState: typeof state}).privacyState = state
  const output = await build({entryPoints:['src/app/api/hermes/chat/route.ts'],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',plugins:[{name:'isolated-dependencies',setup(b){
  b.onResolve({filter:/lib\/supabase\/(admin|server)$/},a=>({path:a.path.endsWith('/server')?'server':'admin',namespace:'fixture'}))
  b.onResolve({filter:/lib\/hermes\/agent$/},()=>({path:'agent',namespace:'fixture'}))
- b.onLoad({filter:/.*/,namespace:'fixture'},a=>({loader:'js',contents:a.path==='server'?`export async function createClient(){return {auth:{getUser:async()=>({data:{user:globalThis.privacyState.user}})}}}`:a.path==='agent'?`export async function* hermesStream(){globalThis.privacyState.calls++;yield {type:'delta',text:'SECRET'};yield {type:'done',conversationId:'test'}}`:`export function createAdminClient(){return {rpc:async(name,args)=>{globalThis.privacyState.rpcCalls.push({name,...args});return {data:{id:args.p_id,status:'queued',sms_enabled:false},error:null}},from(table){let q={select(){return q},eq(){return q},single:async()=>({data:table==='users'?{is_active:globalThis.privacyState.active}:{can_view:globalThis.privacyState.ai},error:null})};return q}}}`}))
+ b.onLoad({filter:/.*/,namespace:'fixture'},a=>({loader:'js',contents:a.path==='server'?`export async function createClient(){return {auth:{getUser:async()=>({data:{user:globalThis.privacyState.user}})}}}`:a.path==='agent'?`export async function* hermesStream(){globalThis.privacyState.calls++;yield {type:'delta',text:'SECRET'};yield {type:'done',conversationId:'test'}}`:`export function createAdminClient(){return {rpc:async(name,args)=>{globalThis.privacyState.rpcCalls.push({name,...args});return {data:{id:args.p_id,status:'queued',sms_enabled:false},error:globalThis.privacyState.rpcError}},from(table){let q={select(){return q},eq(){return q},single:async()=>({data:table==='users'?{is_active:globalThis.privacyState.active}:{can_view:globalThis.privacyState.ai},error:null})};return q}}}`}))
  }}]})
  await mkdir('.playwright-mcp',{recursive:true})
  const file=resolve('.playwright-mcp/privacy-chat-tests.cjs');await writeFile(file,output.outputFiles[0].text)
@@ -28,6 +28,7 @@ async function main() {
  assert.equal(state.rpcCalls[0].name,'enqueue_fixer_employee_request')
  assert.match(queuedText,/saved/i);assert.match(queuedText,/You can close the app/i);assert.match(queuedText,/\"type\":\"queued\"/);assert.match(queuedText,/\"smsEnabled\":false/);assert.match(queuedText,/requestId/);assert.doesNotMatch(queuedText,/SECRET/)
  assert.equal(state.calls,0)
+ state.rpcError={message:'Name exactly one employee by full name for compensation access.'};const missing=await POST(req());assert.equal(missing.status,422);assert.match(await missing.text(),/Name exactly one employee/);state.rpcError=null
  delete process.env.FIXER_PRIVACY_REVIEW_ENABLED
  state.user=null;assert.equal((await POST(req())).status,401)
  state.user={id:'10000000-0000-4000-8000-000000000001'};state.active=false

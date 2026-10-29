@@ -21,6 +21,9 @@ export async function POST(request: Request) {
   const { data, error } = await guard.admin.rpc('enqueue_fixer_employee_request', {
     p_id: retryId ?? randomUUID(), p_user: guard.user.id, p_message: body.message.trim(), p_conversation: body.conversationId ?? null,
   })
+  if (error && ['Name exactly one employee by full name for compensation access.', 'Name the job for financial access.'].includes(error.message)) {
+    return Response.json({ error: error.message }, { status: 422 })
+  }
   if (error || !data) return Response.json({ error: 'Could not save your question. Please try again.' }, { status: 503 })
   const { data: profile } = await guard.admin.from('users').select('phone').eq('id', guard.user.id).single()
   const smsEnabled = isTwilioConfigured() && !!normalizePhone(profile?.phone) && !!data.sms_enabled

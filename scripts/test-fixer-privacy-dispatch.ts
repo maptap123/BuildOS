@@ -20,6 +20,7 @@ async function main(){
  assert.equal((await POST(req(process.env.FIXER_PRIVACY_DISPATCH_KEY))).status,200)
  assert.equal(state.sms.length,1);assert.equal(state.sms[0].to,'+15133480483')
  assert.match(state.sms[0].body,/APPROVE 20000000/);assert.match(state.sms[0].body,/Question/);assert.match(state.sms[0].body,/Employee Name/);assert.match(state.sms[0].body,/employee-id/);assert.match(state.sms[0].body,/exact-job/);assert.doesNotMatch(state.sms[0].body,/not enabled yet/)
+ assert.doesNotMatch(state.sms[0].body,/Existing module permissions remain required/);assert.match(state.sms[0].body,/Only the approved sensitive source/);
  assert.deepEqual(state.calls.at(-1),{name:'finish_fixer_privacy_notice',p_id:'20000000-0000-4000-8000-000000000001',p_lease:'lease',p_sid:'SMsent'})
  state.ok=false;assert.equal((await POST(req(process.env.FIXER_PRIVACY_DISPATCH_KEY))).status,200)
  assert.equal(state.calls.at(-1)?.p_sid,null,'Ambiguous provider failure must not be reported delivered or retried automatically')

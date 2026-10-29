@@ -13,12 +13,12 @@ async function main() {
  create table users(id uuid primary key,is_active boolean,phone text,full_name text);
  create table user_permissions(user_id uuid,module text,can_view boolean,can_manage boolean default false);
  insert into users values('${user}',true,'+15135550123','Synthetic employee'),('${owner}',true,'+15133480483','Synthetic owner');
- insert into user_permissions values('${user}','ai',true,false),('${user}','jobs',true,false),('${user}','budget',true,false),('${owner}','admin',true,true);
+ insert into user_permissions values('${user}','ai',true,false),('${user}','jobs',true,false),('${owner}','admin',true,true);
  create table jobs(id uuid primary key,name text,job_number text,status text,site_address text,start_date date,target_completion_date date,contract_amount numeric);
  insert into jobs values('${job}','Synthetic fixture job','TEST','active','Synthetic site',null,null,99999);
  create table budget_lines(id uuid,job_id uuid,revised_budget numeric,committed_cost numeric,forecast_cost numeric);
  insert into budget_lines values('${job}','${job}',100,10,110);`)
- for (const migration of ['20261028120000_fixer_privacy_review.sql','20261028130000_fixer_private_worker.sql']) await db.exec(await readFile('supabase/migrations/'+migration,'utf8'))
+ for (const migration of ['20261028120000_fixer_privacy_review.sql','20261028130000_fixer_private_worker.sql','20261029100000_fixer_request_scoped_sensitive_grants.sql']) await db.exec(await readFile('supabase/migrations/'+migration,'utf8'))
  await db.exec(`insert into fixer_privacy_settings values(true,'${owner}')`)
  const rpcArgs:Record<string,string[]> = {
  enqueue_fixer_employee_request:['p_id','p_user','p_message','p_conversation'],list_fixer_employee_requests:['p_user'],claim_fixer_employee_request:[],
@@ -71,7 +71,7 @@ async function main() {
  assert.equal(financial.status,200);assert.equal((await financial.json()).data[0].revised_budget,100)
  await post('privacy-worker',{action:'complete',id:approved.id,lease:approved.lease_token,text:'Synthetic approved financial answer'},'w'.repeat(32))
  await post('privacy-delivery',{},'d'.repeat(32));assert.equal(sent.length,2);assert.doesNotMatch(sent[1].body,/financial answer/)
- await db.exec(`update user_permissions set can_view=false where user_id='${user}' and module='budget'`)
+ await db.exec(`update user_permissions set can_view=false where user_id='${user}' and module='jobs'`)
  const revoked=await (await routes['privacy-requests'].GET!()).json();assert.equal(revoked.find((r:{id:string})=>r.id===approved.id).result,undefined)
  state.user=owner
  assert.deepEqual(await (await routes['privacy-requests'].GET!()).json(),{error:'Active user and AI access required'})

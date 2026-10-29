@@ -21,6 +21,7 @@ async function main(){
  const next=await readFile('supabase/migrations/20261028130000_fixer_private_worker.sql','utf8').catch(()=> '')
  await db.exec(`insert into fixer_privacy_requests(id,user_id,phone,message,status) values('20000000-0000-4000-8000-000000000000','${u}','+15135550123','Legacy held question','approved_waiting_for_secure_worker')`)
  await db.exec(next)
+ await db.exec(await readFile('supabase/migrations/20261029100000_fixer_request_scoped_sensitive_grants.sql','utf8'))
  assert.equal((await db.query<{status:string}>(`select status from fixer_privacy_requests where id='20000000-0000-4000-8000-000000000000'`)).rows[0].status,'expired')
  const q=await db.query<{r:{status:string,sms_enabled:boolean}}>(`select enqueue_fixer_employee_request($1,$2,$3,$4) r`,[id,u,'What is scheduled?',null])
  assert.equal(q.rows[0].r.status,'queued','Ordinary questions must run without phone onboarding')
@@ -44,7 +45,6 @@ async function main(){
 
  await db.exec(`update user_permissions set can_view=true where user_id='${u}' and module='jobs';
  insert into fixer_privacy_settings values(true,'${o}');
- insert into user_permissions values('${u}','budget',true,false);
  insert into budget_lines values('${id}','${id}',123,10,130);`)
  const f='20000000-0000-4000-8000-000000000002'
  assert.equal((await db.query<{r:{status:string}}>('select enqueue_fixer_employee_request($1,$2,$3,$4) r',[f,u,'What is the Test job budget?',null])).rows[0].r.status,'held')
@@ -57,7 +57,7 @@ async function main(){
  assert.equal(financial.rows[0].r.id,f)
  const fl=financial.rows[0].r.lease_token
  const money=await db.query<{r:{data:Array<{revised_budget:number}>}}>('select read_fixer_employee_tool($1,$2,$3,$4) r',[f,fl,'read_job_finance',{job_id:id}])
- assert.equal(money.rows[0].r.data[0].revised_budget,123)
+ assert.ok(money.rows[0].r.data,'Exact owner-approved job finance must work without budget permission');assert.equal(money.rows[0].r.data[0].revised_budget,123)
  assert.equal((await db.query<{n:number}>(`select count(*)::integer n from fixer_employee_reads where request_id=$1 and allowed`,[f])).rows[0].n,1,'Sensitive retrieval has a private durable per-request audit')
  const blocked=await db.query<{r:{error:string}}>('select read_fixer_employee_tool($1,$2,$3,$4) r',[f,fl,'read_personal_email',{}])
  assert.equal(blocked.rows[0].r.error,'held','Even approved requests cannot access personal sources')
@@ -113,7 +113,7 @@ async function main(){
  const cp='20000000-0000-4000-8000-000000000005'
  await db.exec(`alter table users add column hourly_rate numeric, add column overtime_rate numeric;
  update users set hourly_rate=21,overtime_rate=31 where id='${o}';
- insert into user_permissions values('${u}','admin',true,true);`)
+`)
  await db.query('select enqueue_fixer_employee_request($1,$2,$3,$4)',[cp,u,'What is August hourly compensation?',null])
  await db.query('select decide_fixer_privacy_request($1,$2,$3,$4)',[cp,'+15133480483',true,'SM'+'d'.repeat(32)])
  const cj=(await db.query<{r:{id:string,lease_token:string}}>('select claim_fixer_employee_request() r')).rows[0].r
@@ -154,7 +154,7 @@ async function main(){
  const nm=(await db.query<{r:{id:string,lease_token:string}}>('select claim_fixer_employee_request() r')).rows[0].r
  assert.equal(nm.id,noManage)
  const nr=(await db.query<{r:{error?:string,data?:unknown}}>('select read_fixer_employee_tool($1,$2,$3,$4) r',[noManage,nm.lease_token,'read_compensation',{person_id:o}])).rows[0].r
- assert.equal(nr.error,'held');assert.equal(nr.data,undefined,'Admin view without admin manage is not authorized to read pay, even after approval')
+ assert.equal(nr.error,undefined);assert.ok(nr.data,'Exact owner approval does not require permanent admin manage')
 
  await db.exec(`update user_permissions set can_manage=false where user_id='${o}' and module='admin'`)
  const ownerRevoked=(await db.query<{r:Array<{id:string,result?:string}>}>('select list_fixer_employee_requests($1) r',[u])).rows[0].r
