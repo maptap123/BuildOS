@@ -1156,7 +1156,8 @@ async function authenticateAgentRequest(
   if (!user) {
     return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
-  return { user }
+  // Browser research must use the request-scoped employee queue, never broad tools.
+  return { response: NextResponse.json({ error: 'Use a scoped Fixer request; direct browser tool access is disabled' }, { status: 403 }) }
 }
 
 function safeTokenEqual(value: string, expected: string) {

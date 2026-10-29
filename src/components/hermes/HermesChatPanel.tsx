@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, Loader2, Bot, Mic, Square } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSpeechInput } from '@/hooks/useSpeechInput'
-import { useFixerChat, formatElapsed } from '@/hooks/useFixerChat'
+import { formatElapsed } from '@/hooks/useFixerChat'
+import { useDurableFixerChat } from '@/hooks/useDurableFixerChat'
 import { OPEN_FIXER_EVENT, type OpenFixerDetail } from '@/lib/hermes/openFixer'
 
 function extractJobId(pathname: string): string | undefined {
@@ -19,6 +20,17 @@ const QUICK_PROMPTS = [
   "Show me the budget snapshot",
   "What's scheduled this week?",
 ]
+
+const RESEARCH_STATUS: Record<string, string> = {
+  queued: 'Research queued.',
+  running: 'Research in progress.',
+  held: 'I need August’s approval before I can share that.',
+  completed: 'Research complete. Your answer is saved below.',
+  denied: 'August did not approve this request.',
+  expired: 'This request expired. Please ask again.',
+  failed: 'Research failed. Please try again.',
+  cancelled: 'This request was cancelled.',
+}
 
 // Always-visible chips above the input (Klutch-style)
 const PERSISTENT_CHIPS = [
@@ -44,10 +56,10 @@ export function HermesChatPanel() {
     setTimeout(() => setOpen(false), 400)
   }, [router])
 
-  // The conversation itself lives in the hook — this component is the floating chrome
-  // around it. The Estimate Builder's panel uses the same hook with estimate context.
-  const { messages, input, setInput, loading, elapsedMs, send, stop } = useFixerChat({
+  // General research is durable; estimate editing keeps its separate worker panel.
+  const { messages, requests, input, setInput, loading, elapsedMs, send, stop, ready } = useDurableFixerChat({
     jobId,
+    active: open,
     onNavigate: handleNavigate,
   })
 
@@ -108,7 +120,6 @@ export function HermesChatPanel() {
   }
 
   function handleClose() {
-    stop()
     setOpen(false)
   }
 
@@ -152,6 +163,8 @@ export function HermesChatPanel() {
           ${open ? 'translate-y-0 opacity-100' : 'translate-y-full md:translate-y-4 opacity-0 pointer-events-none'}
         `}
         role="dialog"
+        aria-hidden={!open}
+        inert={!open}
         aria-label="Fixer AI Chat"
       >
         {/* Header */}
@@ -187,6 +200,7 @@ export function HermesChatPanel() {
                 {QUICK_PROMPTS.map(prompt => (
                   <button
                     key={prompt}
+                    disabled={loading || !ready}
                     onClick={() => send(prompt)}
                     className="text-left text-xs px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:border-gold-400 hover:text-navy-900 transition-colors"
                   >
@@ -195,6 +209,18 @@ export function HermesChatPanel() {
                 ))}
               </div>
             </div>
+          )}
+
+          {requests.length > 0 && (
+            <section aria-label="Saved research" aria-live="polite" className="space-y-2 text-xs text-navy-900">
+              <p className="font-semibold">Saved research</p>
+              {requests.map((request, index) => (
+                <div key={request.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="font-medium">Research {index + 1}</p>
+                  <p>{RESEARCH_STATUS[request.status] ?? 'Checking research status…'}</p>
+                </div>
+              ))}
+            </section>
           )}
 
           {messages.map((msg, i) => (
@@ -238,7 +264,7 @@ export function HermesChatPanel() {
             <button
               key={chip}
               onClick={() => send(chip)}
-              disabled={loading}
+              disabled={loading || !ready}
               className="shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full border border-gold-300 text-navy-700 bg-gold-50 hover:bg-gold-100 disabled:opacity-40 transition-colors"
             >
               {chip}
@@ -256,7 +282,7 @@ export function HermesChatPanel() {
               onKeyDown={handleKeyDown}
               placeholder="Ask Fixer…"
               rows={1}
-              disabled={loading}
+              disabled={loading || !ready}
               className="flex-1 bg-transparent text-sm text-navy-900 placeholder-gray-400 resize-none outline-none max-h-32 leading-5 py-0.5 disabled:opacity-50"
               style={{ height: 'auto' }}
               onInput={e => {
@@ -290,7 +316,7 @@ export function HermesChatPanel() {
             ) : (
               <button
                 onClick={() => send(input)}
-                disabled={!input.trim()}
+                disabled={!ready || !input.trim()}
                 className="w-7 h-7 rounded-lg bg-gold-500 hover:bg-gold-600 text-navy-900 flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 aria-label="Send message"
               >
