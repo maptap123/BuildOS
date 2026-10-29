@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PasswordInput } from '@/components/auth/PasswordInput'
 
 type Stage = 'checking' | 'ready' | 'saving' | 'expired'
 
@@ -169,7 +170,7 @@ export function WelcomeClient() {
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8">
           {stage === 'checking' && (
             <>
-              <h2 className="font-display text-xl font-bold text-navy-900 mb-1">Checking your invite…</h2>
+              <h2 className="font-display text-xl font-bold text-navy-900 mb-1">Checking your link…</h2>
               <p className="text-sm text-gray-500">One moment.</p>
             </>
           )}
@@ -200,14 +201,12 @@ export function WelcomeClient() {
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
                     New password
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     required
                     autoComplete="new-password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="At least 8 characters"
-                    className="w-full border border-border rounded-lg px-3.5 py-2.5 text-sm text-navy-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent"
                   />
                 </div>
 
@@ -215,14 +214,12 @@ export function WelcomeClient() {
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
                     Confirm password
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     required
                     autoComplete="new-password"
                     value={confirm}
                     onChange={e => setConfirm(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full border border-border rounded-lg px-3.5 py-2.5 text-sm text-navy-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-transparent"
                   />
                 </div>
 

@@ -28,6 +28,7 @@ export default async function ConfirmPage({
     type?: string
     code?: string
     next?: string
+    flow?: string
     error?: string
     error_description?: string
   }>
@@ -40,6 +41,7 @@ export default async function ConfirmPage({
       type={params.type ?? null}
       code={params.code ?? null}
       next={params.next ?? null}
+      isReset={params.flow === 'reset' || params.type === 'recovery'}
       upstreamError={params.error_description ?? params.error ?? null}
     />
   )

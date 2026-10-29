@@ -4,6 +4,7 @@ interface Props {
   code: string | null
   next: string | null
   upstreamError: string | null
+  isReset: boolean
 }
 
 /**
@@ -13,7 +14,7 @@ interface Props {
  * auto-submits, and no fetch on mount. Anything that would redeem the invite
  * without a person deciding to defeats the point of the page.
  */
-export function ConfirmForm({ tokenHash, type, code, next, upstreamError }: Props) {
+export function ConfirmForm({ tokenHash, type, code, next, upstreamError, isReset }: Props) {
   const hasToken = Boolean(tokenHash && type) || Boolean(code)
 
   return (
@@ -36,7 +37,7 @@ export function ConfirmForm({ tokenHash, type, code, next, upstreamError }: Prop
                 {upstreamError
                   ? 'The link came through damaged or has already been used.'
                   : 'It looks like only part of the link was copied across.'}{' '}
-                Ask the JDC office to send you a new one.
+                {isReset ? 'Request a new reset link from the sign-in page.' : 'Ask the JDC office to send you a new one.'}
               </p>
               <a
                 href="/login"
@@ -48,10 +49,10 @@ export function ConfirmForm({ tokenHash, type, code, next, upstreamError }: Prop
           ) : (
             <>
               <h2 className="font-display text-xl font-bold text-navy-900 mb-1">
-                You&apos;re invited to BuildOS
+                {isReset ? 'Reset your password' : <>You&apos;re invited to BuildOS</>}
               </h2>
               <p className="text-sm text-gray-500 mb-6">
-                Tap continue and pick a password. It takes about a minute.
+                {isReset ? 'Tap continue and pick a new password.' : 'Tap continue and pick a password. It takes about a minute.'}
               </p>
 
               <form action="/auth/confirm/verify" method="POST">
