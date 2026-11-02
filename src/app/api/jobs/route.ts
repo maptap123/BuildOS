@@ -33,7 +33,8 @@ export async function GET(request: Request) {
 
   const canSeeBudget = budgetPerm?.can_view ?? false
 
-  let query = admin.from('jobs').select('*').order('created_at', { ascending: false })
+  // Every job list in the app (sidebar, picker, dashboard, modals) reads this — keep it A→Z
+  let query = admin.from('jobs').select('*').order('name', { ascending: true })
   if (statusValues.length > 0) {
     query = query.in('status', statusValues)
   } else {
