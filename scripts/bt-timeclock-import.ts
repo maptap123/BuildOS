@@ -163,11 +163,24 @@ async function resolveUser(shift: BTShift): Promise<string | null> {
   if (userByName.has(shift.name))   return userByName.get(shift.name)!
 
   // 1. Check existing BuildOS user by full_name match
-  const { data: existing } = await supabase
+  // Not .maybeSingle(): with two matching accounts it returns an error and
+  // null data, which used to fall through to "create user" -- that made a
+  // third "Cane Jenkins" on 2026-11-02 and filed his shifts under it. Prefer
+  // the account that already owns shifts; refuse to guess otherwise.
+  const { data: matches, error: lookupErr } = await supabase
     .from('users')
-    .select('id, full_name')
+    .select('id, full_name, time_entries(count)')
     .ilike('full_name', shift.name)
-    .maybeSingle()
+  if (lookupErr) throw new Error(`User lookup for "${shift.name}": ${lookupErr.message}`)
+
+  let existing = matches?.[0] ?? null
+  if (matches && matches.length > 1) {
+    const withShifts = matches.filter(m => ((m.time_entries as unknown as Array<{ count: number }>)?.[0]?.count ?? 0) > 0)
+    if (withShifts.length !== 1) {
+      throw new Error(`"${shift.name}" matches ${matches.length} BuildOS users (${matches.map(m => m.id).join(', ')}) -- resolve by hand`)
+    }
+    existing = withShifts[0]
+  }
 
   if (existing) {
     userByBtId.set(shift.userID, existing.id)
@@ -531,7 +544,11 @@ async function main() {
 
       console.log(`── Page ${pageNum} / ${gridData.totalPages} (${gridData.data.length} shifts) ──`)
 
+      // The grid is fetched "all time" (see fetchBtShiftsPage), so --from/--to
+      // must be applied here or they silently do nothing.
       for (const shift of gridData.data) {
+        const day = shift.timeIn.timeStamp.slice(0, 10)
+        if (day < fromDate || day > toDate) { stats.skipped++; continue }
         await importShift(shift, dryRun, stats)
       }
 

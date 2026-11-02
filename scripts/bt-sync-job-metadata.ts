@@ -174,7 +174,7 @@ async function main() {
   console.log(`Missing app jobs : ${missing.length}`);
   console.log(`Rows to update   : ${changes.length}`);
 
-  for (const change of changes.slice(0, 20)) {
+  for (const change of changes.slice(0, Number(process.env.SHOW ?? 20))) {
     console.log(`  ${change.existing.job_number} ${change.existing.name}: ${change.reasons.join(', ')}`);
   }
   if (changes.length > 20) console.log(`  ...${changes.length - 20} more`);

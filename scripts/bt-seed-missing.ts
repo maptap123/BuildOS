@@ -166,7 +166,12 @@ type ExistingLog = {
   log_date?: string;
   author_name?: string | null;
   work_performed?: string | null;
+  created_by?: string | null;
+  updated_at?: string | null;
 };
+
+// Rows touched in BuildOS on/after go-live belong to the crew; never revert them.
+const GO_LIVE = '2026-11-02';
 
 // ─── migration user ───────────────────────────────────────────────────────────
 async function getMigrationUserId(): Promise<string> {
@@ -201,7 +206,10 @@ async function seedLogs(
   // with daily_logs_bt_log_id_key. Range-paginate to actually get them all.
   const existingRows = await fetchAllRows<ExistingLog>(
     'daily_logs',
-    'id, job_id, bt_log_id, log_date, author_name, work_performed'
+    'id, job_id, bt_log_id, log_date, author_name, work_performed, created_by, updated_at'
+  );
+  const protectedIds = new Set(
+    existingRows.filter(row => row.updated_at && row.updated_at >= GO_LIVE).map(row => row.id)
   );
 
   const existingByBtLogId = new Map(
@@ -212,6 +220,9 @@ async function seedLogs(
   const legacyByKey = new Map<string, ExistingLog[]>();
   for (const row of (existingRows ?? []) as ExistingLog[]) {
     if (row.bt_log_id || !row.job_id || !row.log_date) continue;
+    // Only adopt rows the migration itself wrote -- a crew-written log that
+    // happens to match on date/author/text is theirs, not a BT orphan.
+    if (row.created_by !== createdBy) continue;
     const key = legacyLogKey({
       job_id: row.job_id,
       log_date: row.log_date,
@@ -225,7 +236,7 @@ async function seedLogs(
 
   const inserts: object[] = [];
   const updates: Array<{ id: string; row: object }> = [];
-  const skipped = 0;
+  let skipped = 0;
 
   for (const { jobId } of jobs) {
     const jobUuid = btIdToUuid.get(jobId);
@@ -253,7 +264,8 @@ async function seedLogs(
       };
 
       const existingId = existingByBtLogId.get(String(log.id));
-      if (existingId) updates.push({ id: existingId, row });
+      if (existingId && protectedIds.has(existingId)) skipped++;
+      else if (existingId) updates.push({ id: existingId, row });
       else {
         const legacyMatches = legacyByKey.get(legacyLogKey(row));
         const legacy = legacyMatches?.shift();

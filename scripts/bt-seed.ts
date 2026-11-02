@@ -168,22 +168,37 @@ async function seedJobs(jobs: BtJob[], createdBy: string): Promise<Map<number, s
     created_by: createdBy,
   }));
 
-  const btIdToUuid = new Map<number, string>();
   const BATCH = 50;
 
+  // BuildOS is the system of record for jobs now (crew live 2026-11-02), and
+  // jobs get edited there -- name, status, dates, PM. Only INSERT jobs that BT
+  // has and BuildOS doesn't; never overwrite an existing one. Status/date
+  // repair for existing jobs is bt-sync-job-metadata.ts's job, behind --apply.
+  let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const { data, error } = await supabase
       .from('jobs')
-      .upsert(batch, { onConflict: 'job_number', ignoreDuplicates: false })
-      .select('id, job_number');
-    if (error) throw new Error(`Jobs upsert batch ${i}–${i + batch.length}: ${error.message}`);
-    for (const row of data ?? []) btIdToUuid.set(parseInt(row.job_number), row.id);
-    process.stdout.write(`  ${Math.min(i + BATCH, rows.length)}/${rows.length} jobs upserted\r`);
+      .upsert(batch, { onConflict: 'job_number', ignoreDuplicates: true })
+      .select('id');
+    if (error) throw new Error(`Jobs insert batch ${i}–${i + batch.length}: ${error.message}`);
+    inserted += data?.length ?? 0;
+  }
+  console.log(`  ${inserted} new jobs inserted, ${rows.length - inserted} already present (left untouched)`);
+
+  const btIdToUuid = new Map<number, string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('jobs').select('id, job_number').range(from, from + 999);
+    if (error) throw new Error(`Jobs lookup: ${error.message}`);
+    for (const row of data ?? []) if (row.job_number) btIdToUuid.set(parseInt(row.job_number), row.id);
+    if (!data || data.length < 1000) break;
   }
 
   return btIdToUuid;
 }
+
+// Rows touched in BuildOS on/after go-live belong to the crew; never revert them.
+const GO_LIVE = '2026-11-02';
 
 // ─── schedule items ───────────────────────────────────────────────────────────
 async function seedScheduleItems(
@@ -191,7 +206,21 @@ async function seedScheduleItems(
   jobs: BtJob[],
   createdBy: string
 ): Promise<number> {
-  const items: object[] = [];
+  const existing = new Map<string, { id: string; updated_at: string }>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('schedule_items')
+      .select('id, bt_event_id, updated_at')
+      .not('bt_event_id', 'is', null)
+      .range(from, from + 999);
+    if (error) throw new Error(`Schedule lookup: ${error.message}`);
+    for (const row of data ?? []) existing.set(row.bt_event_id, row);
+    if (!data || data.length < 1000) break;
+  }
+
+  const items: Array<Record<string, unknown>> = [];
+  const updates: Array<{ id: string; row: Record<string, unknown> }> = [];
+  let protectedCount = 0;
 
   for (const job of jobs) {
     const jobUuid = btIdToUuid.get(job.jobId);
@@ -208,6 +237,18 @@ async function seedScheduleItems(
       // bt_event_id is the BuilderTrend calendar item id. Carrying it is what
       // makes this seeder re-runnable -- without it the insert below duplicated
       // every row on a second run. Requires migration 050.
+      const prior = existing.get(String(item.id));
+      if (prior) {
+        // BT only carries title + dates. Leave status, progress, assignee and
+        // sort order alone -- those are BuildOS's -- and skip rows the crew
+        // has edited since go-live.
+        if (prior.updated_at >= GO_LIVE) { protectedCount++; continue; }
+        updates.push({
+          id: prior.id,
+          row: { job_id: jobUuid, title: item.title || item.name || 'Untitled', start_date: startDate, end_date: endDate },
+        });
+        continue;
+      }
       items.push({
         job_id: jobUuid,
         bt_event_id: String(item.id),
@@ -230,8 +271,17 @@ async function seedScheduleItems(
       .upsert(batch, { onConflict: 'bt_event_id' });
     if (error) throw new Error(`Schedule items batch ${i}: ${error.message}`);
     inserted += batch.length;
-    process.stdout.write(`  ${inserted}/${items.length} schedule items upserted\r`);
+    process.stdout.write(`  ${inserted}/${items.length} schedule items inserted\r`);
   }
+
+  let changed = 0;
+  for (const { id, row } of updates) {
+    const { error } = await supabase.from('schedule_items').update(row).eq('id', id);
+    if (error) throw new Error(`Schedule item update ${id}: ${error.message}`);
+    changed++;
+    if (changed % 200 === 0) process.stdout.write(`  ${changed}/${updates.length} schedule items refreshed\r`);
+  }
+  console.log(`  ${inserted} new, ${changed} refreshed from BT, ${protectedCount} skipped (edited in BuildOS since ${GO_LIVE})`);
 
   return inserted;
 }
