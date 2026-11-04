@@ -7,7 +7,7 @@ import {
   Briefcase, DollarSign, Calendar, CheckSquare, FileText, LogOut,
   ChevronDown, ShieldCheck, Clock, Folder, Users, Target, TrendingUp,
   HardHat, BarChart3, ClipboardList,
-  Home, Grid3X3, Palette, Gauge,
+  Home, Grid3X3, Palette, Gauge, LayoutTemplate,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJob } from '@/hooks/useJob'
@@ -77,6 +77,7 @@ const DESKTOP_NAV: NavItem[] = [
     ],
   },
   { key: 'documents',  label: 'Documents',  icon: Folder      },
+  { key: 'templates',  label: 'Templates',  icon: LayoutTemplate },
   { key: 'time-clock', label: 'Time Clock', icon: Clock       },
   { key: 'admin',      label: 'Admin',      icon: ShieldCheck },
 ]
@@ -194,6 +195,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'tasks') return isAdmin() || can('tasks', 'view')
     if (key === 'logs') return isAdmin() || can('logs', 'view')
     if (key === 'documents') return isAdmin() || can('documents', 'view')
+    if (key === 'templates') return canManageOffice
     if (key === 'budget') return canViewBudget
     if (key === 'selections') return canViewBudget
     if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
@@ -223,6 +225,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'vendors')    return '/vendors'
     if (key === 'contacts')   return '/contacts'
     if (key === 'documents')  return '/documents'
+    if (key === 'templates')  return '/templates'
     if (!urlJobId && ALL_JOBS_ROUTES[key]) return ALL_JOBS_ROUTES[key]
     if (!urlJobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
     if (!urlJobId) return '/jobs'
@@ -239,6 +242,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'vendors')    return pathname.startsWith('/vendors')
     if (key === 'contacts')   return pathname.startsWith('/contacts')
     if (key === 'documents')  return pathname.startsWith('/documents')
+    if (key === 'templates')  return pathname.startsWith('/templates')
     if (!urlJobId) return key !== 'budget' && key !== 'profitability' && !!ALL_JOBS_ROUTES[key] && pathname.startsWith(ALL_JOBS_ROUTES[key])
     return pathname.startsWith(`/jobs/${urlJobId}/${key}`)
   }

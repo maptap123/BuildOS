@@ -1,10 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Download, RefreshCw, CheckCircle2, AlertTriangle, Users } from 'lucide-react'
+import { AlertCircle, Download, RefreshCw, CheckCircle2, AlertTriangle, Users, LayoutTemplate } from 'lucide-react'
 import { useSchedule } from '@/hooks/useSchedule'
 import { ScheduleList } from './ScheduleList'
 import { AddScheduleItemModal } from './AddScheduleItemModal'
+import { ApplyTemplateModal } from '@/components/templates/ApplyTemplateModal'
 import type { ScheduleItem, OutlookSyncStatus, ScheduleCrewSummary } from '@/types'
 
 interface CrewRow {
@@ -37,6 +38,7 @@ const OUTLOOK_STATUS: Record<OutlookSyncStatus, { icon: React.ReactNode; text: s
 export function ScheduleClient({ jobId, initialItems, permissions, outlookConnected = false }: Props) {
   const { items, loading, error, refresh } = useSchedule(jobId, initialItems)
   const [showAdd, setShowAdd]   = useState(false)
+  const [showTemplate, setShowTemplate] = useState(false)
   const [addDate, setAddDate]   = useState<string | null>(null)
   const [editItem, setEditItem] = useState<ScheduleItem | null>(null)
   const [syncing, setSyncing]   = useState(false)
@@ -153,6 +155,15 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
           )}
         </div>
         <div className="flex items-center gap-2">
+          {permissions.can_create && (
+            <button
+              onClick={() => setShowTemplate(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <LayoutTemplate size={12} />
+              Apply template
+            </button>
+          )}
           {totalItems > 0 && (
             <button
               onClick={handleICalExport}
@@ -202,6 +213,14 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
           onAdd={(date) => { setAddDate(date ?? null); setShowAdd(true) }}
           onEdit={handleEdit}
           onRefresh={refreshAll}
+        />
+      )}
+
+      {showTemplate && (
+        <ApplyTemplateModal
+          jobId={jobId}
+          onClose={() => setShowTemplate(false)}
+          onApplied={() => { void refreshAll() }}
         />
       )}
 

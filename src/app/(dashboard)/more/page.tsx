@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Target, DollarSign, Calendar, CheckSquare,
   FileText, Folder, Users, HardHat, BarChart3, TrendingUp,
-  Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList, Palette, Gauge,
+  Clock, ShieldCheck, LogOut, ChevronRight, ClipboardList, Palette, Gauge, LayoutTemplate,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -36,6 +36,7 @@ const SECTIONS = [
       { key: 'schedule',      label: 'Schedule',       icon: Calendar,     href: '/jobs?selectJob=schedule',      description: 'Job timeline' },
       { key: 'tasks',         label: 'Tasks',          icon: CheckSquare,  href: '/tasks',                        description: 'My tasks across all jobs' },
       { key: 'documents',     label: 'Documents',      icon: Folder,       href: '/documents',                    description: 'File center' },
+      { key: 'templates',     label: 'Templates',      icon: LayoutTemplate, href: '/templates',                  description: 'Job, lead & document templates' },
     ],
   },
   {
@@ -71,7 +72,7 @@ export default function MorePage() {
   // only office-level users (admin, or budget/finance view) ever see them —
   // crew get Today / Jobs / Log / Tasks / Clock and the field tools below.
   const isOfficeUser = isAdmin() || can('budget', 'view') || can('finance', 'view')
-  const OFFICE_ONLY = new Set(['budget', 'estimates', 'selections', 'finance', 'profitability', 'vendors', 'leads'])
+  const OFFICE_ONLY = new Set(['budget', 'estimates', 'selections', 'finance', 'profitability', 'vendors', 'leads', 'templates'])
 
   function canUseItem(key: string): boolean {
     if (key === 'owners') return can('owners', 'view') // not implied by admin
@@ -89,6 +90,7 @@ export default function MorePage() {
     if (key === 'leads') return isAdmin() || can('leads', 'view') || canManageOffice
     if (key === 'vendors') return isAdmin() || can('vendors', 'view') || canManageOffice
     if (key === 'contacts') return isAdmin() || can('contacts', 'view') || canManageOffice
+    if (key === 'templates') return canManageOffice
     if (key === 'admin') return isAdmin()
     return false
   }
