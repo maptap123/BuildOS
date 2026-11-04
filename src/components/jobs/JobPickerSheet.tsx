@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import { hrefForJob } from '@/lib/jobNav'
 import { Search, X, Star, ChevronDown, ChevronUp } from 'lucide-react'
 import { useJobs } from '@/hooks/useJobs'
 import { useTagOptions } from '@/hooks/useTagOptions'
@@ -27,6 +28,7 @@ interface Props {
 
 export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJobs }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState<JobStatus[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -294,7 +296,7 @@ export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJob
             filtered.map(job => (
               <button
                 key={job.id}
-                onClick={() => onSelect ? (onSelect(job), onClose()) : select(`/jobs/${job.id}`)}
+                onClick={() => onSelect ? (onSelect(job), onClose()) : select(hrefForJob(pathname, job.id))}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                   job.id === currentJobId ? 'bg-gold-50' : ''
                 }`}

@@ -84,6 +84,22 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86_400_000)
 }
 
+/** Local-time YYYY-MM-DD (toISOString would shift the day for US timezones). */
+function toISO(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+function shiftISO(s: string, days: number): string {
+  const d = parseDay(s)
+  d.setDate(d.getDate() + days)
+  return toISO(d)
+}
+
+type MoveFn = (item: ScheduleItem, deltaDays: number) => void
+type AddDayFn = (date: string) => void
+
 function itemBarColor(item: ScheduleItem): string {
   return item.color ?? STATUS_HEX[item.status]
 }
@@ -607,7 +623,11 @@ function GanttView({ items, jobId, crewByItem, onEdit }: GanttViewProps) {
 
 // â”€â”€â”€ WEEK VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
+function WeekView({ items, onEdit, onAddDay, onMoveItem }: {
+  items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void; onAddDay?: AddDayFn; onMoveItem?: MoveFn
+}) {
+  const grab = useRef<{ id: string; date: Date } | null>(null)
+  const [dropKey, setDropKey] = useState<string | null>(null)
   const [weekStart, setWeekStart] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
@@ -681,8 +701,22 @@ function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
           return (
             <div
               key={i}
-              className={`min-h-[130px] rounded-xl border p-2 ${
-                isToday ? 'border-gold-400 bg-gold-50/40 ring-1 ring-gold-300' : 'border-gray-100 bg-white'
+              onClick={() => onAddDay?.(toISO(day))}
+              onDragOver={e => { if (onMoveItem && grab.current) { e.preventDefault(); setDropKey(toISO(day)) } }}
+              onDragLeave={() => setDropKey(k => (k === toISO(day) ? null : k))}
+              onDrop={e => {
+                e.preventDefault()
+                setDropKey(null)
+                const g = grab.current
+                grab.current = null
+                if (!g || !onMoveItem) return
+                const it = items.find(x => x.id === g.id)
+                if (it) onMoveItem(it, daysBetween(g.date, day))
+              }}
+              className={`min-h-[130px] rounded-xl border p-2 ${onAddDay ? 'cursor-pointer' : ''} ${
+                dropKey === toISO(day)
+                  ? 'border-navy-400 bg-navy-50 ring-2 ring-navy-300'
+                  : isToday ? 'border-gold-400 bg-gold-50/40 ring-1 ring-gold-300' : 'border-gray-100 bg-white hover:bg-gray-50'
               }`}
             >
               <div className="mb-2.5">
@@ -697,7 +731,14 @@ function WeekView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Schedu
                 {dayItems.slice(0, 4).map(item => (
                   <button
                     key={item.id}
-                    onClick={() => onEdit(item)}
+                    draggable={!!onMoveItem}
+                    onDragStart={e => {
+                      grab.current = { id: item.id, date: day }
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData('text/plain', item.id)
+                    }}
+                    onDragEnd={() => { grab.current = null; setDropKey(null) }}
+                    onClick={e => { e.stopPropagation(); onEdit(item) }}
                     className="w-full text-left text-[10px] font-semibold px-1.5 py-1 rounded truncate text-white"
                     style={{ backgroundColor: itemBarColor(item) }}
                   >
@@ -753,7 +794,13 @@ const BAR_GAP = 3      // px â€” gap between bars
 const DAY_NUM_H = 24   // px â€” space for day number at top
 const WEEK_ROW_MIN = DAY_NUM_H + MAX_BAR_SLOTS * (BAR_H + BAR_GAP) + 8
 
-function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void }) {
+function MonthView({ items, onEdit, onAddDay, onMoveItem }: {
+  items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void; onAddDay?: AddDayFn; onMoveItem?: MoveFn
+}) {
+  // Which calendar day the user grabbed a (possibly multi-day) bar by, so the
+  // whole bar shifts by (drop day - grab day) and keeps its length.
+  const grab = useRef<{ id: string; date: Date } | null>(null)
+  const [dropKey, setDropKey] = useState<string | null>(null)
   const [cursor, setCursor] = useState(() => {
     const n = new Date()
     return new Date(n.getFullYear(), n.getMonth(), 1)
@@ -877,8 +924,21 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
                   return (
                     <div
                       key={dayIdx}
-                      className={`border-r border-gray-100 last:border-r-0 pt-1 px-1 ${
-                        isCurMo ? 'bg-white' : 'bg-gray-50/50'
+                      onClick={() => onAddDay?.(toISO(day))}
+                      onDragOver={e => { if (onMoveItem && grab.current) { e.preventDefault(); setDropKey(toISO(day)) } }}
+                      onDrop={e => {
+                        e.preventDefault()
+                        setDropKey(null)
+                        const g = grab.current
+                        grab.current = null
+                        if (!g || !onMoveItem) return
+                        const it = items.find(x => x.id === g.id)
+                        if (it) onMoveItem(it, daysBetween(g.date, day))
+                      }}
+                      className={`border-r border-gray-100 last:border-r-0 pt-1 px-1 ${onAddDay ? 'cursor-pointer hover:bg-gold-50/40' : ''} ${
+                        dropKey === toISO(day)
+                          ? 'bg-navy-50 ring-2 ring-inset ring-navy-300'
+                          : isCurMo ? 'bg-white' : 'bg-gray-50/50'
                       }`}
                     >
                       <div
@@ -915,9 +975,21 @@ function MonthView({ items, onEdit }: { items: ScheduleItem[]; onEdit: (i: Sched
                   return (
                     <button
                       key={item.id}
-                      onClick={() => onEdit(item)}
-                      title={`${item.title} Â· ${fmtRange(item.start_date, item.end_date)}`}
-                      className="absolute flex items-center text-white text-[10px] font-semibold hover:opacity-80 transition-opacity pointer-events-auto overflow-hidden"
+                      draggable={!!onMoveItem}
+                      onDragStart={e => {
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        const span = colEnd - colStart + 1
+                        const off = Math.max(0, Math.min(span - 1, Math.floor((e.clientX - rect.left) / (rect.width / span))))
+                        const g = new Date(weekStartDate)
+                        g.setDate(g.getDate() + colStart + off)
+                        grab.current = { id: item.id, date: g }
+                        e.dataTransfer.effectAllowed = 'move'
+                        e.dataTransfer.setData('text/plain', item.id)
+                      }}
+                      onDragEnd={() => { grab.current = null; setDropKey(null) }}
+                      onClick={e => { e.stopPropagation(); onEdit(item) }}
+                      title={`${item.title} - ${fmtRange(item.start_date, item.end_date)}`}
+                      className="absolute flex items-center text-white text-[10px] font-semibold hover:opacity-80 transition-opacity pointer-events-auto overflow-hidden cursor-grab active:cursor-grabbing"
                       style={{
                         top: slotIdx * (BAR_H + BAR_GAP),
                         height: BAR_H,
@@ -1137,24 +1209,42 @@ interface Props {
   jobId: string
   canCreate: boolean
   crewByItem?: CrewMap
-  onAdd: () => void
+  canEdit?: boolean
+  onAdd: (date?: string) => void
   onEdit: (item: ScheduleItem) => void
-  onRefresh?: () => void
+  onRefresh?: () => void | Promise<void>
 }
 
-export function ScheduleList({ items, jobId, canCreate, crewByItem, onAdd, onEdit, onRefresh }: Props) {
-  const [view, setView] = useState<ScheduleView>('gantt')
+export function ScheduleList({ items: serverItems, jobId, canCreate, canEdit = false, crewByItem, onAdd, onEdit, onRefresh }: Props) {
+  // Opens on the monthly calendar, even when empty, so a day can be clicked to add to it.
+  const [view, setView] = useState<ScheduleView>('month')
   const [filters, setFilters] = useState<Filters>({ search: '', statuses: [], trades: [] })
   const [showFilters, setShowFilters] = useState(false)
 
-  // A Gantt chart does not fit a phone — the bars sit off-screen behind a
-  // horizontal scroll, so a crew checking the week sees an empty grid. Open on
-  // the list instead, which reads at 390px. Desktop keeps the Gantt.
-  // This is state rather than layout, so it can't be a Tailwind breakpoint;
-  // running it after mount keeps the server and client markup identical.
-  useEffect(() => {
-    if (window.matchMedia('(max-width: 767px)').matches) setView('list')
-  }, [])
+  // Optimistic date changes from drag-and-drop, dropped once fresh data arrives.
+  const [moves, setMoves] = useState<Record<string, { start_date: string; end_date: string }>>({})
+  useEffect(() => { setMoves({}) }, [serverItems])
+  const items = useMemo(
+    () => serverItems.map(i => (moves[i.id] ? { ...i, ...moves[i.id] } : i)),
+    [serverItems, moves],
+  )
+
+  const moveItem: MoveFn = useCallback(async (item, delta) => {
+    if (!delta) return
+    const next = { start_date: shiftISO(item.start_date, delta), end_date: shiftISO(item.end_date, delta) }
+    setMoves(m => ({ ...m, [item.id]: next }))
+    try {
+      const res = await fetch(`/api/schedule/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      if (!res.ok) throw new Error('move failed')
+      await onRefresh?.()
+    } catch {
+      setMoves(m => { const c = { ...m }; delete c[item.id]; return c })
+    }
+  }, [onRefresh])
 
   const allTrades = useMemo(() => {
     const set = new Set(items.map(i => i.trade).filter((t): t is string => Boolean(t)))
@@ -1194,37 +1284,6 @@ export function ScheduleList({ items, jobId, canCreate, crewByItem, onAdd, onEdi
   }
 
   // â”€â”€ Empty state â”€â”€
-  if (items.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-border">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-display font-semibold text-navy-900 text-base">Schedule</h2>
-          {canCreate && (
-            <button
-              onClick={onAdd}
-              className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Plus size={12} />
-              Add Phase
-            </button>
-          )}
-        </div>
-        <div className="flex flex-col items-center justify-center py-14 text-gray-400 text-sm gap-2">
-          <Calendar size={36} className="text-gray-200" />
-          No phases scheduled yet
-          {canCreate && (
-            <button
-              onClick={onAdd}
-              className="mt-2 text-gold-600 hover:text-gold-700 font-medium text-sm transition-colors"
-            >
-              Add the first phase â†’
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-white rounded-xl border border-border overflow-hidden">
 
@@ -1240,7 +1299,7 @@ export function ScheduleList({ items, jobId, canCreate, crewByItem, onAdd, onEdi
         </h2>
         {canCreate && (
           <button
-            onClick={onAdd}
+            onClick={() => onAdd()}
             className="flex items-center gap-1.5 bg-gold-500 hover:bg-gold-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
           >
             <Plus size={12} />
@@ -1376,22 +1435,33 @@ export function ScheduleList({ items, jobId, canCreate, crewByItem, onAdd, onEdi
       )}
 
       {/* No results */}
-      {filteredItems.length === 0 ? (
+      {filteredItems.length === 0 && view !== 'month' && view !== 'week' ? (
         <div className="py-12 text-center">
-          <p className="text-sm text-gray-400">No phases match the current filters</p>
-          <button
-            onClick={clearFilters}
-            className="mt-2 text-xs text-gold-600 hover:text-gold-700 font-medium transition-colors"
-          >
-            Clear filters
-          </button>
+          <p className="text-sm text-gray-400">
+            {items.length === 0 ? 'No phases scheduled yet' : 'No phases match the current filters'}
+          </p>
+          {items.length > 0 ? (
+            <button
+              onClick={clearFilters}
+              className="mt-2 text-xs text-gold-600 hover:text-gold-700 font-medium transition-colors"
+            >
+              Clear filters
+            </button>
+          ) : canCreate && (
+            <button
+              onClick={() => setView('month')}
+              className="mt-2 text-xs text-gold-600 hover:text-gold-700 font-medium transition-colors"
+            >
+              Open the calendar and click a day to add one
+            </button>
+          )}
         </div>
       ) : (
         <>
-          {view === 'list'  && <ListView  items={filteredItems} crewByItem={crewByItem} onEdit={onEdit} onRefresh={onRefresh ?? (() => {})} />}
+          {view === 'list'  && <ListView  items={filteredItems} crewByItem={crewByItem} onEdit={onEdit} onRefresh={() => { void onRefresh?.() }} />}
           {view === 'gantt' && <GanttView items={filteredItems} jobId={jobId} crewByItem={crewByItem} onEdit={onEdit} />}
-          {view === 'week'  && <WeekView  items={filteredItems} onEdit={onEdit} />}
-          {view === 'month' && <MonthView items={filteredItems} onEdit={onEdit} />}
+          {view === 'week'  && <WeekView  items={filteredItems} onEdit={onEdit} onAddDay={canCreate ? onAdd : undefined} onMoveItem={canEdit ? moveItem : undefined} />}
+          {view === 'month' && <MonthView items={filteredItems} onEdit={onEdit} onAddDay={canCreate ? onAdd : undefined} onMoveItem={canEdit ? moveItem : undefined} />}
           {view === 'year'  && <YearView  items={filteredItems} onEdit={onEdit} />}
         </>
       )}

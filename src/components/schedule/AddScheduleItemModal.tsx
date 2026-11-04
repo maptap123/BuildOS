@@ -57,6 +57,7 @@ interface Props {
   item?: ScheduleItem
   allItems?: ScheduleItem[]   // all schedule items in this job (for predecessor dropdown)
   canDelete?: boolean
+  initialDate?: string        // YYYY-MM-DD, set when adding from a clicked calendar day
   onClose: () => void
   onSaved: () => void
 }
@@ -68,6 +69,7 @@ export function AddScheduleItemModal({
   item,
   allItems = [],
   canDelete,
+  initialDate,
   onClose,
   onSaved,
 }: Props) {
@@ -77,7 +79,7 @@ export function AddScheduleItemModal({
   const [deleting, setDeleting] = useState(false)
   const [error, setError]       = useState<string | null>(null)
 
-  const todayISO = new Date().toISOString().split('T')[0]
+  const todayISO = initialDate ?? new Date().toISOString().split('T')[0]
 
   const [form, setForm] = useState({
     title:            item?.title ?? '',

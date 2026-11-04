@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import { hrefForJob } from '@/lib/jobNav'
 import { Search, Plus, LogOut, Star, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJobs } from '@/hooks/useJobs'
@@ -27,6 +28,7 @@ interface Props {
 
 export function DesktopJobPanel({ currentJobId }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState<JobStatus[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -263,7 +265,7 @@ export function DesktopJobPanel({ currentJobId }: Props) {
             filtered.map(job => (
               <button
                 key={job.id}
-                onClick={() => router.push(`/jobs/${job.id}`)}
+                onClick={() => router.push(hrefForJob(pathname, job.id))}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                   job.id === currentJobId ? 'bg-gold-50' : ''
                 }`}

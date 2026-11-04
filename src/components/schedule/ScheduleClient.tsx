@@ -37,6 +37,7 @@ const OUTLOOK_STATUS: Record<OutlookSyncStatus, { icon: React.ReactNode; text: s
 export function ScheduleClient({ jobId, initialItems, permissions, outlookConnected = false }: Props) {
   const { items, loading, error, refresh } = useSchedule(jobId, initialItems)
   const [showAdd, setShowAdd]   = useState(false)
+  const [addDate, setAddDate]   = useState<string | null>(null)
   const [editItem, setEditItem] = useState<ScheduleItem | null>(null)
   const [syncing, setSyncing]   = useState(false)
   const [syncMsg, setSyncMsg]   = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -196,8 +197,9 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
           items={items}
           jobId={jobId}
           canCreate={permissions.can_create}
+          canEdit={permissions.can_edit}
           crewByItem={crewByItem}
-          onAdd={() => setShowAdd(true)}
+          onAdd={(date) => { setAddDate(date ?? null); setShowAdd(true) }}
           onEdit={handleEdit}
           onRefresh={refreshAll}
         />
@@ -207,6 +209,7 @@ export function ScheduleClient({ jobId, initialItems, permissions, outlookConnec
         <AddScheduleItemModal
           jobId={jobId}
           allItems={items}
+          initialDate={addDate ?? undefined}
           onClose={() => setShowAdd(false)}
           onSaved={() => { setShowAdd(false); void refreshAll() }}
         />
