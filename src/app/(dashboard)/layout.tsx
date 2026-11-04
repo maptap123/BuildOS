@@ -306,7 +306,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         {/* Desktop top grouped tab bar */}
         <nav
           ref={navRef}
-          className="hidden md:flex items-center gap-0.5 bg-white border-b border-border px-4 shrink-0 overflow-x-auto scrollbar-none"
+          className="hidden md:flex items-center gap-0.5 bg-white border-b border-border px-4 shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap"
         >
           {DESKTOP_NAV.map((item) => {
             if (isGroup(item)) {

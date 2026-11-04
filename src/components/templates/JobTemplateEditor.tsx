@@ -81,7 +81,7 @@ export function JobTemplateEditor({ id }: { id: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/templates" className="text-gray-400 hover:text-navy-900"><ArrowLeft size={18} /></Link>
-        <h1 className="font-display font-semibold text-navy-900 text-xl flex-1 min-w-0 truncate">{tpl.name || 'Template'}</h1>
+        <h1 className="font-display font-semibold text-navy-900 text-xl flex-1 basis-[calc(100%-2.5rem)] md:basis-0 min-w-0 md:truncate">{tpl.name || 'Template'}</h1>
         <button onClick={() => setApplying(true)} disabled={dirty} title={dirty ? 'Save your changes first' : ''} className={ghostBtn}>
           <Play size={14} /> Apply to job
         </button>

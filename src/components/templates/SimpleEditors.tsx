@@ -59,7 +59,7 @@ function Header({ title, dirty, saving, msg, onSave }: {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/templates" className="text-gray-400 hover:text-navy-900"><ArrowLeft size={18} /></Link>
-        <h1 className="font-display font-semibold text-navy-900 text-xl flex-1 min-w-0 truncate">{title || 'Template'}</h1>
+        <h1 className="font-display font-semibold text-navy-900 text-xl flex-1 basis-[calc(100%-2.5rem)] md:basis-0 min-w-0 md:truncate">{title || 'Template'}</h1>
         <button onClick={onSave} disabled={saving || !dirty} className={primaryBtn}>
           <Save size={14} /> {saving ? 'Saving…' : 'Save'}
         </button>

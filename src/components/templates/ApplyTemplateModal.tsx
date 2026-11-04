@@ -32,7 +32,7 @@ export function ApplyTemplateModal({ jobId, templateId, onClose, onApplied }: Pr
         .then(d => setTemplates(d.job)).catch(e => setError(e.message))
     }
     if (!jobId) {
-      api<{ id: string; name: string }[]>('/api/jobs')
+      api<{ id: string; name: string }[]>('/api/jobs?status=active&status=presale')
         .then(d => setJobs(Array.isArray(d) ? d : [])).catch(e => setError(e.message))
     }
   }, [templateId, jobId])

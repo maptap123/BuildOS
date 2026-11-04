@@ -67,7 +67,7 @@ export function TemplatesClient({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 basis-full md:basis-0 min-w-0">
           <h1 className="font-display font-semibold text-navy-900 text-xl">Templates</h1>
           <p className="text-sm text-gray-400">{active.blurb}</p>
         </div>
@@ -79,7 +79,7 @@ export function TemplatesClient({ canEdit }: { canEdit: boolean }) {
         )}
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto scrollbar-none">
         {TABS.map(t => (
           <button
             key={t.key} onClick={() => setTab(t.key)}
@@ -155,7 +155,7 @@ function NewTemplateModal({ tab, onClose }: { tab: TabKey; onClose: () => void }
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (tab === 'job') api<{ id: string; name: string }[]>('/api/jobs').then(d => setJobs(Array.isArray(d) ? d : [])).catch(() => {})
+    if (tab === 'job') api<{ id: string; name: string }[]>('/api/jobs?status=active&status=presale').then(d => setJobs(Array.isArray(d) ? d : [])).catch(() => {})
   }, [tab])
 
   async function create() {
