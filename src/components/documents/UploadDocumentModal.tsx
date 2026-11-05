@@ -12,11 +12,15 @@ const MODULE_OPTIONS: DocumentModule[] = ['job', 'budget', 'schedule', 'task', '
 interface Props {
   onClose: () => void
   onSaved: () => void
+  defaultJobId?: string | null
+  defaultFolder?: string | null
+  lockJob?: boolean
 }
 
-export function UploadDocumentModal({ onClose, onSaved }: Props) {
+export function UploadDocumentModal({ onClose, onSaved, defaultJobId, defaultFolder, lockJob }: Props) {
   const [jobs, setJobs] = useState<Pick<Job, 'id' | 'name' | 'job_number'>[]>([])
-  const [selectedJobId, setSelectedJobId] = useState<string>('')
+  const [selectedJobId, setSelectedJobId] = useState<string>(defaultJobId ?? '')
+  const [folderName, setFolderName] = useState<string>(defaultFolder && defaultFolder !== 'Unfiled' ? defaultFolder : '')
   const [selectedModule, setSelectedModule] = useState<DocumentModule>('job')
   const [fileNameOverride, setFileNameOverride] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -67,6 +71,7 @@ export function UploadDocumentModal({ onClose, onSaved }: Props) {
         body: JSON.stringify({
           job_id: selectedJobId || null,
           module: selectedModule,
+          folder: folderName.trim() || null,
           file_name: fileNameOverride.trim() || file.name,
           file_path: storagePath,
           file_type: file.type || 'application/octet-stream',
@@ -154,6 +159,7 @@ export function UploadDocumentModal({ onClose, onSaved }: Props) {
             <select
               value={selectedJobId}
               onChange={e => setSelectedJobId(e.target.value)}
+              disabled={lockJob}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400 bg-white"
             >
               <option value="">— No job —</option>
@@ -163,6 +169,17 @@ export function UploadDocumentModal({ onClose, onSaved }: Props) {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Folder (optional)</label>
+            <input
+              type="text"
+              value={folderName}
+              onChange={e => setFolderName(e.target.value)}
+              placeholder="e.g. Pre-Sale Documents, Permits, Photos"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
+            />
           </div>
 
           {error && (

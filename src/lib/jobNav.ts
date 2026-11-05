@@ -18,6 +18,8 @@ export function hrefForJob(pathname: string, jobId: string): string {
     const section = scoped[1].split('/')[0]
     return `/jobs/${jobId}/${section}`
   }
+  // The global Documents page stays on Documents, opened on that job's folder.
+  if (pathname.replace(/\/$/, '') === '/documents') return `/documents?job=${jobId}`
   const section = ALL_JOBS_TO_SECTION[pathname.replace(/\/$/, '')]
   if (section) return `/jobs/${jobId}/${section}`
   return `/jobs/${jobId}`

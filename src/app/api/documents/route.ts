@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   if (!perm?.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  let query = supabase.from('documents').select('*').order('created_at', { ascending: false })
+  let query = supabase.from('documents').select('*, jobs(name)').order('created_at', { ascending: false })
   if (jobId) query = query.eq('job_id', jobId)
   if (documentModule) query = query.eq('module', documentModule)
 
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     file_type,
     file_size,
     storage_bucket,
+    folder,
   } = body
 
   if (!documentModule || !file_name || !file_path || !file_type || file_size == null) {
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
       job_id: job_id ?? null,
       module: documentModule,
       related_record_id: related_record_id ?? null,
+      folder: typeof folder === 'string' && folder.trim() ? folder.trim() : null,
       file_name,
       file_path,
       file_type,

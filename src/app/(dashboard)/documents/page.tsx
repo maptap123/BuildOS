@@ -3,7 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DocumentsClient } from '@/components/documents'
 
-export default async function DocumentsPage() {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ job?: string; folder?: string }>
+}) {
+  const { job, folder } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,12 +33,20 @@ export default async function DocumentsPage() {
 
   const { data: documents } = await admin
     .from('documents')
-    .select('*')
+    .select('*, jobs(name)')
     .order('created_at', { ascending: false })
+
+  const { data: jobs } = await admin
+    .from('jobs')
+    .select('id, name, job_number')
 
   return (
     <DocumentsClient
+      key={`${job ?? ''}|${folder ?? ''}`}
       initialDocuments={documents ?? []}
+      jobs={jobs ?? []}
+      jobId={job ?? null}
+      folder={folder ?? null}
       permissions={{
         can_create: perm.can_create,
         can_edit:   perm.can_edit,
