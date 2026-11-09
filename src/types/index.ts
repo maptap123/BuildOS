@@ -409,6 +409,9 @@ export interface Document {
   uploaded_by: string;
   created_at: string;
   updated_at: string;
+  bt_file_id?: string | null;
+  folder?: string | null;
+  jobs?: { name: string } | null;
 }
 
 export interface Contact {
