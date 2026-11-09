@@ -4,8 +4,9 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, CheckCircle, XCircle, Filter, MapPin, Clock, AlertCircle,
-  Download, Users, CheckSquare, Square, Timer, X, Pencil, LogIn, LogOut,
+  Download, Users, CheckSquare, Square, Timer, X, Pencil, LogIn, LogOut, Send,
 } from 'lucide-react'
+import { PreparePayrollModal } from './PreparePayrollModal'
 import Link from 'next/link'
 import type { TimeEntry } from '@/types'
 import type { ShiftRange } from '@/app/(dashboard)/time-clock/shifts/page'
@@ -114,6 +115,7 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [payrollOpen, setPayrollOpen] = useState(false)
   // Manager clock-in / clock-out / edit sheet
   const [editor, setEditor] = useState<{ mode: ShiftEditorMode; entry: EntryRow | null } | null>(null)
   // Ticks once a minute so open shifts' running hours stay current
@@ -347,6 +349,20 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
           >
             <LogIn size={13} />
             Clock In / Add Shift
+          </button>
+          <Link
+            href="/time-clock/shifts/payroll"
+            className="flex items-center gap-1.5 text-xs font-semibold text-navy-700 bg-white border border-gray-200 hover:border-navy-300 px-3 py-2 rounded-lg transition-colors"
+          >
+            <Clock size={13} />
+            Payroll Report
+          </Link>
+          <button
+            onClick={() => setPayrollOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-navy-900 hover:bg-navy-800 px-3 py-2 rounded-lg transition-colors"
+          >
+            <Send size={13} />
+            Prepare Payroll
           </button>
           <button
             onClick={exportCSV}
@@ -831,6 +847,7 @@ export function ShiftsClient({ initialEntries, users, jobs, currentRange, totalC
           </button>
         </div>
       )}
+      {payrollOpen && <PreparePayrollModal onClose={() => setPayrollOpen(false)} />}
     </div>
   )
 }
