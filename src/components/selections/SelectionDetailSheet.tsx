@@ -37,11 +37,12 @@ export function SelectionDetailSheet({
   onClose: () => void
   onChanged: () => Promise<void> | void
 }) {
-  const picked = selection.choices.find(c => c.is_selected) ?? null
+  const picked = selection.choices.find(c => c.is_selected) ?? null // any pick
+  const pickedCount = selection.choices.filter(c => c.is_selected).length
   const allowance = board.allowances.find(a => a.id === selection.allowance_id) ?? null
   const [adding, setAdding] = useState(selection.choices.length === 0 && permissions.can_create)
   const [form, setForm] = useState({ title: '', client_price: '', vendor_id: '', product_url: '', details: '', builder_cost: '' })
-  const [selectNew, setSelectNew] = useState(!picked)
+  const [selectNew, setSelectNew] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<Overage>(null)
@@ -78,8 +79,8 @@ export function SelectionDetailSheet({
     if (!data) return
     setNotice(data.overage)
     setForm({ title: '', client_price: '', vendor_id: '', product_url: '', details: '', builder_cost: '' })
-    setAdding(false)
-    setSelectNew(false)
+    // Stay open for the next item — several are usually entered in a row.
+    setSelectNew(true)
     await settle()
   }
 
@@ -211,10 +212,10 @@ export function SelectionDetailSheet({
         {/* Choices */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-600">Choices ({selection.choices.length})</p>
+            <p className="text-xs font-semibold text-gray-600">Items ({selection.choices.length}{pickedCount ? ` · ${pickedCount} selected` : ''})</p>
             {permissions.can_create && !adding && (
-              <button onClick={() => { setAdding(true); setSelectNew(!picked) }} className="flex items-center gap-1 text-xs font-semibold text-navy-600">
-                <Plus size={14} /> Add choice
+              <button onClick={() => { setAdding(true); setSelectNew(true) }} className="flex items-center gap-1 text-xs font-semibold text-navy-600">
+                <Plus size={14} /> Add item
               </button>
             )}
           </div>
@@ -268,14 +269,14 @@ export function SelectionDetailSheet({
               </div>
             ))}
             {selection.choices.length === 0 && !adding && (
-              <p className="text-sm text-gray-500">No choices yet.</p>
+              <p className="text-sm text-gray-500">No items yet.</p>
             )}
           </div>
 
           {adding && (
             <div className="mt-3 rounded-xl border border-navy-100 bg-navy-50/50 p-3 space-y-3">
               <div>
-                <label className={labelClass}>Choice</label>
+                <label className={labelClass}>Item</label>
                 <input
                   autoFocus
                   value={form.title}
@@ -311,7 +312,7 @@ export function SelectionDetailSheet({
               </div>
               <label className="flex items-center gap-2 text-sm text-navy-900">
                 <input type="checkbox" checked={selectNew} onChange={e => setSelectNew(e.target.checked)} className="w-4 h-4 accent-navy-900" />
-                Client picked this one
+                Client selected this (counts toward the allowance)
               </label>
               <div className="flex justify-end gap-2">
                 {selection.choices.length > 0 && (
@@ -322,7 +323,7 @@ export function SelectionDetailSheet({
                   disabled={busy === 'add'}
                   className="px-4 py-2 rounded-xl bg-navy-900 text-white text-sm font-semibold disabled:opacity-50"
                 >
-                  {busy === 'add' ? 'Saving…' : 'Save choice'}
+                  {busy === 'add' ? 'Saving…' : 'Save item'}
                 </button>
               </div>
             </div>

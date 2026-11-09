@@ -52,8 +52,8 @@ export async function loadSelectionsBoard(
   for (const s of selections) {
     if (!s.allowance_id) continue
     countBy.set(s.allowance_id, (countBy.get(s.allowance_id) ?? 0) + 1)
-    const picked = s.choices.find(c => c.is_selected)
-    if (picked) spentBy.set(s.allowance_id, (spentBy.get(s.allowance_id) ?? 0) + Number(picked.client_price))
+    const total = s.choices.filter(c => c.is_selected).reduce((sum, c) => sum + Number(c.client_price), 0)
+    if (total) spentBy.set(s.allowance_id, (spentBy.get(s.allowance_id) ?? 0) + total)
   }
 
   const allowances: AllowanceSummary[] = (allowanceRows ?? []).map(a => {

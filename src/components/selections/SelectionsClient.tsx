@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, ChevronRight, AlertTriangle, FileText } from 'lucide-react'
+import { Plus, ChevronRight, AlertTriangle, FileText, Printer } from 'lucide-react'
 import { divisionPhase } from '@/lib/estimates/divisions'
 import type { AllowanceSummary, Selection, SelectionsBoard, SelectionStatus } from '@/types'
 import { fmtMoney } from './Sheet'
@@ -22,6 +22,13 @@ const STATUS_LABEL: Record<SelectionStatus, string> = {
 }
 
 const NO_LOCATION = 'No location'
+
+const pickedList = (s: Selection) => s.choices.filter(c => c.is_selected)
+const pickedTotal = (s: Selection) => pickedList(s).reduce((sum, c) => sum + Number(c.client_price), 0)
+const pickedLabel = (s: Selection) => {
+  const p = pickedList(s)
+  return p.length > 1 ? `${p[0].title} +${p.length - 1} more` : p[0]?.title ?? ''
+}
 
 /**
  * A job's selections. Mobile shows cards grouped by room — the showroom flow: tap a
@@ -82,6 +89,14 @@ export function SelectionsClient({
               : 'No estimate on this job yet — allowances can still be added by hand'}
           </p>
         </div>
+        <div className="shrink-0 flex items-center gap-2">
+        <Link
+          href={`/jobs/${jobId}/selections/print`}
+          target="_blank"
+          className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-white text-navy-900 text-sm font-semibold"
+        >
+          <Printer size={16} /> <span className="hidden sm:inline">Print / PDF</span>
+        </Link>
         {permissions.can_create && (
           <button
             onClick={() => setCreating(true)}
@@ -90,6 +105,7 @@ export function SelectionsClient({
             <Plus size={16} /> <span className="hidden sm:inline">New selection</span><span className="sm:hidden">New</span>
           </button>
         )}
+        </div>
       </div>
 
       {/* Totals */}
@@ -169,7 +185,7 @@ export function SelectionsClient({
                             <td className="px-4 py-2.5 font-medium text-navy-900">{s.title}</td>
                             <td className="px-4 py-2.5 text-gray-500">{s.cost_code ? divisionPhase(null, s.cost_code) : '—'}</td>
                             <td className="px-4 py-2.5 text-gray-700 max-w-[260px] truncate">
-                              {picked?.title ?? <span className="text-gray-400">{s.choices.length ? `${s.choices.length} option${s.choices.length === 1 ? '' : 's'}` : 'No choices'}</span>}
+                              {picked ? pickedLabel(s) : <span className="text-gray-400">{s.choices.length ? `${s.choices.length} option${s.choices.length === 1 ? '' : 's'}` : 'No choices'}</span>}
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums">{picked ? fmtMoney(Number(picked.client_price)) : '—'}</td>
                             <td className="px-4 py-2.5 text-right tabular-nums">
@@ -231,7 +247,7 @@ function SelectionCard({
           <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_CHIP[s.status]}`}>{STATUS_LABEL[s.status]}</span>
         </div>
         <p className="text-xs text-gray-500 truncate mt-0.5">
-          {picked ? `${picked.title} · ${fmtMoney(Number(picked.client_price))}` : s.choices.length ? `${s.choices.length} option${s.choices.length === 1 ? '' : 's'}, none picked` : 'No choices yet'}
+          {picked ? `${pickedLabel(s)} · ${fmtMoney(pickedTotal(s))}` : s.choices.length ? `${s.choices.length} option${s.choices.length === 1 ? '' : 's'}, none selected` : 'No choices yet'}
         </p>
         {allowance && (
           <p className="text-xs mt-1"><AllowanceLeft allowance={allowance} long /></p>
