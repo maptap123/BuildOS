@@ -728,7 +728,7 @@ function WeekView({ items, onEdit, onAddDay, onMoveItem }: {
                 </div>
               </div>
               <div className="space-y-1">
-                {dayItems.slice(0, 4).map(item => (
+                {dayItems.map(item => (
                   <button
                     key={item.id}
                     draggable={!!onMoveItem}
@@ -745,9 +745,6 @@ function WeekView({ items, onEdit, onAddDay, onMoveItem }: {
                     {item.title}
                   </button>
                 ))}
-                {dayItems.length > 4 && (
-                  <p className="text-[9px] text-gray-400 px-0.5">+{dayItems.length - 4} more</p>
-                )}
               </div>
             </div>
           )
@@ -788,11 +785,10 @@ function WeekView({ items, onEdit, onAddDay, onMoveItem }: {
 // Spanning bars â€” each item is a continuous colored bar across its dates,
 // stacked into lanes to avoid overlap, matching BuilderTrend calendar style.
 
-const MAX_BAR_SLOTS = 3 // visible event rows per week before "+N more"
+const MAX_BAR_SLOTS = 3 // minimum event lanes per week; rows grow beyond this to fit all events
 const BAR_H = 18       // px â€” height of each event bar
 const BAR_GAP = 3      // px â€” gap between bars
 const DAY_NUM_H = 24   // px â€” space for day number at top
-const WEEK_ROW_MIN = DAY_NUM_H + MAX_BAR_SLOTS * (BAR_H + BAR_GAP) + 8
 
 function MonthView({ items, onEdit, onAddDay, onMoveItem }: {
   items: ScheduleItem[]; onEdit: (i: ScheduleItem) => void; onAddDay?: AddDayFn; onMoveItem?: MoveFn
@@ -906,14 +902,16 @@ function MonthView({ items, onEdit, onAddDay, onMoveItem }: {
             }
           }
 
-          const visibleItems = overlapping.filter(item => (itemSlot.get(item.id) ?? 99) < MAX_BAR_SLOTS)
-          const hiddenCount  = overlapping.length - visibleItems.length
+          // Show every event: the week row grows to fit however many lanes are needed.
+          const visibleItems = overlapping
+          const laneCount    = Math.max(MAX_BAR_SLOTS, slotOcc.length)
+          const weekRowMin   = DAY_NUM_H + laneCount * (BAR_H + BAR_GAP) + 8
 
           return (
             <div
               key={weekIdx}
               className="relative border-b border-r border-gray-100"
-              style={{ minHeight: WEEK_ROW_MIN }}
+              style={{ minHeight: weekRowMin }}
             >
               {/* Day cell backgrounds + day numbers */}
               <div className="grid grid-cols-7 h-full absolute inset-0">
@@ -1008,16 +1006,6 @@ function MonthView({ items, onEdit, onAddDay, onMoveItem }: {
                     </button>
                   )
                 })}
-
-                {/* Overflow indicator */}
-                {hiddenCount > 0 && (
-                  <div
-                    className="absolute right-2 text-[10px] text-gray-400 font-medium"
-                    style={{ top: MAX_BAR_SLOTS * (BAR_H + BAR_GAP) + 2 }}
-                  >
-                    +{hiddenCount} more
-                  </div>
-                )}
               </div>
             </div>
           )
