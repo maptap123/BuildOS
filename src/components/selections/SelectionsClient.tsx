@@ -187,7 +187,7 @@ export function SelectionsClient({
                             <td className="px-4 py-2.5 text-gray-700 max-w-[260px] truncate">
                               {picked ? pickedLabel(s) : <span className="text-gray-400">{s.choices.length ? `${s.choices.length} option${s.choices.length === 1 ? '' : 's'}` : 'No choices'}</span>}
                             </td>
-                            <td className="px-4 py-2.5 text-right tabular-nums">{picked ? fmtMoney(Number(picked.client_price)) : '—'}</td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">{picked ? fmtMoney(pickedTotal(s)) : '—'}</td>
                             <td className="px-4 py-2.5 text-right tabular-nums">
                               {a ? <AllowanceLeft allowance={a} /> : <span className="text-gray-400">—</span>}
                             </td>
