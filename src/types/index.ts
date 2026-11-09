@@ -269,6 +269,7 @@ export interface ScheduleItem {
   percent_complete: number;
   trade: string | null;
   color: string | null;
+  cost_code: string | null;
   // Outlook sync
   outlook_event_id: string | null;
   outlook_calendar_id: string | null;

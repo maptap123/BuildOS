@@ -4,15 +4,9 @@ import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Link2, Users } from 'lucide-react'
 import { ScheduleCrewTab, type PendingAssignee } from './ScheduleCrewTab'
 import type { ScheduleItem, ScheduleItemStatus, ScheduleItemType, PredecessorType } from '@/types'
+import { COST_DIVISIONS, divisionFor } from '@/lib/schedule/costCodeColors'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const TRADES = [
-  'General', 'Site Work', 'Concrete', 'Masonry', 'Framing', 'Roofing',
-  'Exterior', 'Insulation', 'Drywall', 'Flooring', 'Millwork/Trim',
-  'Painting', 'Plumbing', 'Mechanical/HVAC', 'Electrical', 'Fire Suppression',
-  'Landscaping', 'Punch List', 'Inspections', 'Closeout',
-]
 
 const SCHEDULE_COLORS = [
   { name: 'Blue',    hex: '#3B82F6' },
@@ -91,8 +85,23 @@ export function AddScheduleItemModal({
     sort_order:       String(item?.sort_order ?? 0),
     percent_complete: String(item?.percent_complete ?? 0),
     trade:            item?.trade ?? '',
+    cost_code:        item?.cost_code ?? '',
     color:            item?.color ?? DEFAULT_COLOR,
   })
+  const [codeSearch, setCodeSearch] = useState('')
+
+  // Picking a cost code sets trade (division name) and color together.
+  function pickDivision(num: string) {
+    const d = COST_DIVISIONS.find(x => x.num === num)
+    if (!d) return
+    setForm(f => ({ ...f, cost_code: d.num, trade: d.name, color: d.color }))
+  }
+
+  const q = codeSearch.trim().toLowerCase()
+  const visibleDivisions = q
+    ? COST_DIVISIONS.filter(d => d.num.startsWith(q) || d.name.toLowerCase().includes(q))
+    : COST_DIVISIONS
+  const selectedDivision = divisionFor(form.cost_code)
 
   const [preds, setPreds]           = useState<PredRow[]>([])
   const [predsLoading, setPredsLoading] = useState(false)
@@ -164,6 +173,7 @@ export function AddScheduleItemModal({
         sort_order: parseInt(form.sort_order) || 0,
         percent_complete: parseInt(form.percent_complete) || 0,
         trade: form.trade || null,
+        cost_code: form.cost_code || null,
         color: form.color || null,
       }
 
@@ -323,23 +333,62 @@ export function AddScheduleItemModal({
                 </div>
               </div>
 
-              {/* Color picker */}
+              {/* Cost code picker — color comes from the division */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Display Color</label>
-                <div className="flex flex-wrap gap-2">
-                  {SCHEDULE_COLORS.map(({ name, hex }) => (
-                    <button
-                      key={hex}
-                      type="button"
-                      title={name}
-                      onClick={() => setField('color', hex)}
-                      className={`w-7 h-7 rounded-full transition-all hover:scale-110 focus:outline-none ${
-                        form.color === hex ? 'ring-2 ring-offset-2 ring-navy-800 scale-110' : 'ring-1 ring-black/10'
-                      }`}
-                      style={{ backgroundColor: hex }}
-                    />
-                  ))}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-600">Cost Code</label>
+                  {selectedDivision && (
+                    <span className="text-xs font-semibold text-navy-900 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: selectedDivision.color }} />
+                      {selectedDivision.num} {selectedDivision.name}
+                    </span>
+                  )}
                 </div>
+                <input
+                  value={codeSearch}
+                  onChange={e => setCodeSearch(e.target.value)}
+                  placeholder="Type a trade or number — electric, 14, floor…"
+                  className="w-full mb-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
+                />
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                  {visibleDivisions.map(d => {
+                    const active = form.cost_code === d.num
+                    return (
+                      <button
+                        key={d.num}
+                        type="button"
+                        onClick={() => pickDivision(d.num)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          active ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }`}
+                        style={active ? { backgroundColor: d.color } : undefined}
+                      >
+                        {!active && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />}
+                        <span className="font-bold">{d.num}</span> {d.name}
+                      </button>
+                    )
+                  })}
+                  {visibleDivisions.length === 0 && (
+                    <p className="text-xs text-gray-400 py-1">No matching cost code</p>
+                  )}
+                </div>
+                <details className="mt-2">
+                  <summary className="text-[11px] text-gray-400 cursor-pointer">Override color</summary>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {SCHEDULE_COLORS.map(({ name, hex }) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        title={name}
+                        onClick={() => setField('color', hex)}
+                        className={`w-6 h-6 rounded-full transition-all hover:scale-110 focus:outline-none ${
+                          form.color === hex ? 'ring-2 ring-offset-2 ring-navy-800 scale-110' : 'ring-1 ring-black/10'
+                        }`}
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+                </details>
               </div>
 
               {/* Dates */}
@@ -387,19 +436,8 @@ export function AddScheduleItemModal({
                 </div>
               )}
 
-              {/* Trade + Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Trade</label>
-                  <select
-                    value={form.trade}
-                    onChange={e => setField('trade', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-navy-900 focus:outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400 bg-white"
-                  >
-                    <option value="">— Any —</option>
-                    {TRADES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+              {/* Status */}
+              <div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
                   <select

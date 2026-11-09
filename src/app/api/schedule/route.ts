@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     type = 'phase',
     start_date, end_date, all_day = true,
     assigned_user_id, predecessor_id, sort_order = 0,
-    percent_complete = 0, trade, color,
+    percent_complete = 0, trade, color, cost_code,
   } = body
   if (!job_id || !title || !start_date || !end_date) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       assigned_user_id: assigned_user_id ?? null,
       predecessor_id: predecessor_id ?? null,
       sort_order, percent_complete, trade: trade ?? null,
+      cost_code: cost_code ?? null,
       color: color ?? null, created_by: user.id,
     })
     .select()
