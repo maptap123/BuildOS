@@ -226,10 +226,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'contacts')   return '/contacts'
     if (key === 'documents')  return '/documents'
     if (key === 'templates')  return '/templates'
-    if (!urlJobId && ALL_JOBS_ROUTES[key]) return ALL_JOBS_ROUTES[key]
-    if (!urlJobId && JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
-    if (!urlJobId) return '/jobs'
-    return `/jobs/${urlJobId}/${key}`
+    // Stay on the remembered job until the user picks another (or "All Jobs")
+    if (effectiveJobId) return `/jobs/${effectiveJobId}/${key}`
+    if (ALL_JOBS_ROUTES[key]) return ALL_JOBS_ROUTES[key]
+    if (JOB_SCOPED_TABS.has(key)) return `/jobs?selectJob=${key}`
+    return '/jobs'
   }
 
   function isActiveDesktop(key: string): boolean {
@@ -243,8 +244,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'contacts')   return pathname.startsWith('/contacts')
     if (key === 'documents')  return pathname.startsWith('/documents')
     if (key === 'templates')  return pathname.startsWith('/templates')
+    if (effectiveJobId && pathname.startsWith(`/jobs/${effectiveJobId}/${key}`)) return true
     if (!urlJobId) return key !== 'budget' && key !== 'profitability' && !!ALL_JOBS_ROUTES[key] && pathname.startsWith(ALL_JOBS_ROUTES[key])
-    return pathname.startsWith(`/jobs/${urlJobId}/${key}`)
+    return false
   }
 
   function isGroupActive(group: NavGroup): boolean {
@@ -298,7 +300,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     <div className="flex h-full min-h-screen">
 
       {/* ── Desktop: permanent left job panel ── */}
-      <DesktopJobPanel currentJobId={urlJobId} />
+      <DesktopJobPanel currentJobId={effectiveJobId} />
 
       {/* ── Right side: top bar + content ── */}
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen min-w-0">

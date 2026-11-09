@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { hrefForJob } from '@/lib/jobNav'
+import { useActiveJob } from '@/contexts/ActiveJobContext'
 import { Search, Plus, LogOut, Star, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useJobs } from '@/hooks/useJobs'
@@ -29,8 +30,9 @@ interface Props {
 export function DesktopJobPanel({ currentJobId }: Props) {
   const router = useRouter()
   const pathname = usePathname()
+  const { setActiveJob, clearActiveJob } = useActiveJob()
   const [search, setSearch] = useState('')
-  const [statuses, setStatuses] = useState<JobStatus[]>([])
+  const [statuses, setStatuses] = useState<JobStatus[]>(['active'])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [activeManager, setActiveManager] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -238,7 +240,7 @@ export function DesktopJobPanel({ currentJobId }: Props) {
         <div className="flex-1 overflow-y-auto">
           {/* All Jobs / Dashboard */}
           <button
-            onClick={() => router.push('/jobs')}
+            onClick={() => { clearActiveJob(); router.push('/jobs') }}
             className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
               !currentJobId ? 'bg-gold-50' : ''
             }`}
@@ -265,7 +267,16 @@ export function DesktopJobPanel({ currentJobId }: Props) {
             filtered.map(job => (
               <button
                 key={job.id}
-                onClick={() => router.push(hrefForJob(pathname, job.id))}
+                onClick={() => {
+                  setActiveJob({
+                    id: job.id,
+                    name: job.name,
+                    job_number: job.job_number ?? '',
+                    status: job.status,
+                    client_name: job.client_name ?? null,
+                  })
+                  router.push(hrefForJob(pathname, job.id))
+                }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                   job.id === currentJobId ? 'bg-gold-50' : ''
                 }`}
