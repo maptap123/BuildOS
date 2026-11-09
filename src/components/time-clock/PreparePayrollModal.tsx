@@ -20,7 +20,7 @@ export function PreparePayrollModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<{ mailbox: string; recipient: string } | null>(null)
+  const [done, setDone] = useState<{ mailbox: string; recipient: string; existed: boolean } | null>(null)
 
   const validRange = Boolean(start && end && end >= start)
 
@@ -51,7 +51,7 @@ export function PreparePayrollModal({ onClose }: { onClose: () => void }) {
       })
       const j = await r.json()
       if (!r.ok) throw new Error(j.error ?? 'Failed to create draft')
-      setDone({ mailbox: j.mailbox, recipient: j.recipient })
+      setDone({ mailbox: j.mailbox, recipient: j.recipient, existed: Boolean(j.alreadyExisted) })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create draft')
     } finally {
@@ -72,7 +72,10 @@ export function PreparePayrollModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-3">
               <CheckCircle size={16} className="mt-0.5 shrink-0" />
               <span>
-                Draft created in <b>{done.mailbox}</b> addressed to <b>{done.recipient}</b>. Open Outlook to review and send it.
+                {done.existed
+                  ? <>A draft for this pay period is already in <b>{done.mailbox}</b> Drafts, so no new one was made.</>
+                  : <>Fixer created the draft in <b>{done.mailbox}</b> addressed to <b>{done.recipient}</b>.</>}
+                {' '}Open Outlook to review and send it.
               </span>
             </div>
             <button onClick={onClose} className="w-full text-sm font-semibold text-white bg-navy-900 hover:bg-navy-800 px-3 py-2 rounded-lg">Done</button>
@@ -132,7 +135,7 @@ export function PreparePayrollModal({ onClose }: { onClose: () => void }) {
                 className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-navy-900 hover:bg-navy-800 px-3 py-2 rounded-lg disabled:opacity-40"
               >
                 {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Confirm
+                {submitting ? 'Fixer is drafting…' : 'Confirm'}
               </button>
             </div>
           </div>
