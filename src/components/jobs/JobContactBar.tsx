@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Phone, MessageSquare, MapPin, Info, X, User, Hash } from 'lucide-react'
 import { telHref, smsHref, directionsHref } from '@/lib/contactLinks'
+import { AddressDialog } from '@/components/ui/AddressDialog'
 import type { JobClientContact } from '@/lib/jobClientContact'
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
  */
 export function JobContactBar({ jobNumber, jobName, contact }: Props) {
   const [open, setOpen] = useState(false)
+  const [showAddress, setShowAddress] = useState(false)
 
   const tel = telHref(contact.phone)
   const sms = smsHref(contact.phone)
@@ -59,15 +61,24 @@ export function JobContactBar({ jobNumber, jobName, contact }: Props) {
             label="Text"
             disabledLabel="No number"
           />
-          <BarAction
-            href={maps}
-            icon={<MapPin size={16} />}
-            label="Directions"
-            disabledLabel="No address"
-            external
-          />
+          {maps ? (
+            <button
+              type="button"
+              onClick={() => setShowAddress(true)}
+              className="flex-1 md:flex-none md:w-40 flex flex-col items-center justify-center gap-0.5 min-h-[52px] text-navy-700 font-semibold text-[11px] hover:bg-gold-50/60 active:bg-gold-50 hover:text-gold-700 transition-colors"
+            >
+              <span className="text-gold-500"><MapPin size={16} /></span>
+              Directions
+            </button>
+          ) : (
+            <BarAction href={null} icon={<MapPin size={16} />} label="Directions" disabledLabel="No address" />
+          )}
         </div>
       </div>
+
+      {showAddress && fullAddress && (
+        <AddressDialog address={fullAddress} title="Site address" onClose={() => setShowAddress(false)} />
+      )}
 
       {open && (
         <JobInfoSheet

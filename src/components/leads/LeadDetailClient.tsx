@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AddLeadModal } from './AddLeadModal'
+import { AddressDialog } from '@/components/ui/AddressDialog'
 import type {
   Lead, LeadActivity, LeadActivityKind, LeadAttachment, LeadStatus, LeadSource,
 } from '@/types'
@@ -145,6 +146,7 @@ export function LeadDetailClient({
 
   const userName = new Map(users.map(u => [u.id, u.name]))
   const phoneDigits = lead.client_phone?.replace(/[^\d+]/g, '') ?? ''
+  const [showAddress, setShowAddress] = useState(false)
   const mapsUrl = lead.address ? `https://maps.google.com/?q=${encodeURIComponent(lead.address)}` : null
   const canConvert = lead.status === 'won' && !lead.converted_job_id
   const amount = lead.proposal_total ?? lead.estimated_value
@@ -367,6 +369,9 @@ export function LeadDetailClient({
 
   return (
     <div className="max-w-5xl mx-auto space-y-4 md:space-y-6 pb-8">
+      {showAddress && lead.address && (
+        <AddressDialog address={lead.address} title="Lead address" onClose={() => setShowAddress(false)} />
+      )}
 
       {/* ── Header ── */}
       <div>
@@ -433,12 +438,20 @@ export function LeadDetailClient({
           {/* Quick contact */}
           <div className="grid grid-cols-4 gap-2">
             {quickActions.map(({ label, icon: Icon, href }) =>
-              href ? (
+              href && label === 'Map' ? (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setShowAddress(true)}
+                  className="flex flex-col items-center gap-1 bg-white border border-border rounded-xl py-3 text-navy-900 hover:border-gold-300 hover:bg-gold-50 transition-colors"
+                >
+                  <Icon size={18} className="text-gold-600" />
+                  <span className="text-xs font-medium">{label}</span>
+                </button>
+              ) : href ? (
                 <a
                   key={label}
                   href={href}
-                  target={label === 'Map' ? '_blank' : undefined}
-                  rel={label === 'Map' ? 'noopener noreferrer' : undefined}
                   onClick={label === 'Email' ? () => { emailOpenedAt.current = Date.now() } : undefined}
                   className="flex flex-col items-center gap-1 bg-white border border-border rounded-xl py-3 text-navy-900 hover:border-gold-300 hover:bg-gold-50 transition-colors"
                 >
@@ -519,9 +532,9 @@ export function LeadDetailClient({
             {lead.address && (
               <div className="flex items-start gap-3">
                 <MapPin size={15} className="text-gray-400 shrink-0 mt-0.5" />
-                <a href={mapsUrl!} target="_blank" rel="noopener noreferrer" className="text-sm text-navy-900 hover:underline">
+                <button type="button" onClick={() => setShowAddress(true)} className="text-sm text-navy-900 hover:underline text-left">
                   {lead.address}
-                </a>
+                </button>
               </div>
             )}
             {!lead.client_name && !lead.client_email && !lead.client_phone && !lead.address && (

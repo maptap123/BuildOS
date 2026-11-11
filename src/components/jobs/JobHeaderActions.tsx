@@ -1,5 +1,9 @@
+'use client'
+
+import { useState } from 'react'
 import { MapPin, Phone } from 'lucide-react'
-import { directionsHref, telHref } from '@/lib/contactLinks'
+import { telHref } from '@/lib/contactLinks'
+import { AddressDialog } from '@/components/ui/AddressDialog'
 
 interface Props {
   phone: string | null
@@ -11,7 +15,9 @@ interface Props {
 
 /** Quick actions beside the job title, shared by every job tab. */
 export function JobHeaderActions({ phone, address, cityStateZip, compact = false, variant = 'light' }: Props) {
-  const maps = directionsHref([address, cityStateZip])
+  const [showAddress, setShowAddress] = useState(false)
+  const fullAddress = [address, cityStateZip].map(p => (p ?? '').trim()).filter(Boolean).join(', ')
+  const maps = fullAddress || null
   const tel = telHref(phone)
   const actionClass = `inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-2 rounded-lg border text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors ${compact ? 'p-2' : 'px-3'} ${variant === 'dark' ? 'border-white/20 text-white hover:bg-white/10 focus-visible:outline-white' : 'border-border text-navy-700 hover:bg-gold-50 focus-visible:outline-navy-600'}`
   const disabledClass = `${actionClass} cursor-not-allowed opacity-40 disabled:hover:bg-transparent`
@@ -19,10 +25,10 @@ export function JobHeaderActions({ phone, address, cityStateZip, compact = false
   return (
     <div className={`flex shrink-0 items-center ${compact ? 'gap-1' : 'flex-wrap gap-2'}`} aria-label="Job quick actions" role="group">
       {maps ? (
-        <a href={maps} target="_blank" rel="noopener noreferrer" className={actionClass} title="Open job address in Google Maps" aria-label="Open job address in Google Maps">
+        <button type="button" onClick={() => setShowAddress(true)} className={actionClass} title="Show job address" aria-label="Show job address">
           <MapPin size={16} aria-hidden="true" />
-          {!compact && 'Google Maps'}
-        </a>
+          {!compact && 'Map'}
+        </button>
       ) : (
         <button type="button" disabled className={disabledClass} title="No job address on file" aria-label="No job address on file">
           <MapPin size={16} aria-hidden="true" />
@@ -40,6 +46,7 @@ export function JobHeaderActions({ phone, address, cityStateZip, compact = false
           {!compact && 'No number'}
         </button>
       )}
+      {showAddress && maps && <AddressDialog address={maps} title="Job address" onClose={() => setShowAddress(false)} />}
     </div>
   )
 }
