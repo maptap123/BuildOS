@@ -23,6 +23,7 @@ const eslintConfig = defineConfig([
     "bt-export/**",
     "tmp_althoff_logs_pages/**",
     // Generated test artefacts (esbuild bundles, Playwright fixtures)
+    ".qbo-logs/**",
     ".playwright-mcp/**",
   ]),
 ]);

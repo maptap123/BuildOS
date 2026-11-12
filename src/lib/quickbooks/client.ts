@@ -57,7 +57,7 @@ export function getAuthUrl(state: string): string {
     client_id: process.env.QB_CLIENT_ID!,
     redirect_uri: process.env.QB_REDIRECT_URI!,
     response_type: 'code',
-    scope: SCOPE,
+    scope: process.env.QB_PROJECT_SCOPE_ENABLED === 'true' ? `${SCOPE} project-management.project` : SCOPE,
     state,
   })
   return `${AUTHORIZE_URL}?${params.toString()}`

@@ -43,15 +43,6 @@ function categoryForLine(line: EstimateLineRow) {
   return 'Estimate'
 }
 
-async function generateJobNumber(admin: AdminClient) {
-  const { count } = await admin
-    .from('jobs')
-    .select('id', { count: 'exact', head: true })
-
-  const next = String((count ?? 0) + 1).padStart(3, '0')
-  return `JDC-${new Date().getFullYear()}-${next}`
-}
-
 export async function convertAcceptedProposalToJob({
   admin,
   leadId,
@@ -113,54 +104,18 @@ export async function convertAcceptedProposalToJob({
   const createdBy = actorUserId ?? estimate.created_by ?? lead.created_by
   const total = estimateLines.reduce((sum, line) => sum + lineTotal(line), 0)
 
-  let job = null
-  if (lead.converted_job_id) {
-    const { data: existingJob, error: existingJobErr } = await admin
-      .from('jobs')
-      .select('*')
-      .eq('id', lead.converted_job_id)
-      .single()
-
-    if (existingJobErr || !existingJob) {
-      throw new Error('Lead is marked converted, but the linked job could not be found.')
-    }
-
-    job = existingJob
-  } else {
-    const jobNumber = await generateJobNumber(admin)
-    const { data: createdJob, error: jobErr } = await admin
-      .from('jobs')
-      .insert({
-        job_number: jobNumber,
-        name: estimate.job_name?.trim() || lead.title.trim(),
-        description: estimate.scope_text?.trim() || lead.notes?.trim() || null,
-        client_name: lead.client_name?.trim() || 'Unknown',
-        client_email: lead.client_email?.trim() || null,
-        client_phone: lead.client_phone?.trim() || null,
-        site_address: lead.address?.trim() || 'TBD',
-        status: 'active',
-        contract_amount: total,
-        estimated_cost: estimateLines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unit_cost || 0), 0),
-        tags: [],
-        lead_id: lead.id,
-        created_by: createdBy,
-        qb_sync_status: 'not_synced',
-        closeout_checklist: {},
-      })
-      .select()
-      .single()
-
-    if (jobErr || !createdJob) {
-      throw new Error(jobErr?.message ?? 'Failed to create job.')
-    }
-
-    job = createdJob
-
-    await admin
-      .from('leads')
-      .update({ converted_job_id: job.id, status: 'won' })
-      .eq('id', lead.id)
-  }
+  const { data: job, error: jobErr } = await admin.rpc('ensure_lead_conversion_job', {
+    p_lead_id: leadId,
+    p_actor: createdBy,
+    p_seed: {
+      name: estimate.job_name?.trim() || lead.title.trim(),
+      description: estimate.scope_text?.trim() || lead.notes?.trim() || null,
+      status: 'active',
+      contract_amount: total,
+      estimated_cost: estimateLines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unit_cost || 0), 0),
+    },
+  })
+  if (jobErr || !job) throw new Error(jobErr?.message ?? 'Could not save conversion. Check the conversion migration.')
 
   const conversionNote = `Converted from estimate ${estimate.id}`
 

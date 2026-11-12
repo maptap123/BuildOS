@@ -90,6 +90,10 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
+  // Outside-system identifiers can only be saved by the validated project-setup route.
+  for (const key of Object.keys(body)) {
+    if (key.startsWith('qb_')) delete body[key]
+  }
   const tags = Array.isArray(body.tags)
     ? body.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean)
     : []
@@ -112,7 +116,7 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // QuickBooks is the source of truth and BuildOS never writes to it. A new job is
-  // linked to its QB customer (created in QB by the office) via Connected Systems.
+  // Save the BuildOS job once, then offer project setup. Only the separate,
+  // confirmed Projects API path may create a QuickBooks project.
   return NextResponse.json(job, { status: 201 })
 }

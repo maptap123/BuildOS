@@ -45,6 +45,10 @@ export async function POST(
 
   if (linkErr || !link) return NextResponse.json({ error: 'Link not found' }, { status: 404 })
 
+  if (link.provider === 'quickbooks') {
+    return NextResponse.json({ error: 'Use Change QuickBooks project to validate and save the project connection.' }, { status: 409 })
+  }
+
   const newStatus = action === 'approve' ? 'linked' : 'rejected'
 
   const { error: updateErr } = await admin

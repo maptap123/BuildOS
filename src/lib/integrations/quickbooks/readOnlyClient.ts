@@ -76,6 +76,7 @@ export interface QBCustomerResult {
   GivenName?: string
   FamilyName?: string
   Job?: boolean
+  IsProject?: boolean
   ParentRef?: { value: string; name: string }
   PrimaryEmailAddr?: { Address: string }
   PrimaryPhone?: { FreeFormNumber: string }

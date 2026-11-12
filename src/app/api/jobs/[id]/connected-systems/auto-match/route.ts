@@ -35,7 +35,7 @@ export async function POST(
 
   const { data: job, error: jobErr } = await admin
     .from('jobs')
-    .select('id, name, job_number, client_name')
+    .select('id, name, job_number, client_name, qb_link_version')
     .eq('id', id)
     .single()
 
@@ -60,8 +60,8 @@ export async function POST(
 
   let qbError: string | null = null
   try {
-    const qbCandidates = await searchQuickBooksCustomers(job.name, 20)
-    if (job.client_name) {
+    const qbCandidates = job.qb_link_version > 0 ? [] : await searchQuickBooksCustomers(job.name, 20)
+    if (!job.qb_link_version && job.client_name) {
       const lastName = job.client_name.split(' ').pop() ?? ''
       if (lastName && lastName !== job.name) {
         const byClient = await searchQuickBooksCustomers(lastName, 10)
@@ -107,7 +107,7 @@ export async function POST(
       if (action === 'linked') {
         const { error: jobErr } = await admin.from('jobs').update({
           qb_customer_id: customer.Id,
-          qb_project_id: customer.Job ? customer.Id : null,
+          qb_project_id: customer.IsProject === true ? customer.Id : null,
           qb_sync_status: 'synced',
           qb_last_synced_at: new Date().toISOString(),
           qb_sync_error: null,

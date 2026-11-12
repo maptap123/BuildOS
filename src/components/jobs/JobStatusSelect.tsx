@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { JobStatus } from '@/types'
+import { QuickBooksProjectSetup } from './QuickBooksProjectSetup'
 
 const OPTIONS: { value: JobStatus; label: string; className: string }[] = [
   { value: 'lead',     label: 'Lead',     className: 'bg-gray-100 text-gray-600' },
@@ -24,6 +25,8 @@ export function JobStatusSelect({
   const [status, setStatus] = useState<JobStatus>(initialStatus)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [setup, setSetup] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -36,17 +39,22 @@ export function JobStatusSelect({
 
   const current = OPTIONS.find(o => o.value === status) ?? OPTIONS[0]
 
-  async function select(next: JobStatus) {
+  async function select(next: JobStatus, projectReviewed = false) {
     if (next === status) { setOpen(false); return }
+    if (next === 'active' && !projectReviewed) { setOpen(false); setSetup(true); return }
     setOpen(false)
     setSaving(true)
+    setError(null)
     try {
       const res = await fetch(`/api/jobs/${jobId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
       })
-      if (res.ok) setStatus(next)
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Status was not saved.')
+      setStatus(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Status was not saved.')
     } finally {
       setSaving(false)
     }
@@ -62,6 +70,8 @@ export function JobStatusSelect({
 
   return (
     <div ref={ref} className="relative">
+      {setup && <QuickBooksProjectSetup jobId={jobId} onDone={() => { setSetup(false); void select('active', true) }} />}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <button
         onClick={() => setOpen(o => !o)}
         disabled={saving}

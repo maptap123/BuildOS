@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   const limit  = Math.min(body.limit ?? 25, 100)
   const status = body.status ?? 'active'
 
-  let jobsQuery = admin.from('jobs').select('id, name, job_number, client_name').limit(limit)
+  let jobsQuery = admin.from('jobs').select('id, name, job_number, client_name, qb_link_version').limit(limit)
   if (status && status !== 'all') jobsQuery = jobsQuery.eq('status', status)
 
   const { data: jobs, error: jobsErr } = await jobsQuery
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
 
     try {
       // QuickBooks
-      const qbCandidates = await searchQuickBooksCustomers(job.name, 10)
+      const qbCandidates = job.qb_link_version > 0 ? [] : await searchQuickBooksCustomers(job.name, 10)
 
       for (const customer of qbCandidates) {
         const candidate: ExternalMatchCandidate = {
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
           if (action === 'linked') {
             const { error: jobErr } = await admin.from('jobs').update({
               qb_customer_id: customer.Id,
-              qb_project_id: customer.Job ? customer.Id : null,
+              qb_project_id: customer.IsProject === true ? customer.Id : null,
               qb_sync_status: 'synced',
               qb_last_synced_at: new Date().toISOString(),
               qb_sync_error: null,

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { QuickBooksProjectSetup } from './QuickBooksProjectSetup'
 import { X } from 'lucide-react'
 import type { Job, JobStatus } from '@/types'
 import { useTagOptions } from '@/hooks/useTagOptions'
@@ -30,6 +31,8 @@ function emptyOrNull(value: string) {
 
 export function AddJobModal({ onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false)
+  const pending = useRef(false)
+  const [savedJob, setSavedJob] = useState<Job | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
@@ -63,6 +66,8 @@ export function AddJobModal({ onClose, onCreated }: Props) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (pending.current || savedJob) return
+    pending.current = true
     setSaving(true)
     setError(null)
 
@@ -95,12 +100,16 @@ export function AddJobModal({ onClose, onCreated }: Props) {
         throw new Error(body.error ?? `Error ${res.status}`)
       }
 
-      onCreated(await res.json())
+      setSavedJob(await res.json())
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
       setSaving(false)
+    } finally {
+      pending.current = false
     }
   }
+
+  if (savedJob) return <QuickBooksProjectSetup jobId={savedJob.id} onDone={() => onCreated(savedJob)} />
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">

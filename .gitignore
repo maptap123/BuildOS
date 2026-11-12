@@ -11,6 +11,7 @@
 !.yarn/versions
 
 # testing
+/.qbo-logs/
 /coverage
 /test-results/
 /playwright-report/

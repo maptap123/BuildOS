@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ExternalLink as ExternalLinkIcon, RefreshCw, CheckCircle, AlertCircle, Clock, Link2 } from 'lucide-react'
 
+import { QuickBooksProjectSetup } from './QuickBooksProjectSetup'
+
 interface JobExternalLink {
   id: string
   provider: string
@@ -24,6 +26,7 @@ interface JobSummary {
 }
 
 interface ConnectedSystemsData {
+  can_manage_quickbooks?: boolean
   job: JobSummary
   links: JobExternalLink[]
 }
@@ -61,6 +64,7 @@ function ProviderBadge({ status, count }: { status: string; count: number }) {
 }
 
 export function ConnectedSystemsCard({ jobId }: Props) {
+  const [setup, setSetup] = useState(false)
   const [data, setData] = useState<ConnectedSystemsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
@@ -160,6 +164,8 @@ export function ConnectedSystemsCard({ jobId }: Props) {
         )}
 
         {/* SharePoint row */}
+        {data?.can_manage_quickbooks && <button type="button" onClick={() => setSetup(true)} className="text-sm text-gold-700 underline">{qbLinked.length ? 'Change QuickBooks project' : 'Set up QuickBooks project'}</button>}
+        {setup && <QuickBooksProjectSetup jobId={jobId} onDone={() => { setSetup(false); void fetchData() }} />}
         <div className="flex items-center justify-between py-2 border-b border-gray-50">
           <div className="flex items-center gap-2.5">
             <div className="w-6 h-6 rounded bg-blue-100 flex items-center justify-center shrink-0">

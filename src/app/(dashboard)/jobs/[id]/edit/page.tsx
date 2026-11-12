@@ -6,6 +6,7 @@ import { ArrowLeft, Save, X, Archive, Trash2, AlertTriangle } from 'lucide-react
 import { useUsers } from '@/hooks/useUsers'
 import { useTagOptions } from '@/hooks/useTagOptions'
 import type { Job, JobStatus } from '@/types'
+import { QuickBooksProjectSetup } from '@/components/jobs/QuickBooksProjectSetup'
 
 const STATUS_OPTIONS: { value: JobStatus; label: string }[] = [
   { value: 'lead',     label: 'Lead'     },
@@ -74,6 +75,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [projectSetup, setProjectSetup] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('details')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -178,8 +180,9 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  async function handleSave() {
+  async function handleSave(projectReviewed = false) {
     if (!name.trim()) { setError('Job name is required'); return }
+    if (status === 'active' && job?.status !== 'active' && !projectReviewed) { setProjectSetup(true); return }
     setSaving(true)
     setError(null)
 
@@ -242,6 +245,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
 
   return (
     <div className="max-w-2xl">
+      {projectSetup && <QuickBooksProjectSetup jobId={id} onDone={() => { setProjectSetup(false); void handleSave(true) }} />}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -263,7 +267,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
             Cancel
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-navy-900 hover:bg-navy-800 text-white rounded-lg transition-colors disabled:opacity-60"
           >

@@ -32,6 +32,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { AddLeadModal } from './AddLeadModal'
 import { AddressDialog } from '@/components/ui/AddressDialog'
+import { QuickBooksProjectSetup } from '@/components/jobs/QuickBooksProjectSetup'
 import type {
   Lead, LeadActivity, LeadActivityKind, LeadAttachment, LeadStatus, LeadSource,
 } from '@/types'
@@ -132,6 +133,8 @@ export function LeadDetailClient({
   const [showEdit, setShowEdit] = useState(false)
   const [showConvertConfirm, setShowConvertConfirm] = useState(false)
   const [converting, setConverting] = useState(false)
+  const convertingRef = useRef(false)
+  const [projectSetupJobId, setProjectSetupJobId] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [savingStatus, setSavingStatus] = useState<LeadStatus | null>(null)
@@ -254,6 +257,8 @@ export function LeadDetailClient({
   }
 
   async function convertToJob() {
+    if (convertingRef.current) return
+    convertingRef.current = true
     setConverting(true)
     setError(null)
     try {
@@ -262,15 +267,20 @@ export function LeadDetailClient({
       if (!res.ok) {
         // 409 = already converted — just redirect to the existing job
         if (res.status === 409 && body.job_id) {
-          router.push(`/jobs/${body.job_id}`)
+          setShowConvertConfirm(false)
+          setProjectSetupJobId(body.job_id)
           return
         }
         throw new Error(body.error ?? `Error ${res.status}`)
       }
       setLead(prev => ({ ...prev, converted_job_id: body.job.id, status: 'won' }))
-      router.push(`/jobs/${body.job.id}`)
+      setShowConvertConfirm(false)
+      setProjectSetupJobId(body.job.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to convert lead to job.')
+      setConverting(false)
+    } finally {
+      convertingRef.current = false
       setConverting(false)
     }
   }
@@ -880,6 +890,7 @@ export function LeadDetailClient({
       )}
 
       {/* Convert-to-Job confirmation dialog */}
+      {projectSetupJobId && <QuickBooksProjectSetup jobId={projectSetupJobId} onDone={() => { router.push(`/jobs/${projectSetupJobId}`); setProjectSetupJobId(null) }} />}
       {showConvertConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
           <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-xl shadow-xl p-6 space-y-4">

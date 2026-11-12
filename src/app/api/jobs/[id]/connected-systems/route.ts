@@ -38,6 +38,7 @@ export async function GET(
   if (jobErr || !job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json({
+    can_manage_quickbooks: (await admin.from('user_permissions').select('can_manage').eq('user_id', user.id).eq('module', 'admin').single()).data?.can_manage === true,
     job: {
       id:                       job.id,
       name:                     job.name,
