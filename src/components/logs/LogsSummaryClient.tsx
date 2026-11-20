@@ -10,9 +10,13 @@ import {
   type ActiveFilter,
 } from '@/components/summary/SummaryKit'
 
+export interface LogPhotoRef { id: string; url: string; file_name: string | null }
+
 export interface LogSummaryRow {
   id: string
   job_id: string
+  bt_log_id?: string | null
+  photos?: LogPhotoRef[]
   log_date: string
   author_name: string | null
   weather_summary: string | null
@@ -194,6 +198,8 @@ export function LogsSummaryClient({ logs, activeJobs }: { logs: LogSummaryRow[];
 }
 
 function LogCard({ log }: { log: LogSummaryRow }) {
+  const [lightbox, setLightbox] = useState<number | null>(null)
+  const photos = log.photos ?? []
   const hasIssue = !!log.delays?.trim() || !!log.safety_notes?.trim()
   return (
     <Link
@@ -218,14 +224,45 @@ function LogCard({ log }: { log: LogSummaryRow }) {
         </div>
       </div>
       {log.work_performed?.trim() ? (
-        <p className="text-sm text-gray-700 mt-1.5 line-clamp-3 whitespace-pre-line">{log.work_performed}</p>
+        <p className="text-sm text-gray-700 mt-1.5 whitespace-pre-line">{log.work_performed}</p>
       ) : log.weather_summary ? (
         <p className="text-xs text-gray-400 mt-1 truncate">{log.weather_summary}</p>
       ) : null}
+      {photos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {photos.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); setLightbox(i) }}
+              className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt={p.file_name ?? ''} loading="lazy" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+      {lightbox !== null && photos[lightbox] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-3 p-4"
+          onClick={e => { e.preventDefault(); e.stopPropagation(); setLightbox(null) }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photos[lightbox].url} alt={photos[lightbox].file_name ?? ''} className="max-h-[80vh] max-w-full object-contain rounded-lg" />
+          <div className="flex items-center gap-4 text-white text-sm" onClick={e => e.stopPropagation()}>
+            <button type="button" disabled={lightbox === 0} onClick={e => { e.preventDefault(); setLightbox(lightbox - 1) }} className="px-3 py-1 disabled:opacity-30">‹ Prev</button>
+            <span className="text-white/60 text-xs">{lightbox + 1} / {photos.length}</span>
+            <button type="button" disabled={lightbox === photos.length - 1} onClick={e => { e.preventDefault(); setLightbox(lightbox + 1) }} className="px-3 py-1 disabled:opacity-30">Next ›</button>
+          </div>
+        </div>
+      )}
       {hasIssue && (
         <p className="flex items-start gap-1 text-[11px] text-amber-700 bg-amber-50 rounded-md px-2 py-1 mt-2">
           <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-          <span className="line-clamp-2">{log.delays?.trim() || log.safety_notes?.trim()}</span>
+          <span className="whitespace-pre-line">
+            {[log.delays?.trim() && `Delays: ${log.delays.trim()}`, log.safety_notes?.trim() && `Safety: ${log.safety_notes.trim()}`].filter(Boolean).join('\n')}
+          </span>
         </p>
       )}
     </Link>
