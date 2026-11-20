@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Camera, Image as ImageIcon, Briefcase, Tag, ChevronRight, Check, CloudOff } from 'lucide-react'
+import { X, Camera, Image as ImageIcon, Briefcase, Tag, ChevronRight } from 'lucide-react'
 import { JobPickerSheet } from '@/components/jobs'
-import { saveLogDraft, loadLogDraft, clearLogDraft, markLogDraftPending } from '@/lib/logDrafts'
+import { saveLogDraft, loadLogDraft, clearLogDraft } from '@/lib/logDrafts'
+import { enqueueLog } from '@/lib/logOutbox'
 import type { DailyLog, Job } from '@/types'
 
 interface JobInfo {
@@ -40,8 +41,6 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
   const [photos, setPhotos] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
-  const [savedOffline, setSavedOffline] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -65,47 +64,19 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          job_id: job.id,
-          log_date: todayDate(),
-          work_performed: notes.trim() || null,
-          cost_code: costCode.trim() || null,
-        }),
+      // Stores the log + photos on the phone (instant), then uploads in the
+      // background — the crew doesn't wait, and nothing is lost if signal drops.
+      await enqueueLog({
+        job_id: job.id,
+        log_date: todayDate(),
+        work_performed: notes.trim() || null,
+        cost_code: costCode.trim() || null,
+        photos,
       })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? `Error ${res.status}`)
-      }
-
-      const savedLog = await res.json() as DailyLog
-
-      if (photos.length > 0 && savedLog.id) {
-        await Promise.all(photos.map(file => {
-          const fd = new FormData()
-          fd.append('job_id', job.id)
-          fd.append('log_id', savedLog.id)
-          fd.append('file', file)
-          return fetch('/api/photos', { method: 'POST', body: fd })
-        }))
-      }
-
       clearLogDraft(DRAFT_KEY)
-      onSaved?.(savedLog)
-      setSaved(true)
-      setTimeout(onClose, 900)
+      onClose()
     } catch (e) {
-      // Network failure → keep the draft on the phone and auto-retry later
-      if (e instanceof TypeError) {
-        markLogDraftPending(DRAFT_KEY)
-        setSavedOffline(true)
-        setError(null)
-      } else {
-        setError(e instanceof Error ? e.message : 'Something went wrong')
-      }
+      setError(e instanceof Error ? e.message : 'Something went wrong')
       setSaving(false)
     }
   }
@@ -266,16 +237,6 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5">{error}</p>
           )}
 
-          {savedOffline && (
-            <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
-              <CloudOff size={15} className="shrink-0 mt-0.5" />
-              <span>
-                No connection — your log is saved on this phone and will send automatically when
-                you&apos;re back online.
-                {photos.length > 0 && ' Photos stay attached here until it sends.'}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -283,12 +244,7 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
           className="shrink-0 px-5 py-4 border-t border-gray-100"
           style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
         >
-          {saved ? (
-            <div className="flex items-center justify-center gap-2 h-12 text-green-600">
-              <Check size={18} strokeWidth={2.5} />
-              <span className="font-semibold text-sm">Log saved!</span>
-            </div>
-          ) : (
+          {(
             <div className="flex gap-3">
               <button
                 type="button"

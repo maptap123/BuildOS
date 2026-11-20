@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Bot, Sparkles, X } from 'lucide-react'
+import { FileText, Bot, Sparkles, X, List } from 'lucide-react'
 import { JobPickerSheet } from '@/components/jobs'
 import type { Job } from '@/types'
 
@@ -64,7 +64,7 @@ export function LogModePicker({ jobId, activeJob, onClose, onTraditionalOpen }: 
 
         <div className="px-5 pb-10">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-display font-bold text-[#1b2b4a] text-xl">Create Daily Log</h2>
+            <h2 className="font-display font-bold text-[#1b2b4a] text-xl">Daily Logs</h2>
             <button onClick={onClose} className="p-1 text-gray-400 hover:text-[#1b2b4a] transition-colors">
               <X size={20} />
             </button>
@@ -121,11 +121,26 @@ export function LogModePicker({ jobId, activeJob, onClose, onTraditionalOpen }: 
                 </p>
               </div>
             </button>
-          </div>
 
-          <p className="text-center text-xs text-gray-400 mt-4">
-            Inspired by Klutch AI — talk your log, skip the typing.
-          </p>
+            {/* View logs */}
+            <button
+              onClick={() => {
+                onClose()
+                router.push(jobId ? `/jobs/${jobId}/logs` : '/logs')
+              }}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-[#e2ddd6] bg-white text-left transition-all active:scale-[0.98] hover:border-[#1b2b4a]"
+            >
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-[#f1eee8]">
+                <List size={22} className="text-[#1b2b4a]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-[#1b2b4a] text-base">View Daily Logs</p>
+                <p className="text-[#4d6a9a] text-sm mt-0.5 leading-snug">
+                  {activeJob?.name ? `Browse past logs for ${activeJob.name}.` : 'Browse past logs and photos.'}
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { CloudUpload } from 'lucide-react'
 import { retryPendingLogDrafts, LOG_DRAFT_SYNCED_EVENT } from '@/lib/logDrafts'
+import { processOutbox, LOG_OUTBOX_STATUS_EVENT, type OutboxStatus } from '@/lib/logOutbox'
 
 /**
  * Mounted once in the dashboard layout. Retries pending offline log drafts
@@ -20,23 +21,37 @@ export function LogDraftSync() {
       }
     }
 
+    function handleOutbox(e: Event) {
+      const status = (e as CustomEvent<OutboxStatus>).detail
+      if (status?.message) setToast(status.message)
+    }
+
     function retry() {
       retryPendingLogDrafts().catch(() => {})
+      processOutbox().catch(() => {})
+    }
+
+    function onVisible() {
+      if (document.visibilityState === 'visible') retry()
     }
 
     window.addEventListener(LOG_DRAFT_SYNCED_EVENT, handleSynced)
+    window.addEventListener(LOG_OUTBOX_STATUS_EVENT, handleOutbox)
     window.addEventListener('online', retry)
+    document.addEventListener('visibilitychange', onVisible)
     retry()
 
     return () => {
       window.removeEventListener(LOG_DRAFT_SYNCED_EVENT, handleSynced)
+      window.removeEventListener(LOG_OUTBOX_STATUS_EVENT, handleOutbox)
       window.removeEventListener('online', retry)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
   useEffect(() => {
     if (!toast) return
-    const id = setTimeout(() => setToast(null), 3500)
+    const id = setTimeout(() => setToast(null), 4000)
     return () => clearTimeout(id)
   }, [toast])
 
