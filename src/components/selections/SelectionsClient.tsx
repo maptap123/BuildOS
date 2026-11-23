@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, ChevronRight, AlertTriangle, FileText, Printer } from 'lucide-react'
+import { Plus, ChevronRight, AlertTriangle, FileText, Printer, Share2, MessageSquare, Check } from 'lucide-react'
 import { divisionPhase } from '@/lib/estimates/divisions'
 import type { AllowanceSummary, Selection, SelectionsBoard, SelectionStatus } from '@/types'
-import { fmtMoney } from './Sheet'
+import { fmtMoney, Sheet } from './Sheet'
+import { CommentsPanel } from './CommentsPanel'
 import { NewSelectionSheet } from './NewSelectionSheet'
 import { SelectionDetailSheet } from './SelectionDetailSheet'
 
@@ -48,6 +49,32 @@ export function SelectionsClient({
   const [tab, setTab] = useState<'selections' | 'allowances'>('selections')
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [shareUrl, setShareUrl] = useState('')
+
+  // Unread count for the Comments badge (the open panel keeps it fresh itself).
+  useEffect(() => {
+    let live = true
+    const load = async () => {
+      const res = await fetch(`/api/jobs/${jobId}/selections/comments`, { cache: 'no-store' })
+      if (res.ok && live) setUnread((await res.json()).unread ?? 0)
+    }
+    load()
+    const t = setInterval(load, 30000)
+    return () => { live = false; clearInterval(t) }
+  }, [jobId])
+
+  async function share() {
+    const res = await fetch(`/api/jobs/${jobId}/selections/share`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    if (!res.ok) { setShareState('error'); return }
+    const { token } = await res.json()
+    const url = `${window.location.origin}/selections/${token}`
+    setShareUrl(url)
+    try { await navigator.clipboard.writeText(url); setShareState('copied') } catch { setShareState('copied') }
+    setTimeout(() => setShareState('idle'), 4000)
+  }
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/jobs/${jobId}/selections`, { cache: 'no-store' })
@@ -90,6 +117,24 @@ export function SelectionsClient({
           </p>
         </div>
         <div className="shrink-0 flex items-center gap-2">
+        {permissions.can_edit && (
+          <button
+            onClick={share}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-white text-navy-900 text-sm font-semibold"
+          >
+            {shareState === 'copied' ? <Check size={16} className="text-green-600" /> : <Share2 size={16} />}
+            <span className="hidden sm:inline">{shareState === 'copied' ? 'Link copied' : 'Share'}</span>
+          </button>
+        )}
+        <button
+          onClick={() => setCommentsOpen(true)}
+          className="relative flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-white text-navy-900 text-sm font-semibold"
+        >
+          <MessageSquare size={16} /> <span className="hidden sm:inline">Comments</span>
+          {unread > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">{unread}</span>
+          )}
+        </button>
         <Link
           href={`/jobs/${jobId}/selections/print`}
           target="_blank"
@@ -107,6 +152,14 @@ export function SelectionsClient({
         )}
         </div>
       </div>
+
+      {(shareState === 'copied' || shareState === 'error') && (
+        <p className={`text-xs ${shareState === 'error' ? 'text-red-600' : 'text-gray-600'}`}>
+          {shareState === 'error'
+            ? 'Could not create the share link.'
+            : <>Anyone with this link can view the selections and comment, no login needed: <span className="font-mono break-all select-all">{shareUrl}</span></>}
+        </p>
+      )}
 
       {/* Totals */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -215,6 +268,19 @@ export function SelectionsClient({
           onClose={() => setCreating(false)}
           onCreated={async () => { setCreating(false); await refresh() }}
         />
+      )}
+      {commentsOpen && (
+        <Sheet title="Client comments" subtitle="From the shared link. Your replies show there too." onClose={() => setCommentsOpen(false)}>
+          <div className="-mx-5 -my-4 h-[60vh]">
+            <CommentsPanel
+              mode="staff"
+              listUrl={`/api/jobs/${jobId}/selections/comments?markRead=1`}
+              postUrl={`/api/jobs/${jobId}/selections/comments`}
+              selections={board.selections.map(s => ({ id: s.id, title: s.title }))}
+              onUnread={setUnread}
+            />
+          </div>
+        </Sheet>
       )}
       {open && (
         <SelectionDetailSheet
