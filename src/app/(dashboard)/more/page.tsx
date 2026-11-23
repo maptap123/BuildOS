@@ -76,14 +76,14 @@ export default function MorePage() {
 
   function canUseItem(key: string): boolean {
     if (key === 'owners') return can('owners', 'view') // not implied by admin
-    if (OFFICE_ONLY.has(key) && !isOfficeUser) return false
+    if (OFFICE_ONLY.has(key) && !isOfficeUser && !(key === 'selections' && can('selections', 'view'))) return false
     if (key === 'time-clock') return isAdmin() || can('time_clock', 'view') || can('jobs', 'view')
     if (key === 'logs') return isAdmin() || can('logs', 'view')
     if (key === 'schedule') return isAdmin() || can('schedule', 'view')
     if (key === 'tasks') return isAdmin() || can('tasks', 'view')
     if (key === 'documents') return isAdmin() || can('documents', 'view')
     if (key === 'budget') return canViewBudget
-    if (key === 'selections') return canViewBudget
+    if (key === 'selections') return isAdmin() || can('selections', 'view')
     if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
     if (key === 'profitability') return isAdmin() || can('profitability', 'view') || canViewBudget
     if (key === 'estimates') return isAdmin() || can('estimates', 'view') || canViewBudget

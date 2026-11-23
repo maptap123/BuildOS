@@ -197,7 +197,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     if (key === 'documents') return isAdmin() || can('documents', 'view')
     if (key === 'templates') return canManageOffice
     if (key === 'budget') return canViewBudget
-    if (key === 'selections') return canViewBudget
+    if (key === 'selections') return isAdmin() || can('selections', 'view')
     if (key === 'finance') return isAdmin() || can('finance', 'view') || canViewBudget
     if (key === 'profitability') return isAdmin() || can('profitability', 'view') || canViewBudget
     if (key === 'estimates') return isAdmin() || can('estimates', 'view') || canViewBudget

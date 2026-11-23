@@ -89,7 +89,7 @@ export default async function PrintSelectionsPage({
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  if (!(await hasModulePermOrAdmin(admin, user.id, 'budget', 'can_view'))) {
+  if (!(await hasModulePermOrAdmin(admin, user.id, 'selections', 'can_view'))) {
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: CSS }} />

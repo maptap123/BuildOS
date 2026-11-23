@@ -18,12 +18,12 @@ export default async function JobSelectionsPage({
 
   const admin = createAdminClient()
 
-  // Selections rides the Budget permission (allowances + overage change orders are money).
+  // Selections has its own permission module; Edit also covers delete.
   const [canView, canCreate, canEdit, canDelete, { data: job }] = await Promise.all([
-    hasModulePermOrAdmin(admin, user.id, 'budget', 'can_view'),
-    hasModulePermOrAdmin(admin, user.id, 'budget', 'can_create'),
-    hasModulePermOrAdmin(admin, user.id, 'budget', 'can_edit'),
-    hasModulePermOrAdmin(admin, user.id, 'budget', 'can_delete'),
+    hasModulePermOrAdmin(admin, user.id, 'selections', 'can_view'),
+    hasModulePermOrAdmin(admin, user.id, 'selections', 'can_create'),
+    hasModulePermOrAdmin(admin, user.id, 'selections', 'can_edit'),
+    hasModulePermOrAdmin(admin, user.id, 'selections', 'can_delete'),
     admin.from('jobs').select('id').eq('id', id).single(),
   ])
 
