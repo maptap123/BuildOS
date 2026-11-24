@@ -10,6 +10,9 @@ import {
 import { searchQuickBooksCustomers } from '@/lib/integrations/quickbooks/readOnlyClient'
 import { searchSharePointDriveItems } from '@/lib/integrations/microsoft/sharepointReadOnlyClient'
 
+// Two external searches plus one upsert per candidate: well past the default function timeout.
+export const maxDuration = 60
+
 const SCORE_AUTO_LINK = 0.90
 const SCORE_CANDIDATE = 0.70
 

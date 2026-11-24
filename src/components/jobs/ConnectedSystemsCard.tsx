@@ -97,6 +97,7 @@ export function ConnectedSystemsCard({ jobId }: Props) {
       }
       const errors = [json.errors?.quickbooks, json.errors?.sharepoint].filter(Boolean)
       if (errors.length) setMatchError(errors.join(' | '))
+      else if (!(json.results ?? []).length) setMatchError('No matches found in QuickBooks or SharePoint.')
       await fetchData()
       // No confident QuickBooks match (and nothing already linked): open the manual picker.
       const results: { provider: string; action: string }[] = json.results ?? []
