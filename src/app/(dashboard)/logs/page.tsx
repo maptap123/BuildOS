@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LogsSummaryClient } from '@/components/logs'
+import { PendingLogCards } from '@/components/logs/PendingLogCards'
 import type { LogSummaryRow, LogPhotoRef } from '@/components/logs'
 
 export const metadata = { title: 'Daily Logs — BuildOS' }
@@ -88,5 +89,10 @@ export default async function LogsSummaryPage() {
     .eq('status', 'active')
     .order('name')
 
-  return <LogsSummaryClient logs={logs} activeJobs={activeJobs ?? []} />
+  return (
+    <>
+      <PendingLogCards />
+      <LogsSummaryClient logs={logs} activeJobs={activeJobs ?? []} />
+    </>
+  )
 }

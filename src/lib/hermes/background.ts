@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 export const PUBLIC_REQUEST_FIELDS = 'id,estimate_id,message,status,progress,result,error,created_at,started_at,finished_at'
-export const BACKGROUND_TOOLS = new Set(['find_comparable_estimates', 'find_line_pricing', 'add_estimate_lines'])
+export const BACKGROUND_TOOLS = new Set(['find_comparable_estimates', 'find_line_pricing', 'add_estimate_lines', 'read_estimate_lines', 'change_estimate_line'])
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Budget access is company-wide in BuildOS. Conversations additionally belong to

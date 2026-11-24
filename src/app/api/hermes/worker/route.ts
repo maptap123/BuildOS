@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { BACKGROUND_TOOLS, canUseBackground, UUID } from '@/lib/hermes/background'
 import { HERMES_TOOLS } from '@/lib/hermes/tools'
+import { FIXER_LINE_TOOLS } from '@/lib/hermes/fixerLineTools'
 
 export const maxDuration = 30
 
@@ -26,13 +27,13 @@ export async function POST(request: Request) {
       admin.from('fixer_requests').select('message,result').eq('user_id', job.user_id).eq('estimate_id', job.estimate_id)
         .eq('status', 'completed').lt('created_at', job.created_at).order('created_at', { ascending: false }).limit(20),
       admin.from('estimates').select('id,title,job_name,scope_text,notes,internal_notes,markup_pct,is_locked,lead_id,job_id').eq('id', job.estimate_id).single(),
-      admin.from('estimate_lines').select('description,phase,quantity,uom,unit_cost,labor_cost,material_cost,sub_cost,markup_pct').eq('estimate_id', job.estimate_id).order('sort_order').limit(1000),
+      admin.from('estimate_lines').select('id,estimate_id,description,phase,cost_code,quantity,uom,unit_cost,labor_cost,material_cost,sub_cost,markup_pct,sort_order,source,source_line_id,cost_item_id,comp_job_id,comp_label,ai_rationale,notes,allowance').eq('estimate_id', job.estimate_id).order('sort_order').limit(1000),
     ])
     if (historyError || estimateError || linesError || !estimate || estimate.is_locked) {
       await admin.rpc('update_fixer_request', { p_id: job.id, p_lease: job.lease_token, p_action: 'fail', p_text: 'Could not load the estimate context, or the estimate is locked. Please try again after checking it.' })
       return Response.json({ job: null })
     }
-    return Response.json({ job: { ...job, estimate: { ...estimate, lines }, tools: HERMES_TOOLS.filter(t => BACKGROUND_TOOLS.has(t.name)).map(t => ({ name: t.name, description: t.name === 'add_estimate_lines' ? 'Propose lines for human review on this request’s estimate. Never directly applies lines. Preserve source citations and labor/material/sub breakdowns.' : t.description, parameters: t.input_schema })), history: (history ?? []).reverse().flatMap(h => [
+    return Response.json({ job: { ...job, estimate: { ...estimate, lines }, tools: [...HERMES_TOOLS, ...FIXER_LINE_TOOLS].filter(t => BACKGROUND_TOOLS.has(t.name)).map(t => ({ name: t.name, description: t.name === 'add_estimate_lines' ? 'Propose lines for human review on this request’s estimate. Never directly applies lines. Preserve source citations and labor/material/sub breakdowns.' : t.description, parameters: t.input_schema })), history: (history ?? []).reverse().flatMap(h => [
       { role: 'user', content: h.message }, { role: 'assistant', content: h.result },
     ]) } }, { headers: { 'Cache-Control': 'no-store' } })
   }

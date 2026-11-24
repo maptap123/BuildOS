@@ -31,6 +31,7 @@ interface OutboxPhoto {
 interface OutboxItem {
   id: string
   job_id: string
+  job_name?: string | null
   log_date: string
   work_performed: string | null
   cost_code: string | null
@@ -210,8 +211,36 @@ async function postPhoto(item: OutboxItem, photo: OutboxPhoto, smaller = false) 
 
 // ── public API ───────────────────────────────────────────────────────────────
 
+export interface PendingLog {
+  id: string
+  job_id: string
+  job_name: string | null
+  log_date: string
+  work_performed: string | null
+  photos: number
+  /** true when it needs a human (rejected by the server) rather than just waiting on signal */
+  failed: boolean
+  message: string | null
+}
+
+/** Logs saved on this phone that haven't fully reached the server yet. */
+export async function listPendingLogs(): Promise<PendingLog[]> {
+  const items = await getAllItems()
+  return items.map(i => ({
+    id: i.id,
+    job_id: i.job_id,
+    job_name: i.job_name ?? null,
+    log_date: i.log_date,
+    work_performed: i.work_performed,
+    photos: i.photos.length,
+    failed: !!i.failedReason,
+    message: i.failedReason ?? i.lastError ?? null,
+  }))
+}
+
 export async function enqueueLog(input: {
   job_id: string
+  job_name?: string | null
   log_date: string
   work_performed: string | null
   cost_code: string | null
@@ -220,6 +249,7 @@ export async function enqueueLog(input: {
   const item: OutboxItem = {
     id: newId(),
     job_id: input.job_id,
+    job_name: input.job_name ?? null,
     log_date: input.log_date,
     work_performed: input.work_performed,
     cost_code: input.cost_code,

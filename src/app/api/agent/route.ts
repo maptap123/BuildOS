@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   const { tool, params = {} } = body
 
   const background = 'background' in authResult ? authResult.background : undefined
-  if (background && (!BACKGROUND_TOOLS.has(tool) || (tool === 'add_estimate_lines' && params.estimate_id !== background.estimate_id))) {
+  if (background && (!BACKGROUND_TOOLS.has(tool) || (['add_estimate_lines', 'read_estimate_lines', 'change_estimate_line'].includes(tool) && params.estimate_id !== background.estimate_id))) {
     return NextResponse.json({ error: 'This request can only research pricing and propose lines for its own estimate' }, { status: 403 })
   }
 
@@ -116,6 +116,39 @@ export async function POST(request: Request) {
 
   try {
     switch (tool) {
+      case 'read_estimate_lines':
+      case 'change_estimate_line': {
+        // New existing-line capabilities are deliberately unavailable to general
+        // session/SMS/service credentials, even if that account has budget access.
+        if (!background) return permError()
+        if (tool === 'read_estimate_lines') {
+          if (!await hasPerm('budget', 'can_view')) return permError()
+          const { data, error } = await admin.rpc('read_fixer_estimate_lines', {
+            p_request: background.id, p_lease: background.lease_token,
+          })
+          if (error) return NextResponse.json({ error: error.message }, { status: 409 })
+          return ok(data)
+        }
+        if (!['edit', 'delete'].includes(params.operation)) {
+          return NextResponse.json({ error: 'operation must be edit or delete' }, { status: 400 })
+        }
+        if (!await hasPerm('budget', params.operation === 'delete' ? 'can_delete' : 'can_edit')) return permError()
+        if (!UUID.test(params.operation_id ?? '') || !UUID.test(params.line_id ?? '')
+          || typeof params.expected_revision !== 'string' || !/^[a-f0-9]{32}$/.test(params.expected_revision)
+          || params.explicit_user_request !== true || typeof params.instruction_quote !== 'string'
+          || params.instruction_quote.trim().length < 8 || params.instruction_quote.length > 30000
+          || !params.patch || typeof params.patch !== 'object' || Array.isArray(params.patch)) {
+          return NextResponse.json({ error: 'A stable operation ID, current line revision, patch and explicit user instruction are required' }, { status: 400 })
+        }
+        const { data, error } = await admin.rpc('change_fixer_estimate_line', {
+          p_request: background.id, p_lease: background.lease_token,
+          p_operation_id: params.operation_id, p_operation: params.operation, p_line: params.line_id,
+          p_revision: params.expected_revision, p_patch: params.patch,
+          p_instruction_quote: params.instruction_quote, p_explicit: params.explicit_user_request,
+        })
+        if (error) return NextResponse.json({ error: error.message }, { status: 409 })
+        return ok(data)
+      }
 
       // ─── JOBS ───────────────────────────────────────────────────────────
       case 'list_jobs': {

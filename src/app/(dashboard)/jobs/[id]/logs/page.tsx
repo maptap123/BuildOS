@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LogClient } from '@/components/logs'
+import { PendingLogCards } from '@/components/logs/PendingLogCards'
 
 export default async function JobLogsPage({
   params,
@@ -48,14 +49,17 @@ export default async function JobLogsPage({
   if (!job) notFound()
 
   return (
-    <LogClient
-      jobId={id}
-      initialLogs={logs ?? []}
-      permissions={{
-        can_create: perm.can_create,
-        can_edit:   perm.can_edit,
-        can_delete: perm.can_delete,
-      }}
-    />
+    <>
+      <PendingLogCards jobId={id} />
+      <LogClient
+        jobId={id}
+        initialLogs={logs ?? []}
+        permissions={{
+          can_create: perm.can_create,
+          can_edit:   perm.can_edit,
+          can_delete: perm.can_delete,
+        }}
+      />
+    </>
   )
 }

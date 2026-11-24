@@ -8,6 +8,7 @@ import { useJobs } from '@/hooks/useJobs'
 import { useTagOptions } from '@/hooks/useTagOptions'
 import { useUsers } from '@/hooks/useUsers'
 import { useJobFilterPrefs } from '@/hooks/useJobFilterPrefs'
+import { useKeyboardViewport } from '@/hooks/useKeyboardViewport'
 import { JobStatusBadge } from './JobStatusBadge'
 import type { Job, JobStatus } from '@/types'
 
@@ -29,8 +30,9 @@ interface Props {
 export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJobs }: Props) {
   const router = useRouter()
   const pathname = usePathname()
+  const { viewportHeight, keyboardHeight } = useKeyboardViewport()
   const [search, setSearch] = useState('')
-  const [statuses, setStatuses] = useState<JobStatus[]>([])
+  const [statuses, setStatuses] = useState<JobStatus[]>(['active'])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [activeManager, setActiveManager] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -112,7 +114,11 @@ export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJob
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
-      <div className="fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[88vh]">
+      <div
+        data-testid="job-picker-sheet"
+        className="fixed inset-x-0 z-50 bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[88vh]"
+        style={{ bottom: keyboardHeight, maxHeight: viewportHeight === null ? undefined : viewportHeight * 0.88 }}
+      >
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -137,11 +143,14 @@ export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJob
               onChange={e => setSearch(e.target.value)}
               placeholder="Search jobs…"
               autoFocus
-              className="w-full pl-8 pr-4 py-2 border border-border rounded-lg text-sm text-navy-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
+              className="w-full pl-8 pr-4 py-2 border border-border rounded-lg text-base md:text-sm [@media(pointer:coarse)]:text-base text-navy-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-navy-600"
             />
           </div>
         </div>
 
+        {/* Filters and results share a scroll region so expanded filters cannot
+            crowd results below the keyboard on short/landscape viewports. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {/* Status chips */}
         <div className="flex gap-2 px-4 pb-2 overflow-x-auto shrink-0">
           <button
@@ -269,7 +278,7 @@ export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJob
         )}
 
         {/* Job list */}
-        <div className="overflow-y-auto flex-1 pb-8">
+        <div className="pb-8">
 
           {/* All Jobs */}
           <button
@@ -317,6 +326,7 @@ export function JobPickerSheet({ onClose, currentJobId, onSelect, onSelectAllJob
               </button>
             ))
           )}
+        </div>
         </div>
       </div>
     </>

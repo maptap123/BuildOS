@@ -68,6 +68,7 @@ export function MobileTraditionalLogSheet({ initialJob, onClose, onSaved }: Prop
       // background — the crew doesn't wait, and nothing is lost if signal drops.
       await enqueueLog({
         job_id: job.id,
+        job_name: job.name,
         log_date: todayDate(),
         work_performed: notes.trim() || null,
         cost_code: costCode.trim() || null,
