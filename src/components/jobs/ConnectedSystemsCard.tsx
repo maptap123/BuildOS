@@ -98,6 +98,10 @@ export function ConnectedSystemsCard({ jobId }: Props) {
       const errors = [json.errors?.quickbooks, json.errors?.sharepoint].filter(Boolean)
       if (errors.length) setMatchError(errors.join(' | '))
       await fetchData()
+      // No confident QuickBooks match (and nothing already linked): open the manual picker.
+      const results: { provider: string; action: string }[] = json.results ?? []
+      const qbMatched = results.some(r => r.provider === 'quickbooks' && r.action === 'linked')
+      if (!qbMatched && qbLinked.length === 0 && !json.errors?.quickbooks && data?.can_manage_quickbooks) setSetup(true)
     } catch (err) {
       setMatchError(err instanceof Error ? err.message : 'Auto-match failed')
     } finally {
