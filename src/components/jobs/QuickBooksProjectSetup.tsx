@@ -21,6 +21,7 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [searched, setSearched] = useState(false)
   const pending = useRef(false)
   const sequence = useRef(0)
   const dialog = useRef<HTMLDivElement>(null)
@@ -48,10 +49,23 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
       if (token !== sequence.current) return
       // Keep the version from opening the dialog: a stale editor must not silently overwrite a newer choice.
       if (projectSearch) setProjects(result.projects ?? [])
-      else { setCustomers(result.customers ?? []); setNotice(result.truncated ? 'First 100 matches. Narrow the homeowner search.' : '') }
+      else {
+        const found = result.customers ?? []
+        setCustomers(found)
+        setSearched(true)
+        setNotice(result.truncated ? 'First 100 matches. Narrow the homeowner search.'
+          : found.length ? `${found.length} homeowner${found.length === 1 ? '' : 's'} found. Choose one in the list below.`
+          : 'No active homeowners match that search. Try the last name or a shorter word. Sub-customers and projects are not listed here.')
+      }
       setCapability(result.capability)
     } catch (e) { if (token === sequence.current) setError(e instanceof Error ? e.message : 'Could not read QuickBooks.') }
     finally { pending.current = false; setBusy(false) }
+  }
+
+  function searchNow() {
+    if (search.trim().length < 2 || version === null) return
+    setParent(''); setProject(''); setProjects([]); setConfirmed(false)
+    void load(`?search=${encodeURIComponent(search.trim())}`, false)
   }
 
   async function save() {
@@ -80,10 +94,10 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
       <h2 className="text-lg font-semibold">QuickBooks project setup</h2>
       <p className="text-sm text-gray-600">Does this homeowner already have a QuickBooks project for this job? Select it below, or create a new project. The BuildOS job is saved separately; a setup failure will not create another job.</p>
       <fieldset disabled={busy} className="space-y-3">
-        <label className="block">Search homeowner<input className={field} value={search} onChange={e => setSearch(e.target.value)} /></label>
-        <button type="button" disabled={search.trim().length < 2 || version === null} onClick={() => { setParent(''); setProject(''); setProjects([]); setConfirmed(false); void load(`?search=${encodeURIComponent(search.trim())}`, false) }} className="border rounded px-3 py-2">Search</button>
-        {notice && <p className="text-sm">{notice}</p>}
-        <label className="block">QuickBooks homeowner<select className={field} value={parent} onChange={e => { setParent(e.target.value); setProject(''); setProjects([]); setConfirmed(false); if (e.target.value) void load(`?customer_id=${e.target.value}`, true) }}><option value="">Select homeowner</option>{customers.map(c => <option key={c.Id} value={c.Id}>{c.DisplayName} (#{c.Id})</option>)}</select></label>
+        <label className="block">Search homeowner<input className={field} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchNow() } }} /></label>
+        <button type="button" disabled={search.trim().length < 2 || version === null} onClick={searchNow} className="border rounded px-3 py-2">Search</button>
+        {notice && <p className="text-sm font-medium text-navy-800">{notice}</p>}
+        <label className="block">QuickBooks homeowner<select className={field} value={parent} onChange={e => { setParent(e.target.value); setProject(''); setProjects([]); setConfirmed(false); if (e.target.value) void load(`?customer_id=${e.target.value}`, true) }}><option value="">{searched ? `Select homeowner (${customers.length} found)` : 'Select homeowner'}</option>{customers.map(c => <option key={c.Id} value={c.Id}>{c.DisplayName} (#{c.Id})</option>)}</select></label>
         <label className="flex gap-2"><input type="radio" name="qb-project-mode" checked={mode === 'existing'} onChange={() => { setMode('existing'); setConfirmed(false) }} />Use an existing QuickBooks project</label>
         {mode === 'existing' && <label className="block">Existing QuickBooks project<select className={field} disabled={!parent} value={project} onChange={e => setProject(e.target.value)}><option value="">Select project</option>{projects.map(p => <option key={p.Id} value={p.Id}>{p.DisplayName} (#{p.Id})</option>)}</select>{parent && !projects.length && <span className="text-sm">No active projects returned for this homeowner. Generic sub-customers are not projects.</span>}</label>}
         <label className="flex gap-2"><input type="radio" name="qb-project-mode" checked={mode === 'new'} onChange={() => setMode('new')} />Create a new QuickBooks project</label>
