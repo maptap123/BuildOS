@@ -24,6 +24,31 @@ async function activeJobsForParent(parentId: string): Promise<QBCustomerResult[]
   }
 }
 
+
+type ApprovedResult = { qbId: string } | { error: string; status: number }
+
+/**
+ * One approved QuickBooks write: propose (validated, logged), claim as the acting approver, execute.
+ * Every write from this window leaves a row in qb_change_requests.
+ */
+async function writeApproved(admin: ReturnType<typeof createAdminClient>, userId: string, params: Record<string, unknown>): Promise<ApprovedResult> {
+  const proposed = await proposeQuickBooksChange(admin, userId, params, { notify: false })
+  if (!proposed.ok) return { error: proposed.error ?? 'Could not prepare the QuickBooks change.', status: 400 }
+  const requestId = proposed.data?.request_id as string
+  const claimed = await admin.rpc('claim_qb_change', { p_id: requestId, p_actor: userId })
+  if (claimed.error || !claimed.data) return { error: claimed.error?.message ?? 'Could not approve the change.', status: 409 }
+  try {
+    const done = await executeApprovedChange(admin, claimed.data as ChangeRow)
+    await admin.from('qb_change_requests').update({ status: 'executed', result: done.result, result_qb_id: done.qbId, error: null }).eq('id', requestId)
+    if (!done.qbId) throw new Error('QuickBooks did not return an ID')
+    return { qbId: done.qbId }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Unknown error'
+    await admin.from('qb_change_requests').update({ status: 'failed', error: msg }).eq('id', requestId)
+    return { error: `QuickBooks did not make the change: ${msg}`, status: 502 }
+  }
+}
+
 const isTopLevel = (c: QBCustomerResult | null) => !!c && c.Active && !c.Job && !c.IsProject && !c.ParentRef
 
 async function requireAdmin(id: string) {
@@ -35,7 +60,7 @@ async function requireAdmin(id: string) {
   if (!officeUser?.is_active) return { response: NextResponse.json({ error: 'Active office administrator access required.' }, { status: 403 }) }
   const { data: perm } = await admin.from('user_permissions').select('can_manage').eq('user_id', user.id).eq('module', 'admin').single()
   if (!perm?.can_manage) return { response: NextResponse.json({ error: 'Office administrator access required.' }, { status: 403 }) }
-  const { data: job, error } = await admin.from('jobs').select('id, qb_link_version, qb_customer_id, qb_parent_customer_id').eq('id', id).single()
+  const { data: job, error } = await admin.from('jobs').select('id, name, client_name, qb_link_version, qb_customer_id, qb_parent_customer_id').eq('id', id).single()
   if (error || !job) return { response: NextResponse.json({ error: 'Job not found or project setup migration is not installed.' }, { status: 404 }) }
   return { user, admin, job, userName: officeUser.full_name as string | null }
 }
@@ -73,51 +98,51 @@ export async function POST(req: Request, { params }: Context) {
   // same machinery as Fixer's proposals: validated, claimed by an approver, then executed by approvedWrite.
   // Clicking the confirmed button here IS the approval, so it is limited to people in qb_approvers.
   if (body?.action === 'create') {
-    if (body.confirmed !== true || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 100 || !/^\d+$/.test(body.customer_id ?? '') || !Number.isSafeInteger(body.version) || body.version < 0) {
+    const newCustomer = typeof body.new_customer_name === 'string' ? body.new_customer_name.trim() : ''
+    const hasParent = /^\d+$/.test(body.customer_id ?? '')
+    if (body.confirmed !== true || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 100 || (!hasParent && !newCustomer) || newCustomer.length > 100 || (hasParent && newCustomer) || !Number.isSafeInteger(body.version) || body.version < 0) {
       return NextResponse.json({ error: 'Confirm the exact new job name and homeowner before creating it.' }, { status: 400 })
     }
     if (!await isQuickBooksApprover(admin, user.id)) {
-      return NextResponse.json({ error: 'Only QuickBooks approvers (August, Lisa, Jason, Evelyn) can create a job in QuickBooks. Ask one of them, or ask Fixer to propose it.' }, { status: 403 })
+      return NextResponse.json({ error: 'Only QuickBooks approvers (August, Lisa, Jason, Evelyn) can create in QuickBooks. Ask one of them, or ask Fixer to propose it.' }, { status: 403 })
     }
+    let createdHomeowner: string | null = null
+    const fail = (msg: string, status: number) => NextResponse.json({ error: createdHomeowner ? `${msg} The homeowner WAS created in QuickBooks (#${createdHomeowner}); search for them and finish from there.` : msg }, { status })
     try {
-      const parent = await getQuickBooksCustomer(body.customer_id)
-      if (!isTopLevel(parent)) return NextResponse.json({ error: 'Choose an active homeowner, not a sub-customer or project.' }, { status: 400 })
       const name = body.name.trim()
+      const reason = 'Created from the job\'s QuickBooks setup window'
+      let parentId: string
+      let parentName: string
+
+      if (newCustomer) {
+        // Homeowner is not in QuickBooks yet: create them first (a second logged, approved write).
+        const made = await writeApproved(admin, user.id, { entity: 'customer', action: 'create', job_id: id, data: { DisplayName: newCustomer }, reason, requested_by_name: userName ?? 'BuildOS user' })
+        if ('error' in made) return fail(made.error, made.status)
+        parentId = made.qbId; parentName = newCustomer; createdHomeowner = made.qbId
+      } else {
+        const parent = await getQuickBooksCustomer(body.customer_id)
+        if (!isTopLevel(parent)) return NextResponse.json({ error: 'Choose an active homeowner, not a sub-customer or project.' }, { status: 400 })
+        parentId = parent!.Id; parentName = parent!.DisplayName
+      }
 
       // Same name already under this homeowner: link to it instead of making a twin.
-      const existing = (await activeJobsForParent(parent!.Id)).filter(p => p.DisplayName.toLocaleLowerCase() === name.toLocaleLowerCase())
-      if (existing.length > 1) return NextResponse.json({ error: 'Several jobs match that name. Select the existing job instead.' }, { status: 409 })
+      const existing = createdHomeowner ? [] : (await activeJobsForParent(parentId)).filter(p => p.DisplayName.toLocaleLowerCase() === name.toLocaleLowerCase())
+      if (existing.length > 1) return fail('Several jobs match that name. Select the existing job instead.', 409)
       let newId: string
       if (existing.length === 1) {
         newId = existing[0].Id
       } else {
-        const claim = await admin.rpc('claim_job_quickbooks_creation', { p_job_id: id, p_version: body.version, p_parent_id: parent!.Id, p_name: name, p_actor: user.id })
-        if (claim.error || !claim.data) return NextResponse.json({ error: 'Creation was already attempted for this job and name, or the connection changed. Search the existing jobs before retrying; nothing was created twice.' }, { status: 409 })
-        const proposed = await proposeQuickBooksChange(admin, user.id, {
-          entity: 'customer', action: 'create', job_id: id,
-          data: { DisplayName: name, Job: true, BillWithParent: true, ParentRef: { value: parent!.Id } },
-          reason: 'Created from the job\'s QuickBooks setup window', requested_by_name: userName ?? 'BuildOS user',
-        }, { notify: false })
-        if (!proposed.ok) return NextResponse.json({ error: proposed.error ?? 'Could not prepare the QuickBooks job.' }, { status: 400 })
-        const requestId = proposed.data?.request_id as string
-        const approved = await admin.rpc('claim_qb_change', { p_id: requestId, p_actor: user.id })
-        if (approved.error || !approved.data) return NextResponse.json({ error: approved.error?.message ?? 'Could not approve the change.' }, { status: 409 })
-        try {
-          const done = await executeApprovedChange(admin, approved.data as ChangeRow)
-          await admin.from('qb_change_requests').update({ status: 'executed', result: done.result, result_qb_id: done.qbId, error: null }).eq('id', requestId)
-          if (!done.qbId) throw new Error('QuickBooks did not return an ID for the new job')
-          newId = done.qbId
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : 'Unknown error'
-          await admin.from('qb_change_requests').update({ status: 'failed', error: msg }).eq('id', requestId)
-          return NextResponse.json({ error: `QuickBooks did not create the job: ${msg}` }, { status: 502 })
-        }
+        const claim = await admin.rpc('claim_job_quickbooks_creation', { p_job_id: id, p_version: body.version, p_parent_id: parentId, p_name: name, p_actor: user.id })
+        if (claim.error || !claim.data) return fail('Creation was already attempted for this job and name, or the connection changed. Search the existing jobs before retrying; nothing was created twice.', 409)
+        const made = await writeApproved(admin, user.id, { entity: 'customer', action: 'create', job_id: id, data: { DisplayName: name, Job: true, BillWithParent: true, ParentRef: { value: parentId } }, reason, requested_by_name: userName ?? 'BuildOS user' })
+        if ('error' in made) return fail(made.error, made.status)
+        newId = made.qbId
       }
-      const { data, error } = await admin.rpc('set_job_quickbooks_project', { p_job_id: id, p_version: body.version, p_parent_id: parent!.Id, p_project_id: newId, p_name: name, p_actor: user.id, p_graphql_id: null })
-      if (error) return NextResponse.json({ error: `The job exists in QuickBooks (#${newId}) but BuildOS did not save the connection. Reopen this window and select it from the existing jobs.` }, { status: 409 })
-      return NextResponse.json({ ok: true, version: data, qb_id: newId })
+      const { data, error } = await admin.rpc('set_job_quickbooks_project', { p_job_id: id, p_version: body.version, p_parent_id: parentId, p_project_id: newId, p_name: name, p_actor: user.id, p_graphql_id: null })
+      if (error) return fail(`The job exists in QuickBooks (#${newId}) under ${parentName} but BuildOS did not save the connection. Reopen this window and select it from the existing jobs.`, 409)
+      return NextResponse.json({ ok: true, version: data, qb_id: newId, homeowner_created: !!createdHomeowner })
     } catch {
-      return NextResponse.json({ error: 'QuickBooks could not be reached, so nothing was confirmed. Search the existing jobs before trying again.' }, { status: 502 })
+      return fail('QuickBooks could not be reached, so nothing more was confirmed. Search the existing jobs before trying again.', 502)
     }
   }
 

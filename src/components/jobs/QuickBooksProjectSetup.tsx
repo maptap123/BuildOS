@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 type Option = { Id: string; DisplayName: string }
-type Result = { job: { qb_link_version: number }; customers?: Option[]; projects?: Option[]; canCreate?: boolean; truncated?: boolean }
+type Result = { job: { qb_link_version: number; name?: string; client_name?: string | null }; customers?: Option[]; projects?: Option[]; canCreate?: boolean; truncated?: boolean }
 
 /** Only the creation checkbox authorizes a QuickBooks write (a new job under the homeowner). Selecting an existing job writes BuildOS only. */
 export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDone: (linked: boolean) => void }) {
@@ -18,6 +18,8 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
   const [mode, setMode] = useState('existing')
   const [name, setName] = useState('')
   const [confirmed, setConfirmed] = useState(false)
+  const [newHomeowner, setNewHomeowner] = useState(false)
+  const [homeownerName, setHomeownerName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
@@ -32,7 +34,11 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
     fetch(endpoint, { cache: 'no-store' }).then(async r => {
       const data = await r.json()
       if (!r.ok) throw new Error(data.error ?? 'Could not load QuickBooks setup.')
-      if (alive) { setVersion(data.job.qb_link_version); setCanCreate(!!data.canCreate) }
+      if (alive) {
+        setVersion(data.job.qb_link_version); setCanCreate(!!data.canCreate)
+        // Prefill from the BuildOS job so a brand-new homeowner and job are one click away.
+        setHomeownerName(h => h || data.job.client_name || ''); setName(n => n || data.job.name || '')
+      }
     }).catch(e => { if (alive) setError(e.message) })
     const invalidate = () => { sequence.current++ }
     return () => { alive = false; invalidate() }
@@ -72,7 +78,7 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
     if (pending.current || version === null) return
     pending.current = true; setBusy(true); setError(null)
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mode === 'existing' ? { action: 'select', customer_id: parent, project_id: project, version } : { action: 'create', customer_id: parent, name: name.trim(), confirmed, version }) })
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mode === 'existing' ? { action: 'select', customer_id: parent, project_id: project, version } : { action: 'create', ...(newHomeowner ? { new_customer_name: homeownerName.trim() } : { customer_id: parent }), name: name.trim(), confirmed, version }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? 'Connection was not saved.')
       onDone(true)
@@ -97,20 +103,24 @@ export function QuickBooksProjectSetup({ jobId, onDone }: { jobId: string; onDon
         <label className="block">Search homeowner<input className={field} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchNow() } }} /></label>
         <button type="button" disabled={search.trim().length < 2 || version === null} onClick={searchNow} className="border rounded px-3 py-2">Search</button>
         {notice && <p className="text-sm font-medium text-navy-800">{notice}</p>}
-        <label className="block">QuickBooks homeowner<select className={field} value={parent} onChange={e => { setParent(e.target.value); setProject(''); setProjects([]); setConfirmed(false); if (e.target.value) void load(`?customer_id=${e.target.value}`, true) }}><option value="">{searched ? `Select homeowner (${customers.length} found)` : 'Select homeowner'}</option>{customers.map(c => <option key={c.Id} value={c.Id}>{c.DisplayName} (#{c.Id})</option>)}</select></label>
-        <label className="flex gap-2"><input type="radio" name="qb-project-mode" checked={mode === 'existing'} onChange={() => { setMode('existing'); setConfirmed(false) }} />Use an existing QuickBooks job</label>
+        <label className="block">QuickBooks homeowner<select className={field} disabled={newHomeowner} value={parent} onChange={e => { setParent(e.target.value); setProject(''); setProjects([]); setConfirmed(false); if (e.target.value) void load(`?customer_id=${e.target.value}`, true) }}><option value="">{searched ? `Select homeowner (${customers.length} found)` : 'Select homeowner'}</option>{customers.map(c => <option key={c.Id} value={c.Id}>{c.DisplayName} (#{c.Id})</option>)}</select></label>
+        <label className="flex gap-2"><input type="checkbox" checked={newHomeowner} onChange={e => { setNewHomeowner(e.target.checked); setConfirmed(false); if (e.target.checked) { setMode('new'); setParent(''); setProject(''); setProjects([]) } }} />This homeowner is not in QuickBooks yet. Create them.</label>
+        {newHomeowner && <label className="block">New homeowner name (as it should appear in QuickBooks)<input className={field} maxLength={100} value={homeownerName} onChange={e => { setHomeownerName(e.target.value); setConfirmed(false) }} /></label>}
+        <label className="flex gap-2"><input type="radio" name="qb-project-mode" disabled={newHomeowner} checked={mode === 'existing'} onChange={() => { setMode('existing'); setConfirmed(false) }} />Use an existing QuickBooks job</label>
         {mode === 'existing' && <label className="block">Existing QuickBooks job<select className={field} disabled={!parent} value={project} onChange={e => setProject(e.target.value)}><option value="">Select job</option>{projects.map(p => <option key={p.Id} value={p.Id}>{p.DisplayName} (#{p.Id})</option>)}</select>{parent && !projects.length && <span className="text-sm">No active jobs found under this homeowner. Choose "Create a new QuickBooks job" to add one.</span>}</label>}
         <label className="flex gap-2"><input type="radio" name="qb-project-mode" checked={mode === 'new'} onChange={() => setMode('new')} />Create a new QuickBooks job</label>
         {mode === 'new' && <>
           {!canCreate && <p className="text-sm text-amber-700">Only QuickBooks approvers (August, Lisa, Jason, Evelyn) can create a job in QuickBooks. Ask one of them, or ask Fixer to propose it.</p>}
           <label className="block">New job name<input className={field} maxLength={100} value={name} onChange={e => { setName(e.target.value); setConfirmed(false) }} /></label>
-          <label className="flex gap-2"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />I confirm creating the job “{name.trim() || 'new job'}” in QuickBooks under “{selectedParent?.DisplayName ?? 'select homeowner'}”. This writes a new job to QuickBooks.</label>
+          <label className="flex gap-2"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />{newHomeowner
+            ? <>I confirm creating the homeowner “{homeownerName.trim() || 'new homeowner'}” and the job “{name.trim() || 'new job'}” in QuickBooks. This writes a new customer and a new job to QuickBooks.</>
+            : <>I confirm creating the job “{name.trim() || 'new job'}” in QuickBooks under “{selectedParent?.DisplayName ?? 'select homeowner'}”. This writes a new job to QuickBooks.</>}</label>
         </>}
       </fieldset>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="flex gap-3">
         <button type="button" disabled={busy} onClick={() => onDone(false)} className="border rounded px-3 py-2">Set up later</button>
-        <button type="button" disabled={busy || version === null || !parent || (mode === 'existing' ? !project : !confirmed || !name.trim() || !canCreate)} onClick={save} className="rounded bg-navy-800 text-white px-3 py-2 disabled:opacity-50">{busy ? 'Working…' : mode === 'existing' ? 'Save job connection' : 'Create job and connect'}</button>
+        <button type="button" disabled={busy || version === null || (!parent && !newHomeowner) || (newHomeowner && !homeownerName.trim()) || (mode === 'existing' ? !project : !confirmed || !name.trim() || !canCreate)} onClick={save} className="rounded bg-navy-800 text-white px-3 py-2 disabled:opacity-50">{busy ? 'Working…' : mode === 'existing' ? 'Save job connection' : newHomeowner ? 'Create homeowner and job' : 'Create job and connect'}</button>
       </div>
     </div>
   </div>
