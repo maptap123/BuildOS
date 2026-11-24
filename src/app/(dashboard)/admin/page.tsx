@@ -87,6 +87,9 @@ export default async function AdminPage({
           {qbSettings?.is_connected ? 'Reconnect' : 'Connect'}
         </a>
       </div>
+      <a href="/quickbooks-approvals" className="block bg-white border border-border rounded-xl p-4 text-sm font-semibold text-navy-900 hover:bg-gray-50">
+        QuickBooks approvals <span className="font-normal text-gray-500">— changes Fixer proposed, waiting for you</span>
+      </a>
 
       <AdminUsersClient
         currentUserId={user.id}

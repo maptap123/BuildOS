@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { notify, getJobNotifyTargets } from '@/lib/notifications'
 import { findLinePricing } from '@/lib/estimates/linePricing'
 import { buildAiEstimateLines } from '@/lib/estimates/aiLines'
+import { proposeQuickBooksChange, listQuickBooksChangeRequests } from '@/lib/quickbooks/changeRequests'
 
 // ─── Tool schemas for Claude ──────────────────────────────────────────────────
 
@@ -274,6 +275,36 @@ export const HERMES_TOOLS: Anthropic.Tool[] = [
         modules: { type: 'array', items: { type: 'string', enum: ['jobs','tasks','schedule'] }, description: 'Which modules to search (default: all)' },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'propose_quickbooks_change',
+    description: 'PROPOSE a change to QuickBooks: create/edit a customer or job, create/edit/delete/void/send an invoice or estimate. This does NOT change QuickBooks. It queues the change; August, Lisa, Jason or Evelyn must approve it in BuildOS first. Always look the record up (read QuickBooks) before proposing an edit, never guess IDs. entity: customer|invoice|estimate. action: create|update|delete|void|send|deactivate. Customers cannot be deleted, use deactivate. A job is a customer with Job:true and ParentRef:{value:<parent customer ID>}. entity_id is required for everything except create. data holds ONLY the fields to set (unknown fields are rejected). For invoices/estimates data needs CustomerRef:{value}, and Line:[{Description, Amount, DetailType:"SalesItemLineDetail", SalesItemLineDetail:{ItemRef:{value}, Qty, UnitPrice}}]; on update, Line replaces ALL existing lines, so send the full list. send emails the invoice/estimate (optional send_to). Tell the person it is waiting for approval; never say it was done.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        entity:    { type: 'string', enum: ['customer','invoice','estimate'] },
+        action:    { type: 'string', enum: ['create','update','delete','void','send','deactivate'] },
+        entity_id: { type: 'string', description: 'QuickBooks numeric ID of the existing record (not for create)' },
+        data:      { type: 'object', description: 'Fields to set, for create or update only' },
+        send_to:   { type: 'string', description: 'Email address, for action send only' },
+        reason:    { type: 'string', description: 'Why, in one sentence. Shown to the approver.' },
+        requested_by_name: { type: 'string', description: 'Who asked for it, if known' },
+        job_id:    { type: 'string', description: 'BuildOS job UUID this relates to, if any' },
+      },
+      required: ['entity', 'action'],
+    },
+  },
+  {
+    name: 'list_quickbooks_change_requests',
+    description: 'Check the status of QuickBooks changes you proposed: pending, executed, failed, rejected or expired. Pass request_id for one, or status to filter.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        request_id: { type: 'string' },
+        status: { type: 'string', enum: ['pending','approving','executed','failed','rejected','expired'] },
+        limit: { type: 'number' },
+      },
     },
   },
   {
@@ -701,6 +732,18 @@ export async function executeTool(
         results.schedule = data ?? []
       }
       return { results, query: q }
+    }
+
+    case 'propose_quickbooks_change': {
+      if (!await hasPerm(admin, userId, 'finance', 'can_view')) return { error: 'Permission denied' }
+      const r = await proposeQuickBooksChange(admin, userId, params)
+      return r.ok ? r.data : { error: r.error, problems: r.problems }
+    }
+
+    case 'list_quickbooks_change_requests': {
+      if (!await hasPerm(admin, userId, 'finance', 'can_view')) return { error: 'Permission denied' }
+      const r = await listQuickBooksChangeRequests(admin, params)
+      return r.ok ? r.data : { error: r.error }
     }
 
     case 'navigate_to': {

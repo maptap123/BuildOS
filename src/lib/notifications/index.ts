@@ -16,6 +16,7 @@ export type NotificationType =
   | 'schedule_confirmed'
   | 'schedule_declined'
   | 'schedule_question'
+  | 'qb_change_pending'
 
 /**
  * Types that get a text as well as the in-app bell: something is stuck and the

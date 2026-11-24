@@ -31,7 +31,7 @@ export interface QBTokens {
 
 // ─── URL helpers ─────────────────────────────────────────────────────────────
 
-function baseUrl(realmId: string): string {
+export function baseUrl(realmId: string): string {
   const env = process.env.QB_ENVIRONMENT
   const host =
     env === 'sandbox'

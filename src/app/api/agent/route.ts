@@ -20,6 +20,7 @@ import { canonicalJson } from '@/lib/hermes/requestPayload'
 import { findLinePricing } from '@/lib/estimates/linePricing'
 import { mergeCostTypeRows } from '@/lib/estimates/costBreakdown'
 import { buildAiEstimateLines } from '@/lib/estimates/aiLines'
+import { proposeQuickBooksChange, listQuickBooksChangeRequests } from '@/lib/quickbooks/changeRequests'
 
 // The gateway calls back into this route for every tool an estimating turn needs, and
 // all of those round-trips run inside the caller's own window. Left unset it ran on the
@@ -72,6 +73,10 @@ export const maxDuration = 60
  *   list_daily_logs        { job_id, limit? }
  *   create_daily_log       { job_id, log_date?, work_performed, weather_summary?, manpower_count?, delays?, safety_notes?, inspection_notes? }
  *   search_across_jobs     { query, modules? }
+ *
+ * QuickBooks changes — propose only; an approver approves in BuildOS before anything is sent:
+ *   propose_quickbooks_change        { entity, action, entity_id?, data?, send_to?, reason?, requested_by_name?, job_id? }
+ *   list_quickbooks_change_requests  { request_id?, status?, limit? }
  */
 export async function POST(request: Request) {
   const admin = createAdminClient()
@@ -910,6 +915,18 @@ export async function POST(request: Request) {
         })
       }
 
+      case 'propose_quickbooks_change': {
+        // Fixer can only PROPOSE. The change waits for an approver in qb_approvers; BuildOS
+        // sends it to QuickBooks after they approve. See lib/quickbooks/changeRequests.ts.
+        const r = await proposeQuickBooksChange(admin, user!.id, params)
+        return r.ok ? ok(r.data) : NextResponse.json({ error: r.error, problems: r.problems }, { status: 400 })
+      }
+
+      case 'list_quickbooks_change_requests': {
+        const r = await listQuickBooksChangeRequests(admin, params)
+        return r.ok ? ok(r.data) : NextResponse.json({ error: r.error }, { status: 500 })
+      }
+
       default:
         return NextResponse.json({
           error: `Unknown tool: ${tool}`,
@@ -923,6 +940,7 @@ export async function POST(request: Request) {
             'list_daily_logs','create_daily_log',
             'find_comparable_estimates','find_line_pricing','add_estimate_lines',
             'search_across_jobs',
+            'propose_quickbooks_change','list_quickbooks_change_requests',
           ],
         }, { status: 400 })
     }
