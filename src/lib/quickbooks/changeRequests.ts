@@ -29,6 +29,7 @@ export async function proposeQuickBooksChange(
   admin: SupabaseClient,
   requestedBy: string,
   params: Record<string, unknown>,
+  opts: { notify?: boolean } = {},
 ): Promise<ProposeResult> {
   const v = validateChange({
     entity: params.entity, action: params.action, entity_id: params.entity_id,
@@ -116,7 +117,7 @@ export async function proposeQuickBooksChange(
   }).select('id').single()
   if (error || !row) return { ok: false, error: `Could not save the proposal: ${error?.message ?? 'unknown error'}` }
 
-  const { data: approvers } = await admin.from('qb_approvers').select('user_id')
+  const { data: approvers } = opts.notify === false ? { data: [] } : await admin.from('qb_approvers').select('user_id')
   await notify({
     admin: admin as never, userIds: (approvers ?? []).map(a => a.user_id),
     type: 'qb_change_pending', title: 'QuickBooks change needs approval',
