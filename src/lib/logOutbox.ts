@@ -40,7 +40,16 @@ interface OutboxItem {
   droppedPhotos: number
   /** Permanent failure on the log itself (validation/permission) — needs a human */
   failedReason?: string
+  /** Last transient error (network/server) — item is still retrying */
+  lastError?: string
   created_at: string
+}
+
+export interface OutboxSummary {
+  pending: number
+  photos: number
+  failed: number
+  message: string | null
 }
 
 const DB_NAME = 'buildos_outbox'
@@ -129,10 +138,10 @@ function newId() {
 }
 
 /** Downscale + re-encode to JPEG. Falls back to the original if the browser can't decode it. */
-async function shrinkPhoto(blob: Blob): Promise<Blob> {
+async function shrinkPhoto(blob: Blob, maxEdge = MAX_EDGE, quality = JPEG_QUALITY): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' })
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
     const w = Math.round(bitmap.width * scale)
     const h = Math.round(bitmap.height * scale)
     const canvas = document.createElement('canvas')
@@ -142,7 +151,7 @@ async function shrinkPhoto(blob: Blob): Promise<Blob> {
     if (!ctx) return blob
     ctx.drawImage(bitmap, 0, 0, w, h)
     bitmap.close?.()
-    const out = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', JPEG_QUALITY))
+    const out = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', quality))
     // Keep whichever is smaller
     return out && out.size < blob.size ? out : blob
   } catch {
@@ -176,8 +185,8 @@ async function postLog(item: OutboxItem): Promise<string> {
   throw new Error(msg)
 }
 
-async function postPhoto(item: OutboxItem, photo: OutboxPhoto) {
-  const small = await shrinkPhoto(photo.blob)
+async function postPhoto(item: OutboxItem, photo: OutboxPhoto, smaller = false) {
+  const small = smaller ? await shrinkPhoto(photo.blob, 1280, 0.6) : await shrinkPhoto(photo.blob)
   const isJpeg = small.type === 'image/jpeg'
   const base = photo.name.replace(/\.[^.]+$/, '') || 'photo'
   const file = new File([small], `${base}${isJpeg ? '.jpg' : photo.name.match(/\.[^.]+$/)?.[0] ?? ''}`, {
@@ -189,6 +198,8 @@ async function postPhoto(item: OutboxItem, photo: OutboxPhoto) {
   fd.append('file', file)
   const res = await fetch('/api/photos', { method: 'POST', body: fd })
   if (res.ok) return
+  // Too big for the server: retry once, much smaller, before giving up
+  if (res.status === 413 && !smaller) return postPhoto(item, photo, true)
   const body = await res.json().catch(() => ({}))
   const msg = body.error ?? `Error ${res.status}`
   if (res.status === 413 || (res.status >= 400 && res.status < 500 && ![401, 408, 429].includes(res.status))) {
@@ -224,6 +235,31 @@ export async function enqueueLog(input: {
   void processOutbox()
 }
 
+/** What's still sitting on this phone waiting to upload (for a persistent banner). */
+export async function getOutboxSummary(): Promise<OutboxSummary> {
+  const items = await getAllItems()
+  const failedItems = items.filter(i => i.failedReason)
+  const message = failedItems[0]?.failedReason ?? items.find(i => i.lastError)?.lastError ?? null
+  return {
+    pending: items.length,
+    photos: items.reduce((n, i) => n + i.photos.length, 0),
+    failed: failedItems.length,
+    message,
+  }
+}
+
+/** Clear permanent-failure flags and try everything again (user tapped Retry). */
+export async function retryOutbox(): Promise<void> {
+  const items = await getAllItems()
+  for (const item of items) {
+    if (item.failedReason) {
+      item.failedReason = undefined
+      await putItem(item)
+    }
+  }
+  await processOutbox()
+}
+
 let running = false
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -241,13 +277,10 @@ export async function processOutbox(): Promise<void> {
           await putItem(item)
         }
         for (const photo of [...item.photos]) {
-          try {
-            await postPhoto(item, photo)
-          } catch (e) {
-            if (!(e instanceof PermanentError)) throw e
-            item.droppedPhotos++
-          }
+          // Never discard a photo on failure — keep it in the outbox so it can be retried/seen
+          await postPhoto(item, photo)
           item.photos = item.photos.filter(p => p.id !== photo.id)
+          item.lastError = undefined
           await putItem(item)
         }
         await deleteItem(item.id)
@@ -264,6 +297,8 @@ export async function processOutbox(): Promise<void> {
           emit({ kind: 'failed', message: `Log couldn't be sent: ${e.message}` })
         } else {
           needsRetry = true // network / server hiccup — keep everything, try again
+          item.lastError = e instanceof Error ? e.message : 'Upload failed'
+          await putItem(item)
         }
       }
     }
