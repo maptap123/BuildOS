@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { JobStatus } from '@/types'
 
 export function useJobFilterPrefs() {
-  const [defaultStatuses, setDefaultStatuses] = useState<JobStatus[]>([])
+  const [defaultStatuses, setDefaultStatuses] = useState<JobStatus[]>(['active'])
   const [defaultTags, setDefaultTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -24,7 +24,7 @@ export function useJobFilterPrefs() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const f = row.jobs_filter as any
             // Support legacy single-status format { status: '...' }
-            const statuses: JobStatus[] = f.statuses ?? (f.status ? [f.status as JobStatus] : [])
+            const statuses: JobStatus[] = f.statuses ?? (f.status ? [f.status as JobStatus] : ['active'])
             setDefaultStatuses(statuses)
             setDefaultTags(f.tags ?? [])
           }

@@ -7,8 +7,8 @@ import { hasModulePermOrAdmin } from '@/lib/permissions/server'
 type Action = 'can_view' | 'can_create' | 'can_edit' | 'can_delete'
 
 /**
- * Selections rides the Budget permission — allowances and overage change orders are
- * money, and the office users who manage selections already hold it.
+ * Selections has its own permission module (View / Create / Edit). Edit also covers
+ * delete, so can_delete is checked against can_edit's mirrored flag.
  * Returns the user + service-role client, or the response to send back.
  */
 export async function requireSelectionsPerm(
@@ -19,7 +19,7 @@ export async function requireSelectionsPerm(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-  if (!(await hasModulePermOrAdmin(admin, user.id, 'budget', action))) {
+  if (!(await hasModulePermOrAdmin(admin, user.id, 'selections', action))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   return { user, admin }

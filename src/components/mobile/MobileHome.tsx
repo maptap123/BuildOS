@@ -189,7 +189,7 @@ export function MobileHome(_props: Props) {
               </div>
               <div>
                 <p className="font-bold text-[#1b2b4a] text-base leading-tight">Daily Log</p>
-                <p className="text-[#4d6a9a] text-xs mt-0.5">Traditional or AI</p>
+                <p className="text-[#4d6a9a] text-xs mt-0.5">Create or view</p>
               </div>
             </button>
 

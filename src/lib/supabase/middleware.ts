@@ -34,6 +34,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith('/co/') ||
     path.startsWith('/proposals/') ||
     path.startsWith('/appt/') ||
+    path.startsWith('/selections/') ||
     path.startsWith('/auth/') ||
     path === '/welcome'
 

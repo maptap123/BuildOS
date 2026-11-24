@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Check, ExternalLink, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Check, ExternalLink, Pencil, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import type { Selection, SelectionsBoard, SelectionStatus } from '@/types'
 import { Sheet, fmtMoney, inputClass, labelClass } from './Sheet'
 
@@ -43,6 +43,7 @@ export function SelectionDetailSheet({
   const [adding, setAdding] = useState(selection.choices.length === 0 && permissions.can_create)
   const [form, setForm] = useState({ title: '', client_price: '', vendor_id: '', product_url: '', details: '', builder_cost: '' })
   const [selectNew, setSelectNew] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<Overage>(null)
@@ -84,6 +85,43 @@ export function SelectionDetailSheet({
     await settle()
   }
 
+  function startEdit(c: Selection['choices'][number]) {
+    setAdding(false); setError('')
+    setEditingId(c.id)
+    setForm({
+      title: c.title,
+      client_price: String(Number(c.client_price)),
+      vendor_id: c.vendor_id ?? '',
+      product_url: c.product_url ?? '',
+      details: c.details ?? '',
+      builder_cost: c.builder_cost != null ? String(Number(c.builder_cost)) : '',
+    })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setForm({ title: '', client_price: '', vendor_id: '', product_url: '', details: '', builder_cost: '' })
+  }
+
+  async function saveEdit() {
+    if (!editingId) return
+    if (!form.title.trim()) { setError('Name the item'); return }
+    const price = Number(form.client_price.replace(/[$,]/g, '') || 0)
+    if (!Number.isFinite(price)) { setError('Price must be a number'); return }
+    const data = await call(`edit-${editingId}`, `/api/selections/choices/${editingId}`, 'PATCH', {
+      title: form.title,
+      client_price: price,
+      builder_cost: form.builder_cost.replace(/[$,]/g, ''),
+      vendor_id: form.vendor_id,
+      product_url: form.product_url,
+      details: form.details,
+    })
+    if (!data) return
+    setNotice(data.overage)
+    cancelEdit()
+    await settle()
+  }
+
   async function togglePick(choiceId: string, select: boolean) {
     const data = await call(choiceId, `/api/selections/choices/${choiceId}`, 'PATCH', { is_selected: select })
     if (!data) return
@@ -107,6 +145,46 @@ export function SelectionDetailSheet({
       onClose()
     }
   }
+
+  const itemFields = (
+    <>
+      <div>
+        <label className={labelClass}>Item</label>
+        <input
+          autoFocus
+          value={form.title}
+          onChange={e => setForm({ ...form, title: e.target.value })}
+          placeholder="e.g. Delta Trinsic 1-handle, champagne bronze"
+          className={inputClass}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Client price</label>
+          <input inputMode="decimal" value={form.client_price} onChange={e => setForm({ ...form, client_price: e.target.value })} placeholder="$0" className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Our cost (optional)</label>
+          <input inputMode="decimal" value={form.builder_cost} onChange={e => setForm({ ...form, builder_cost: e.target.value })} placeholder="$0" className={inputClass} />
+        </div>
+      </div>
+      <div>
+        <label className={labelClass}>Vendor</label>
+        <select value={form.vendor_id} onChange={e => setForm({ ...form, vendor_id: e.target.value })} className={inputClass}>
+          <option value="">—</option>
+          {board.vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className={labelClass}>Product link</label>
+        <input value={form.product_url} onChange={e => setForm({ ...form, product_url: e.target.value })} placeholder="https://" className={inputClass} />
+      </div>
+      <div>
+        <label className={labelClass}>Details</label>
+        <textarea rows={2} value={form.details} onChange={e => setForm({ ...form, details: e.target.value })} placeholder="Model, finish, size" className={inputClass} />
+      </div>
+    </>
+  )
 
   const draftCo = allowance ? board.changeOrders.find(c => c.allowance_id === allowance.id && c.status === 'draft') : null
 
@@ -214,14 +292,29 @@ export function SelectionDetailSheet({
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-600">Items ({selection.choices.length}{pickedCount ? ` · ${pickedCount} selected` : ''})</p>
             {permissions.can_create && !adding && (
-              <button onClick={() => { setAdding(true); setSelectNew(true) }} className="flex items-center gap-1 text-xs font-semibold text-navy-600">
+              <button onClick={() => { cancelEdit(); setAdding(true); setSelectNew(true) }} className="flex items-center gap-1 text-xs font-semibold text-navy-600">
                 <Plus size={14} /> Add item
               </button>
             )}
           </div>
 
           <div className="space-y-2">
-            {selection.choices.map(c => (
+            {selection.choices.map(c => editingId === c.id ? (
+              <div key={c.id} className="rounded-xl border border-navy-100 bg-navy-50/50 p-3 space-y-3">
+                <p className="text-xs font-bold text-navy-900">Edit item</p>
+                {itemFields}
+                <div className="flex justify-end gap-2">
+                  <button onClick={cancelEdit} className="px-3 py-2 text-sm font-semibold text-gray-600">Cancel</button>
+                  <button
+                    onClick={saveEdit}
+                    disabled={busy === `edit-${c.id}`}
+                    className="px-4 py-2 rounded-xl bg-navy-900 text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    {busy === `edit-${c.id}` ? 'Saving…' : 'Save changes'}
+                  </button>
+                </div>
+              </div>
+            ) : (
               <div
                 key={c.id}
                 className={`rounded-xl border p-3 ${c.is_selected ? 'border-green-500 bg-green-50/60' : 'border-border bg-white'}`}
@@ -259,6 +352,11 @@ export function SelectionDetailSheet({
                         {c.is_selected ? <><Check size={13} /> Selected</> : 'Select'}
                       </button>
                     )}
+                    {permissions.can_edit && (
+                      <button onClick={() => startEdit(c)} aria-label="Edit item" className="flex items-center gap-1 text-xs font-semibold text-navy-600">
+                        <Pencil size={12} /> Edit
+                      </button>
+                    )}
                     {permissions.can_delete && (
                       <button onClick={() => deleteChoice(c.id)} aria-label="Delete choice" className="p-1 text-gray-300 hover:text-red-600">
                         <Trash2 size={14} />
@@ -275,41 +373,7 @@ export function SelectionDetailSheet({
 
           {adding && (
             <div className="mt-3 rounded-xl border border-navy-100 bg-navy-50/50 p-3 space-y-3">
-              <div>
-                <label className={labelClass}>Item</label>
-                <input
-                  autoFocus
-                  value={form.title}
-                  onChange={e => setForm({ ...form, title: e.target.value })}
-                  placeholder="e.g. Delta Trinsic 1-handle, champagne bronze"
-                  className={inputClass}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Client price</label>
-                  <input inputMode="decimal" value={form.client_price} onChange={e => setForm({ ...form, client_price: e.target.value })} placeholder="$0" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Our cost (optional)</label>
-                  <input inputMode="decimal" value={form.builder_cost} onChange={e => setForm({ ...form, builder_cost: e.target.value })} placeholder="$0" className={inputClass} />
-                </div>
-              </div>
-              <div>
-                <label className={labelClass}>Vendor</label>
-                <select value={form.vendor_id} onChange={e => setForm({ ...form, vendor_id: e.target.value })} className={inputClass}>
-                  <option value="">—</option>
-                  {board.vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Product link</label>
-                <input value={form.product_url} onChange={e => setForm({ ...form, product_url: e.target.value })} placeholder="https://" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Details</label>
-                <textarea rows={2} value={form.details} onChange={e => setForm({ ...form, details: e.target.value })} placeholder="Model, finish, size" className={inputClass} />
-              </div>
+              {itemFields}
               <label className="flex items-center gap-2 text-sm text-navy-900">
                 <input type="checkbox" checked={selectNew} onChange={e => setSelectNew(e.target.checked)} className="w-4 h-4 accent-navy-900" />
                 Client selected this (counts toward the allowance)

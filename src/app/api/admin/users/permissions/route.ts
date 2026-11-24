@@ -21,7 +21,11 @@ const MODULES: PermissionModule[] = [
   'admin',
   'ai',
   'owners',
+  'selections',
 ]
+
+// Every module exposes only View / Create / Edit. Edit implies everything else
+// (delete, export, manage); without Edit none of those apply.
 
 const FLAGS = [
   'can_view',
@@ -85,6 +89,11 @@ export async function PATCH(request: Request) {
   for (const flag of FLAGS) {
     updates[flag] = permissions[flag] === true
   }
+
+  updates.can_view = updates.can_view || updates.can_create || updates.can_edit
+  updates.can_delete = updates.can_edit
+  updates.can_export = updates.can_edit
+  updates.can_manage = updates.can_edit
 
   const { data, error } = await admin
     .from('user_permissions')

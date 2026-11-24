@@ -65,9 +65,11 @@ export async function POST(request: Request) {
 
   if (!jobId || !file) return NextResponse.json({ error: 'job_id and file required' }, { status: 400 })
 
-  const storagePath = logId
-    ? `${jobId}/${logId}/${Date.now()}-${file.name}`
-    : `${jobId}/${Date.now()}-${file.name}`
+  // Sanitize the name and add a random suffix: camera files are all called
+  // "image.jpg", and same-millisecond uploads used to collide on the same path.
+  const safeName = (file.name || 'photo.jpg').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80)
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+  const storagePath = logId ? `${jobId}/${logId}/${unique}` : `${jobId}/${unique}`
 
   const arrayBuffer = await file.arrayBuffer()
   const { error: upErr } = await admin.storage

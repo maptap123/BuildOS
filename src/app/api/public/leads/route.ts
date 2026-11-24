@@ -112,8 +112,8 @@ export async function POST(request: Request) {
     return reply({ error: 'Something went wrong. Please call us instead.' }, 500)
   }
 
-  // Website leads are time-sensitive (the site promises a reply within one
-  // business day), so admins get a text as well as the in-app alert.
+  // In-app alert only — no text. Texting admins on every website lead was
+  // turned off at the team's request.
   await notify({
     admin,
     userIds: await getAdminUserIds(admin),
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
     title: `New website lead: ${lead.title}`,
     body: `${clientName} · ${phone}`,
     link: `/leads/${lead.id}`,
-    urgent: true,
+    urgent: false,
   })
 
   return reply({ ok: true }, 201)

@@ -19,6 +19,7 @@ const MODULES: { key: PermissionModule; label: string; helper: string }[] = [
   { key: 'contacts', label: 'Contacts', helper: 'Homeowner, subcontractor, and job contact directory' },
   { key: 'vendors', label: 'Vendors', helper: 'Vendor/supplier directory and records' },
   { key: 'budget', label: 'Budget', helper: 'Job budget lines, actuals, purchase orders, and change orders' },
+  { key: 'selections', label: 'Selections', helper: 'Client picks and allowances' },
   { key: 'finance', label: 'Finance', helper: 'Cross-job finance dashboard and reports' },
   { key: 'profitability', label: 'Profitability', helper: 'Job margin, forecast, variance, and closeout reports' },
   { key: 'estimates', label: 'Estimates', helper: 'Estimate builder, proposals, and homeowner acceptance flow' },
@@ -37,10 +38,13 @@ const FLAGS: { key: PermissionFlag; label: string }[] = [
   { key: 'can_view', label: 'View' },
   { key: 'can_create', label: 'Create' },
   { key: 'can_edit', label: 'Edit' },
-  { key: 'can_delete', label: 'Delete' },
-  { key: 'can_export', label: 'Export' },
-  { key: 'can_manage', label: 'Manage' },
 ]
+
+// Every module shows only View / Create / Edit. Edit implies delete, export and manage.
+function normalizeSimple(p: PermissionPatch): PermissionPatch {
+  const can_view = p.can_view || p.can_create || p.can_edit
+  return { ...p, can_view, can_delete: p.can_edit, can_export: p.can_edit, can_manage: p.can_edit }
+}
 
 const EMPTY_PERMISSION: PermissionPatch = {
   can_view: false,
@@ -141,7 +145,10 @@ export function AdminUsersClient({ currentUserId, initialUsers, initialPermissio
 
     const key = permissionKey(selectedUser.id, module)
     const previous = getPermission(selectedUser.id, module)
-    const next = { ...previous, [flag]: value }
+    let next = { ...previous, [flag]: value }
+    // Unchecking View takes Create/Edit with it; checking them turns View on.
+    if (flag === 'can_view' && !value) next = { ...next, can_create: false, can_edit: false }
+    next = normalizeSimple(next)
 
     setPermissions(current => ({ ...current, [key]: next }))
     setSavingKey(`${key}:${flag}`)

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useActiveJob } from '@/contexts/ActiveJobContext'
+import { useKeyboardViewport } from '@/hooks/useKeyboardViewport'
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge'
 import type { JobStatus, TimeEntry } from '@/types'
 
@@ -264,6 +265,7 @@ export function TimeClockClient({
 }: Props) {
   // Active job context — shared with the layout picker
   const { activeJob, activeJobId, setActiveJob } = useActiveJob()
+  const { keyboardHeight } = useKeyboardViewport()
 
   const [entries, setEntries] = useState<EntryWithJob[]>(initialEntries)
   const [step, setStep] = useState<Step>(() =>
@@ -559,7 +561,12 @@ export function TimeClockClient({
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-lg mx-auto space-y-4 pb-12">
+    <div
+      className="max-w-lg mx-auto space-y-4 pb-12"
+      // iOS keeps the layout viewport tall: reserve its obscured bottom area
+      // so the inline picker can still scroll fully above the keyboard.
+      style={keyboardHeight > 0 ? { paddingBottom: keyboardHeight + 48 } : undefined}
+    >
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between pt-1">
